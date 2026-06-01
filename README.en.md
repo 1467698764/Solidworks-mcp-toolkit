@@ -125,6 +125,13 @@ tools/solidworks_codex/mcp/server.cjs
 
 This repository does not edit your global Codex config automatically.
 
+## License
+
+This project uses a custom non-commercial license. Personal learning, research,
+evaluation, and non-commercial modification are allowed. Resale, paid hosting,
+commercial bundling, and commercial CAD automation / MCP / AI-agent services
+require separate written permission from the copyright holder. See `LICENSE`.
+
 ## Documentation
 
 - Usage guide: `docs/solidworks-codex-usage.md`

@@ -1,21 +1,41 @@
-MIT License
+﻿SolidWorks Codex MCP Non-Commercial License
+Version 1.0
 
 Copyright (c) 2026 Alphahui
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+This repository and its contents are provided for personal learning, research,
+evaluation, and other non-commercial use only.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+Permission is granted, free of charge, to use, copy, inspect, modify, and create
+private derivative works from this software for non-commercial purposes, subject
+to the conditions below.
+
+You may not, without prior written permission from the copyright holder:
+
+1. sell, rent, sublicense, host, or otherwise provide this software or derivative
+   works as a paid product or paid service;
+2. use this software or derivative works to provide commercial SolidWorks,
+   CAD automation, MCP, AI-agent, consulting, integration, SaaS, or support
+   services;
+3. bundle this software or derivative works into a commercial product;
+4. remove or obscure copyright, license, or attribution notices;
+5. imply endorsement by the copyright holder.
+
+Non-commercial sharing of modified versions is allowed only if this license and
+all copyright notices are preserved and the modified work is clearly marked as
+modified.
+
+This license applies only to this repository's original content. Third-party
+software, dependencies, examples, referenced projects, and generated outputs may
+be governed by their own licenses.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL THE COPYRIGHT
+HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER IN AN
+ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT OF, OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+For commercial licensing, resale, paid hosting, paid integration, or other use
+outside the scope above, contact the copyright holder for separate written
+permission.

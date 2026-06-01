@@ -125,6 +125,10 @@ tools/solidworks_codex/mcp/server.cjs
 
 本仓库不会自动修改你的全局 Codex 配置。
 
+## 许可证
+
+本项目使用自定义非商业许可证：允许个人学习、研究、评估和非商业修改；未经作者书面许可，不允许转售、付费托管、打包进商业产品，或用于提供商业 CAD 自动化 / MCP / AI-agent 服务。详见 `LICENSE`。
+
 ## 文档
 
 - 使用指南：`docs/solidworks-codex-usage.md`

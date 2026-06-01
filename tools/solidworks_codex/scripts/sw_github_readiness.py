@@ -32,7 +32,7 @@ def main() -> None:
 
     checks = {
         "root_readme": check_contains("README.md", ["practical SolidWorks MCP", "35", "model-understand", "report-context", "handoff-bundle", "tool-catalog", "audit"]),
-        "license": {"ok": exists("LICENSE"), "path": "LICENSE"},
+        "license": check_contains("LICENSE", ["Non-Commercial License", "non-commercial use only", "sell, rent, sublicense", "commercial licensing"]),
         "install_script": check_contains("tools/solidworks_codex/install.ps1", ["CheckOnly", "mcp", "preflight"]),
         "mcp_config_example": check_contains("examples/codex-mcp-config.example.toml", ["mcp_servers", "server.cjs"]),
         "ci_workflow": check_contains(".github/workflows/solidworks-codex-offline.yml", ["unittest", "py_compile", "node --check", "sw_github_readiness.py"]),

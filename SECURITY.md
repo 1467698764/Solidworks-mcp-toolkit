@@ -2,6 +2,13 @@
 
 This project controls local SolidWorks through a conservative wrapper. Treat all CAD files as valuable source data.
 
+## License boundary
+
+This repository is not MIT-licensed. It uses a custom non-commercial license.
+Commercial resale, paid hosting, commercial bundling, and paid CAD automation /
+MCP / AI-agent services require separate written permission from the copyright
+holder. See `LICENSE`.
+
 ## Safety model
 
 - Read-only inspection is preferred before writes.
