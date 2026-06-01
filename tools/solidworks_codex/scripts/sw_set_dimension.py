@@ -92,6 +92,15 @@ def open_model_if_requested(sw: Any, path: str | None) -> Any:
     return model
 
 
+
+def save_model(model: Any) -> dict[str, Any]:
+    pythoncom_mod, win32_client = require_pywin32()
+    errors = win32_client.VARIANT(pythoncom_mod.VT_BYREF | pythoncom_mod.VT_I4, 0)
+    warnings = win32_client.VARIANT(pythoncom_mod.VT_BYREF | pythoncom_mod.VT_I4, 0)
+    ok = model.Save3(1, errors, warnings)
+    return {"ok": bool(ok), "errors": getattr(errors, "value", errors), "warnings": getattr(warnings, "value", warnings)}
+
+
 def set_dimension(model: Any, dimension_name: str, value_m: float, save: bool) -> dict[str, Any]:
     param = read_member(model, "Parameter", dimension_name)
     if param is None or isinstance(param, dict):
@@ -104,7 +113,7 @@ def set_dimension(model: Any, dimension_name: str, value_m: float, save: bool) -
 
     save_result: Any = None
     if save:
-        save_result = read_member(model, "Save3", 1, 0, 0)
+        save_result = save_model(model)
 
     return {
         "dimension": dimension_name,

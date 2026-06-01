@@ -39,6 +39,21 @@ def val(value: Any) -> Any:
     return str(value)
 
 
+
+def json_safe(value: Any) -> Any:
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if hasattr(value, "_oleobj_"):
+        return str(value)
+    if isinstance(value, list):
+        return [json_safe(v) for v in value]
+    if isinstance(value, tuple):
+        return [json_safe(v) for v in value]
+    if isinstance(value, dict):
+        return {str(k): json_safe(v) for k, v in value.items()}
+    return str(value)
+
+
 def read(obj: Any, name: str, *args: Any) -> Any:
     try:
         member = getattr(obj, name)
@@ -120,6 +135,7 @@ def main() -> None:
     }
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
+    result = json_safe(result)
     out.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(result, ensure_ascii=False, indent=2))
 

@@ -89,6 +89,15 @@ def open_or_active(sw: Any, model_path: str | None) -> Any:
     return model
 
 
+
+def save_model(model: Any) -> dict[str, Any]:
+    pythoncom_mod, win32_client = require_pywin32()
+    errors = win32_client.VARIANT(pythoncom_mod.VT_BYREF | pythoncom_mod.VT_I4, 0)
+    warnings = win32_client.VARIANT(pythoncom_mod.VT_BYREF | pythoncom_mod.VT_I4, 0)
+    ok = model.Save3(1, errors, warnings)
+    return {"ok": bool(ok), "errors": getattr(errors, "value", errors), "warnings": getattr(warnings, "value", warnings)}
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--start", action="store_true")
@@ -103,7 +112,7 @@ def main() -> None:
     rebuild_result = read_member(model, "ForceRebuild3", False)
     save_result = None
     if args.save:
-        save_result = read_member(model, "Save3", 1, 0, 0)
+        save_result = save_model(model)
     result = {
         "timestamp": datetime.now().isoformat(timespec="seconds"),
         "connected": True,
