@@ -39,6 +39,25 @@ class ChangeVerifyTests(unittest.TestCase):
             self.assertEqual(data["unexpected"], [])
             self.assertGreaterEqual(len(data["accepted"]), 4)
 
+    def test_verify_supports_requiring_at_least_one_allowed_change(self):
+        with tempfile.TemporaryDirectory() as d:
+            out = Path(d) / "verify.json"
+            proc = run_py(
+                "tools/solidworks_codex/scripts/sw_change_verify.py",
+                "--delta", "tools/solidworks_codex/sandbox/compare_fixture.json",
+                "--allow-dimension", "D1@Sketch1@plate.SLDPRT",
+                "--allow-component", "support_bushing-1:suppressed",
+                "--allow-component", "drive_unit-1:fixed",
+                "--allow-component-added", "reference_sensor-1",
+                "--allow-feature-type", "Fillet",
+                "--require-allowed-change",
+                "--out", str(out),
+            )
+            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+            data = json.loads(out.read_text(encoding="utf-8-sig"))
+            self.assertTrue(data["ok"], data)
+            self.assertGreaterEqual(len(data["accepted"]), 4)
+
     def test_verify_rejects_unexpected_component_and_feature_changes(self):
         with tempfile.TemporaryDirectory() as d:
             out = Path(d) / "verify.json"
@@ -78,6 +97,28 @@ class ChangeVerifyTests(unittest.TestCase):
             self.assertNotEqual(proc.returncode, 0, proc.stdout + proc.stderr)
             data = json.loads(out.read_text(encoding="utf-8-sig"))
             self.assertFalse(data["ok"])
+
+    def test_verify_rejects_noop_when_allowed_changes_are_required(self):
+        with tempfile.TemporaryDirectory() as d:
+            delta = Path(d) / "noop_delta.json"
+            out = Path(d) / "verify.json"
+            delta.write_text(json.dumps({
+                "document": {"before_title": "a", "after_title": "a"},
+                "dimensions": {"changed": [], "added": [], "removed": []},
+                "components": {"added": [], "removed": [], "changed": []},
+                "features": {"count_changes": []},
+            }), encoding="utf-8")
+            proc = run_py(
+                "tools/solidworks_codex/scripts/sw_change_verify.py",
+                "--delta", str(delta),
+                "--allow-dimension", "D1@Sketch1@part.SLDPRT",
+                "--require-allowed-change",
+                "--out", str(out),
+            )
+            self.assertNotEqual(proc.returncode, 0, proc.stdout)
+            data = json.loads(out.read_text(encoding="utf-8-sig"))
+            self.assertFalse(data["ok"])
+            self.assertEqual(data["unexpected"][0]["kind"], "required_allowed_change_missing")
 
 
 if __name__ == "__main__":

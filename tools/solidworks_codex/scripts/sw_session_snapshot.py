@@ -18,7 +18,7 @@ SCRIPTS = ROOT / "tools" / "solidworks_codex" / "scripts"
 
 
 def run(cmd: list[str]) -> dict[str, Any]:
-    proc = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, shell=False)
+    proc = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, shell=False, encoding="utf-8", errors="replace")
     return {"cmd": cmd, "returncode": proc.returncode, "stdout": proc.stdout, "stderr": proc.stderr}
 
 

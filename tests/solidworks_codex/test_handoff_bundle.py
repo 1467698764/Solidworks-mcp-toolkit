@@ -59,6 +59,32 @@ class HandoffBundleTests(unittest.TestCase):
             self.assertIn("support_bushing-1", context)
 
 
+class SessionSnapshotEncodingTests(unittest.TestCase):
+    def test_run_captures_non_gbk_output_without_reader_thread_decode_error(self):
+        with tempfile.TemporaryDirectory() as d:
+            script = Path(d) / "emit_unicode.py"
+            script.write_text("print('SolidWorks ?? ? ?')", encoding="utf-8")
+            code = (
+                "from tools.solidworks_codex.scripts import sw_session_snapshot as mod; "
+                "import sys, json; "
+                f"result = mod.run([sys.executable, {str(script)!r}]); "
+                "print(json.dumps(result, ensure_ascii=False))"
+            )
+            proc = subprocess.run(
+                [sys.executable, "-c", code],
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+            )
+            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+            data = json.loads(proc.stdout)
+            self.assertEqual(data["returncode"], 0)
+            self.assertIn("??", data["stdout"])
+            self.assertIn("?", data["stdout"])
+
+
 if __name__ == "__main__":
     unittest.main()
 

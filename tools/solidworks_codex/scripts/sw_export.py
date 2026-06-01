@@ -7,30 +7,66 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-import pythoncom
-import win32com.client
+try:
+    import pythoncom  # type: ignore[import-not-found]
+    import win32com.client  # type: ignore[import-not-found]
+except ModuleNotFoundError:  # offline tests can import helpers without pywin32
+    pythoncom = None  # type: ignore[assignment]
+    win32com = None  # type: ignore[assignment]
+
+
+def require_pywin32() -> tuple[Any, Any]:
+    if pythoncom is None or win32com is None:
+        raise RuntimeError(
+            "SolidWorks live COM commands require pywin32. "
+            "Install pywin32 or set SWCODEX_PYTHON to a Python that can import pythoncom and win32com.client."
+        )
+    return pythoncom, win32com.client
 
 
 def read_member(obj: Any, name: str, *args: Any) -> Any:
     try:
         member = getattr(obj, name)
-        value = member(*args) if callable(member) else member
+        if args:
+            if callable(member):
+                value = member(*args)
+            else:
+                return {"error": f"member {name} is a property, arguments were provided"}
+        elif hasattr(member, "_oleobj_"):
+            return member
+        elif callable(member):
+            value = member()
+        else:
+            value = member
         if isinstance(value, (str, int, float, bool)) or value is None:
             return value
+        if hasattr(value, "_oleobj_"):
+            return value
         if isinstance(value, (list, tuple)):
-            return list(value)
+            return [read_member_value(v) for v in value]
         return str(value)
     except Exception as exc:
         return {"error": f"{type(exc).__name__}: {exc}"}
 
 
+def read_member_value(value: Any) -> Any:
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    if hasattr(value, "_oleobj_"):
+        return value
+    if isinstance(value, (list, tuple)):
+        return [read_member_value(v) for v in value]
+    return str(value)
+
+
 def attach(allow_start: bool) -> tuple[Any, bool]:
+    _pythoncom, win32_client = require_pywin32()
     try:
-        return win32com.client.GetActiveObject("SldWorks.Application"), False
+        return win32_client.GetActiveObject("SldWorks.Application"), False
     except Exception as exc:
         if not allow_start:
             raise RuntimeError("SolidWorks is not running. Start it or pass --start.") from exc
-        sw = win32com.client.Dispatch("SldWorks.Application")
+        sw = win32_client.Dispatch("SldWorks.Application")
         sw.Visible = True
         return sw, True
 
@@ -60,7 +96,8 @@ def main() -> None:
     parser.add_argument("--target", required=True)
     parser.add_argument("--out", default="tools/solidworks_codex/reports/export.json")
     args = parser.parse_args()
-    pythoncom.CoInitialize()
+    pythoncom_mod, _win32_client = require_pywin32()
+    pythoncom_mod.CoInitialize()
     sw, started = attach(args.start)
     model = open_or_active(sw, args.model)
     target = Path(args.target).resolve()

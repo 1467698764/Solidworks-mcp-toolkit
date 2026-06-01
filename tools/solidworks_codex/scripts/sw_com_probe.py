@@ -11,34 +11,61 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-import pythoncom
-import win32com.client
+def load_pywin32() -> tuple[Any, Any]:
+    try:
+        import pythoncom  # type: ignore[import-not-found]
+        import win32com.client  # type: ignore[import-not-found]
+    except ModuleNotFoundError as exc:
+        raise RuntimeError(
+            "SolidWorks live COM commands require pywin32. "
+            "Install pywin32 or set SWCODEX_PYTHON to a Python that can import pythoncom and win32com.client."
+        ) from exc
+    return pythoncom, win32com.client
+
+
+def safe_value(value: Any) -> Any:
+    try:
+        if value is None or isinstance(value, (str, int, float, bool)):
+            return value
+        if hasattr(value, "_oleobj_"):
+            return value
+        if isinstance(value, (list, tuple)):
+            return [safe_value(v) for v in value]
+        return str(value)
+    except Exception as exc:  # pragma: no cover - defensive COM formatting
+        return f"<unprintable {type(exc).__name__}: {exc}>"
 
 
 def read_member(obj: Any, name: str, *args: Any) -> Any:
     try:
         member = getattr(obj, name)
-        if callable(member):
-            return member(*args)
         if args:
+            if callable(member):
+                return safe_value(member(*args))
             return {"error": f"member {name} is a property, arguments were provided"}
-        return member
+        if hasattr(member, "_oleobj_"):
+            return member
+        if callable(member):
+            return safe_value(member())
+        return safe_value(member)
     except Exception as exc:
         return {"error": f"{type(exc).__name__}: {exc}"}
 
 
 def attach_solidworks(allow_start: bool) -> tuple[Any, bool]:
+    _pythoncom, win32_client = load_pywin32()
     try:
-        return win32com.client.GetActiveObject("SldWorks.Application"), False
+        return win32_client.GetActiveObject("SldWorks.Application"), False
     except Exception as attach_error:
         if not allow_start:
             raise RuntimeError(
                 "SolidWorks is not running. Start SolidWorks and rerun, or pass --start to launch it."
             ) from attach_error
-        return win32com.client.Dispatch("SldWorks.Application"), True
+        return win32_client.Dispatch("SldWorks.Application"), True
 
 
 def probe(allow_start: bool = False) -> dict[str, Any]:
+    pythoncom, _win32_client = load_pywin32()
     pythoncom.CoInitialize()
     sw, started_by_probe = attach_solidworks(allow_start)
     report: dict[str, Any] = {

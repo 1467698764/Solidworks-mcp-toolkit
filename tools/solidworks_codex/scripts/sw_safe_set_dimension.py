@@ -75,12 +75,12 @@ def guarded_pipeline(args: argparse.Namespace) -> dict[str, Any]:
     model = str(resolve(args.model))
     steps_spec: list[tuple[str, list[str]]] = [
         ("backup", ["backup", "-Files", model, "-Out", str(artifacts["backup"])]),
-        ("inspect_before", ["inspect", "-Out", str(artifacts["before"])]),
+        ("inspect_before", ["inspect", "-Model", model, "-Out", str(artifacts["before"])]),
         ("set_dimension", ["set-dimension", "-Model", model, "-Dimension", args.dimension, "-ValueM", str(args.value_m), "-Out", str(artifacts["set_dimension"])]),
         ("rebuild", ["rebuild", "-Model", model, "-Out", str(artifacts["rebuild"])]),
-        ("inspect_after", ["inspect", "-Out", str(artifacts["after"])]),
+        ("inspect_after", ["inspect", "-Model", model, "-Out", str(artifacts["after"])]),
         ("compare", ["compare", "-Before", str(artifacts["before"]), "-After", str(artifacts["after"]), "-Out", str(artifacts["delta_md"]), "-JsonOut", str(artifacts["delta_json"])]),
-        ("change_verify", ["change-verify", "-Report", str(artifacts["delta_json"]), "-AllowDimension", args.dimension, "-Out", str(artifacts["verify"])]),
+        ("change_verify", ["change-verify", "-Report", str(artifacts["delta_json"]), "-AllowDimension", args.dimension, "-RequireAllowedChange", "-Out", str(artifacts["verify"])]),
     ]
 
     if args.save:

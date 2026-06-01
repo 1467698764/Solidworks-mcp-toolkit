@@ -1,6 +1,6 @@
 # SolidWorks Codex Capability Matrix
 
-- Timestamp: `2026-06-01T20:30:02`
+- Timestamp: `2026-06-01T23:42:34`
 - Capability count: `46`
 
 ## Coverage
@@ -23,11 +23,11 @@
 | CLI | MCP | Workflow | Safety | SolidWorks required | Required args |
 | --- | --- | --- | --- | --- | --- |
 | `audit` | `solidworks_audit` | `release_gate` | `offline_gate` | `False` | `-` |
-| `backup` | `solidworks_backup` | `guarded_edit` | `guarded_write` | `True` | `files` |
-| `backup-status` | `solidworks_backup_status` | `guarded_edit` | `guarded_write` | `True` | `report` |
+| `backup` | `solidworks_backup` | `guarded_edit` | `guarded_write` | `False` | `files` |
+| `backup-status` | `solidworks_backup_status` | `guarded_edit` | `guarded_write` | `False` | `report` |
 | `capability-matrix` | `-` | `release_gate` | `offline_gate` | `False` | `-` |
 | `change-plan` | `solidworks_change_plan` | `analysis` | `read_only` | `False` | `report, goal` |
-| `change-verify` | `solidworks_change_verify` | `verify_export` | `verification_or_export` | `True` | `delta` |
+| `change-verify` | `solidworks_change_verify` | `verify_export` | `verification_or_export` | `False` | `delta` |
 | `compare` | `solidworks_compare_reports` | `verify_export` | `verification_or_export` | `False` | `before, after` |
 | `component-state` | `solidworks_component_state` | `guarded_edit` | `guarded_write` | `True` | `component, action` |
 | `design-review` | `solidworks_design_review` | `analysis` | `read_only` | `False` | `report` |
@@ -51,7 +51,7 @@
 | `repo-health` | `-` | `release_gate` | `offline_gate` | `False` | `-` |
 | `report-context` | `solidworks_report_context` | `analysis` | `read_only` | `False` | `report` |
 | `report-search` | `solidworks_report_search` | `analysis` | `read_only` | `False` | `report` |
-| `restore-backup` | `solidworks_restore_backup` | `guarded_edit` | `guarded_write` | `True` | `report` |
+| `restore-backup` | `solidworks_restore_backup` | `guarded_edit` | `guarded_write` | `False` | `report` |
 | `safe-set-dimension` | `solidworks_safe_set_dimension` | `guarded_edit` | `guarded_write` | `True` | `model, dimension, value_m` |
 | `selection-report` | `solidworks_selection_report` | `discover` | `read_only` | `True` | `-` |
 | `session-snapshot` | `solidworks_session_snapshot` | `handoff` | `offline_or_read_only` | `False` | `-` |

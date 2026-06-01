@@ -62,6 +62,11 @@ class ToolCatalogTests(unittest.TestCase):
             self.assertGreaterEqual(data["count"], 30)
             self.assertEqual(by_cli["backup"]["safety"], "guarded_write")
             self.assertEqual(by_cli["backup-status"]["mcp"], "solidworks_backup_status")
+
+            self.assertFalse(by_cli["backup"]["solidworks_required"])
+            self.assertFalse(by_cli["backup-status"]["solidworks_required"])
+            self.assertFalse(by_cli["restore-backup"]["solidworks_required"])
+            self.assertFalse(by_cli["change-verify"]["solidworks_required"])
             self.assertEqual(by_cli["restore-backup"]["safety"], "guarded_write")
             self.assertEqual(by_cli["restore-backup"]["mcp"], "solidworks_restore_backup")
             self.assertEqual(by_cli["set-dimension"]["safety"], "guarded_write")

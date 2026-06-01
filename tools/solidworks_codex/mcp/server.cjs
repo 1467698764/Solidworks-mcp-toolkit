@@ -41,6 +41,7 @@ const toolSchemas = [
     inputSchema: {
       type: 'object',
       properties: {
+        model: { type: 'string', description: 'Optional SolidWorks file to open before inspection.' },
         out: { type: 'string', description: 'Optional output JSON path.' }
       },
       additionalProperties: false
@@ -52,6 +53,7 @@ const toolSchemas = [
     inputSchema: {
       type: 'object',
       properties: {
+        model: { type: 'string', description: 'Optional SolidWorks file to open before inspection.' },
         out: { type: 'string', description: 'Optional output JSON path.' }
       },
       additionalProperties: false
@@ -158,7 +160,7 @@ const toolSchemas = [
   {
     name: 'solidworks_change_verify',
     description: 'Verify a compare delta contains only expected dimensions, component changes, additions/removals, or feature type count changes.',
-    inputSchema: { type: 'object', properties: { delta: { type: 'string' }, allow_dimension: { type: 'array', items: { type: 'string' } }, allow_component: { type: 'array', items: { type: 'string' } }, allow_component_added: { type: 'array', items: { type: 'string' } }, allow_component_removed: { type: 'array', items: { type: 'string' } }, allow_feature_type: { type: 'array', items: { type: 'string' } }, out: { type: 'string' } }, required: ['delta'], additionalProperties: false }
+    inputSchema: { type: 'object', properties: { delta: { type: 'string' }, allow_dimension: { type: 'array', items: { type: 'string' } }, allow_component: { type: 'array', items: { type: 'string' } }, allow_component_added: { type: 'array', items: { type: 'string' } }, allow_component_removed: { type: 'array', items: { type: 'string' } }, allow_feature_type: { type: 'array', items: { type: 'string' } }, require_allowed_change: { type: 'boolean', description: 'Fail if allow lists are provided but no allowed change is observed.' }, out: { type: 'string' } }, required: ['delta'], additionalProperties: false }
   },  {
     name: 'solidworks_component_state',
     description: 'Change assembly component state by Component2.Name2: hide/show/suppress/unsuppress/fix/float.',
@@ -336,10 +338,12 @@ async function callTool(name, input) {
       break;
     case 'solidworks_inspect':
       args.push('inspect');
+      if (input?.model) args.push('-Model', input.model);
       if (input?.out) args.push('-Out', input.out);
       break;
     case 'solidworks_start_inspect':
       args.push('start-inspect');
+      if (input?.model) args.push('-Model', input.model);
       if (input?.out) args.push('-Out', input.out);
       break;
     case 'solidworks_backup':
@@ -395,6 +399,7 @@ async function callTool(name, input) {
       if ((input.allow_component_added || []).length) args.push('-AllowComponentAdded', input.allow_component_added.join(','));
       if ((input.allow_component_removed || []).length) args.push('-AllowComponentRemoved', input.allow_component_removed.join(','));
       if ((input.allow_feature_type || []).length) args.push('-AllowFeatureType', input.allow_feature_type.join(','));
+      if (input?.require_allowed_change) args.push('-RequireAllowedChange');
       if (input?.out) args.push('-Out', input.out);
       break;
     case 'solidworks_component_state':

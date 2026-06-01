@@ -94,6 +94,11 @@ class SafeSetDimensionTests(unittest.TestCase):
             self.assertIn("restore-backup", data["rollback_command"])
             calls = [json.loads(line) for line in (root / "calls.jsonl").read_text(encoding="utf-8").splitlines()]
             self.assertEqual([call[0] for call in calls], ["backup", "inspect", "set-dimension", "rebuild", "inspect", "compare", "change-verify"])
+            self.assertIn("-Model", calls[1])
+            self.assertIn(str(root / "part.SLDPRT"), calls[1])
+            self.assertIn("-Model", calls[4])
+            self.assertIn(str(root / "part.SLDPRT"), calls[4])
+            self.assertIn("-RequireAllowedChange", calls[-1])
             self.assertIn("-AllowDimension", calls[-1])
             self.assertIn("D1@Sketch1@part.SLDPRT", calls[-1])
 

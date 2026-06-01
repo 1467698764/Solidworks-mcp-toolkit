@@ -1,6 +1,6 @@
 # SolidWorks Codex Final Readiness Report
 
-- Timestamp: `2026-06-01T20:35:02`
+- Timestamp: `2026-06-02T00:12:15`
 - Audit OK: `True`
 - Preflight OK: `True`
 
@@ -27,7 +27,7 @@
 - durable multi-turn worklog for decisions, verification, failures, and next steps
 - handoff bundles with inspect report, context, worklog, README, and manifest
 - MCP tool catalog for discoverability and workflow selection
-- GitHub release readiness gate with README, non-commercial license, installer, CI, and config example
+- GitHub release readiness gate with README, license, installer, CI, and config example
 - offline demo bundle for five-minute public evaluation
 - public copy guard to prevent rank-boasting and overclaiming in release docs
 - repository health checks for issue templates, PR template, demo bundle, and verify-all

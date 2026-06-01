@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-06-01T20:30:02",
+  "timestamp": "2026-06-01T23:42:34",
   "count": 46,
   "capabilities": [
     {
@@ -19,7 +19,7 @@
       "mcp": "solidworks_backup",
       "workflow": "guarded_edit",
       "safety": "guarded_write",
-      "solidworks_required": true,
+      "solidworks_required": false,
       "required": [
         "files"
       ],
@@ -34,7 +34,7 @@
       "mcp": "solidworks_backup_status",
       "workflow": "guarded_edit",
       "safety": "guarded_write",
-      "solidworks_required": true,
+      "solidworks_required": false,
       "required": [
         "report"
       ],
@@ -78,7 +78,7 @@
       "mcp": "solidworks_change_verify",
       "workflow": "verify_export",
       "safety": "verification_or_export",
-      "solidworks_required": true,
+      "solidworks_required": false,
       "required": [
         "delta"
       ],
@@ -89,7 +89,8 @@
         "allow_dimension",
         "allow_feature_type",
         "delta",
-        "out"
+        "out",
+        "require_allowed_change"
       ],
       "description": "Verify a compare delta contains only expected dimensions, component changes, additions/removals, or feature type count changes."
     },
@@ -210,6 +211,7 @@
       "solidworks_required": true,
       "required": [],
       "properties": [
+        "model",
         "out"
       ],
       "description": "Deep read-only inspect of active part/assembly: features, dimensions, components."
@@ -423,7 +425,7 @@
       "mcp": "solidworks_restore_backup",
       "workflow": "guarded_edit",
       "safety": "guarded_write",
-      "solidworks_required": true,
+      "solidworks_required": false,
       "required": [
         "report"
       ],
@@ -520,6 +522,7 @@
       "solidworks_required": true,
       "required": [],
       "properties": [
+        "model",
         "out"
       ],
       "description": "Allow COM launch of SolidWorks, then run deep read-only inspect."

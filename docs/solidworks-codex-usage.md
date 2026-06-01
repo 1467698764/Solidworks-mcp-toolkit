@@ -44,7 +44,7 @@ D1@Sketch1@plate.SLDPRT
 再执行默认不保存的修改：
 
 ```powershell
-.\tools\solidworks_codex\swctl.ps1 safe-set-dimension -Dimension 'D1@Sketch1@plate.SLDPRT' -ValueM 0.012 -BackupFiles 'C:\path\to\changed_part.SLDPRT' -Out tools\solidworks_codex\reports\safe_set_dimension.json
+.\tools\solidworks_codex\swctl.ps1 safe-set-dimension -Model 'C:\path\to\changed_part.SLDPRT' -Dimension 'D1@Sketch1@plate.SLDPRT' -ValueM 0.012 -Out tools\solidworks_codex\reports\safe_set_dimension.json
 ```
 
 确认无误后再决定是否保存。每次修改后建议执行：

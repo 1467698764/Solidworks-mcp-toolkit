@@ -15,7 +15,8 @@ param(
     [string]$Manifest = '', [string]$Mate = '', [double]$DistanceMm = 0, [double]$AngleDeg = 0, [switch]$Flip,
     [string]$SessionName = 'session', [string]$FromReport = '', [string]$OutDir = '',
     [string]$Message = '', [string]$Next = '', [string[]]$Artifact = @(),
-    [string[]]$AllowDimension = @(), [string[]]$AllowComponent = @(), [string[]]$AllowComponentAdded = @(), [string[]]$AllowComponentRemoved = @(), [string[]]$AllowFeatureType = @()
+    [string[]]$AllowDimension = @(), [string[]]$AllowComponent = @(), [string[]]$AllowComponentAdded = @(), [string[]]$AllowComponentRemoved = @(), [string[]]$AllowFeatureType = @(),
+    [switch]$RequireAllowedChange
 )
 
 $Root = Split-Path -Parent $PSCommandPath
@@ -38,27 +39,42 @@ function Invoke-SwPython([object[]]$Arguments) {
     $codexPython = Join-Path $env:USERPROFILE '.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'
     if (Test-Path $codexPython) { $candidates += ,@($codexPython) }
     $candidates += @(@('py','-3.12'), @('py','-3'), @('python'), @('python3'))
+
+    $scriptPath = if ($Arguments.Count -gt 0) { [string]$Arguments[0] } else { '' }
+    $requiresPywin32 = $false
+    if ($scriptPath -and (Test-Path $scriptPath)) {
+        $head = Get-Content -LiteralPath $scriptPath -TotalCount 80 -ErrorAction SilentlyContinue
+        $requiresPywin32 = ($head -match 'import pythoncom|win32com').Count -gt 0
+    }
+
     foreach ($candidate in $candidates) {
         $exe = [string]$candidate[0]
         $prefix = @()
         if ($candidate.Count -gt 1) { $prefix = $candidate[1..($candidate.Count - 1)] }
         & $exe @prefix -c "import sys; print(sys.executable)" *> $null
-        if ($LASTEXITCODE -eq 0) {
-            & $exe @prefix @Arguments | ForEach-Object { Write-Host $_ }
-            $code = $LASTEXITCODE
-            if ($null -eq $code) { return 0 }
-            return [int]$code
+        if ($LASTEXITCODE -ne 0) { continue }
+        if ($requiresPywin32) {
+            & $exe @prefix -c "import pythoncom, win32com.client" *> $null
+            if ($LASTEXITCODE -ne 0) { continue }
         }
+        & $exe @prefix @Arguments | ForEach-Object { Write-Host $_ }
+        $code = $LASTEXITCODE
+        if ($null -eq $code) { return 0 }
+        return [int]$code
     }
-    Write-Error "No usable Python found. Install Python 3 or set SWCODEX_PYTHON to a python.exe path."
+    if ($requiresPywin32) {
+        Write-Error "No usable Python with pywin32 found. Install pywin32 or set SWCODEX_PYTHON to a python.exe path that can import pythoncom and win32com.client."
+    } else {
+        Write-Error "No usable Python found. Install Python 3 or set SWCODEX_PYTHON to a python.exe path."
+    }
     return 127
 }
 
 switch ($Command) {
     'probe' { $outPath = if ($Out) { $Out } else { DefaultOut 'com_probe.json' }; exit (Invoke-SwPython @((Join-Path $Root 'scripts/sw_com_probe.py'), '--out', $outPath)) }
     'start-probe' { $outPath = if ($Out) { $Out } else { DefaultOut 'com_probe_start.json' }; exit (Invoke-SwPython @((Join-Path $Root 'scripts/sw_com_probe.py'), '--start', '--out', $outPath)) }
-    'inspect' { $outPath = if ($Out) { $Out } else { DefaultOut 'assembly_inspect.json' }; exit (Invoke-SwPython @((Join-Path $Root 'scripts/sw_assembly_inspect.py'), '--out', $outPath)) }
-    'start-inspect' { $outPath = if ($Out) { $Out } else { DefaultOut 'assembly_inspect_start.json' }; exit (Invoke-SwPython @((Join-Path $Root 'scripts/sw_assembly_inspect.py'), '--start', '--out', $outPath)) }
+    'inspect' { $outPath = if ($Out) { $Out } else { DefaultOut 'assembly_inspect.json' }; $argsList = @((Join-Path $Root 'scripts/sw_assembly_inspect.py'), '--out', $outPath); if ($Model) { $argsList += @('--model', $Model) }; exit (Invoke-SwPython $argsList) }
+    'start-inspect' { $outPath = if ($Out) { $Out } else { DefaultOut 'assembly_inspect_start.json' }; $argsList = @((Join-Path $Root 'scripts/sw_assembly_inspect.py'), '--start', '--out', $outPath); if ($Model) { $argsList += @('--model', $Model) }; exit (Invoke-SwPython $argsList) }
     'session-snapshot' { $argsList = @((Join-Path $Root 'scripts/sw_session_snapshot.py'), '--name', $SessionName, '--out-dir', $OutDir); if ($FromReport) { $argsList += @('--from-report', $FromReport) }; exit (Invoke-SwPython $argsList) }
     'start-session-snapshot' { $argsList = @((Join-Path $Root 'scripts/sw_session_snapshot.py'), '--start', '--name', $SessionName, '--out-dir', $OutDir); if ($FromReport) { $argsList += @('--from-report', $FromReport) }; exit (Invoke-SwPython $argsList) }
     'selection-report' { $outPath = if ($Out) { $Out } else { DefaultOut 'selection_report.json' }; exit (Invoke-SwPython @((Join-Path $Root 'scripts/sw_selection_report.py'), '--out', $outPath)) }
@@ -66,7 +82,7 @@ switch ($Command) {
     'summary' { if (-not $Report) { throw 'summary requires -Report <json report path>' }; $argsList = @((Join-Path $Root 'scripts/sw_report_summary.py'), $Report); if ($Out) { $argsList += @('--out', $Out) }; exit (Invoke-SwPython $argsList) }
     'issue-report' { if (-not $Report) { throw 'issue-report requires -Report <inspect json>' }; $outPath = if ($Out) { $Out } else { DefaultOut 'issue_report.md' }; $argsList = @((Join-Path $Root 'scripts/sw_issue_report.py'), '--report', $Report, '--out', $outPath); if ($JsonOut) { $argsList += @('--json-out', $JsonOut) }; exit (Invoke-SwPython $argsList) }
     'compare' { if (-not $Before -or -not $After) { throw 'compare requires -Before and -After' }; $outPath = if ($Out) { $Out } else { DefaultOut 'report_delta.md' }; $argsList = @((Join-Path $Root 'scripts/sw_compare_reports.py'), '--before', $Before, '--after', $After, '--out', $outPath); if ($JsonOut) { $argsList += @('--json-out', $JsonOut) }; exit (Invoke-SwPython $argsList) }
-    'change-verify' { if (-not $Report) { throw 'change-verify requires -Report <compare delta json>' }; $outPath = if ($Out) { $Out } else { DefaultOut 'change_verify.json' }; $argsList = @((Join-Path $Root 'scripts/sw_change_verify.py'), '--delta', $Report, '--out', $outPath); foreach ($x in (Expand-List $AllowDimension)) { $argsList += @('--allow-dimension', $x) }; foreach ($x in (Expand-List $AllowComponent)) { $argsList += @('--allow-component', $x) }; foreach ($x in (Expand-List $AllowComponentAdded)) { $argsList += @('--allow-component-added', $x) }; foreach ($x in (Expand-List $AllowComponentRemoved)) { $argsList += @('--allow-component-removed', $x) }; foreach ($x in (Expand-List $AllowFeatureType)) { $argsList += @('--allow-feature-type', $x) }; exit (Invoke-SwPython $argsList) }
+    'change-verify' { if (-not $Report) { throw 'change-verify requires -Report <compare delta json>' }; $outPath = if ($Out) { $Out } else { DefaultOut 'change_verify.json' }; $argsList = @((Join-Path $Root 'scripts/sw_change_verify.py'), '--delta', $Report, '--out', $outPath); foreach ($x in (Expand-List $AllowDimension)) { $argsList += @('--allow-dimension', $x) }; foreach ($x in (Expand-List $AllowComponent)) { $argsList += @('--allow-component', $x) }; foreach ($x in (Expand-List $AllowComponentAdded)) { $argsList += @('--allow-component-added', $x) }; foreach ($x in (Expand-List $AllowComponentRemoved)) { $argsList += @('--allow-component-removed', $x) }; foreach ($x in (Expand-List $AllowFeatureType)) { $argsList += @('--allow-feature-type', $x) }; if ($RequireAllowedChange) { $argsList += '--require-allowed-change' }; exit (Invoke-SwPython $argsList) }
     'backup' { if (-not $Files -or $Files.Count -eq 0) { throw 'backup requires -Files <file1,file2,...>' }; $outPath = if ($Out) { $Out } else { DefaultOut 'backup.json' }; $argsList = @((Join-Path $Root 'scripts/sw_backup.py')) + $Files + @('--out', $outPath); exit (Invoke-SwPython $argsList) }
     'backup-status' { if (-not $Report) { throw 'backup-status requires -Report <backup json>' }; $outPath = if ($Out) { $Out } else { DefaultOut 'backup_status.json' }; exit (Invoke-SwPython @((Join-Path $Root 'scripts/sw_backup_status.py'), '--report', $Report, '--out', $outPath)) }
     'restore-backup' { if (-not $Report) { throw 'restore-backup requires -Report <backup json>' }; $outPath = if ($Out) { $Out } else { DefaultOut 'restore_backup.json' }; $argsList = @((Join-Path $Root 'scripts/sw_restore_backup.py'), '--report', $Report, '--out', $outPath); if ($Apply) { $argsList += '--apply' }; exit (Invoke-SwPython $argsList) }

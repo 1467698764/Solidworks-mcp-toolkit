@@ -11,15 +11,27 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-import pythoncom
-import win32com.client
 
 SW_DOC_TYPES = {1: "part", 2: "assembly", 3: "drawing"}
+
+def load_pywin32() -> tuple[Any, Any]:
+    try:
+        import pythoncom  # type: ignore[import-not-found]
+        import win32com.client  # type: ignore[import-not-found]
+    except ModuleNotFoundError as exc:
+        raise RuntimeError(
+            "SolidWorks live COM commands require pywin32. "
+            "Install pywin32 or set SWCODEX_PYTHON to a Python that can import pythoncom and win32com.client."
+        ) from exc
+    return pythoncom, win32com.client
+
 
 
 def safe_value(value: Any) -> Any:
     try:
         if value is None or isinstance(value, (str, int, float, bool)):
+            return value
+        if hasattr(value, "_oleobj_"):
             return value
         if isinstance(value, (list, tuple)):
             return [safe_value(v) for v in value]
@@ -31,24 +43,29 @@ def safe_value(value: Any) -> Any:
 def read_member(obj: Any, name: str, *args: Any) -> Any:
     try:
         member = getattr(obj, name)
-        if callable(member):
-            return safe_value(member(*args))
         if args:
+            if callable(member):
+                return safe_value(member(*args))
             return {"error": f"member {name} is a property, arguments were provided"}
+        if hasattr(member, "_oleobj_"):
+            return member
+        if callable(member):
+            return safe_value(member())
         return safe_value(member)
     except Exception as exc:
         return {"error": f"{type(exc).__name__}: {exc}"}
 
 
 def attach_solidworks(allow_start: bool) -> tuple[Any, bool]:
+    _pythoncom, win32_client = load_pywin32()
     try:
-        return win32com.client.GetActiveObject("SldWorks.Application"), False
+        return win32_client.GetActiveObject("SldWorks.Application"), False
     except Exception as attach_error:
         if not allow_start:
             raise RuntimeError(
                 "SolidWorks is not running. Start SolidWorks and rerun, or pass --start to launch it."
             ) from attach_error
-        sw = win32com.client.Dispatch("SldWorks.Application")
+        sw = win32_client.Dispatch("SldWorks.Application")
         try:
             sw.Visible = True
         except Exception:
@@ -166,7 +183,24 @@ def classify_mate_like_features(features: list[dict[str, Any]]) -> list[dict[str
     return result
 
 
-def inspect(allow_start: bool, feature_limit: int, component_limit: int, dimension_limit: int) -> dict[str, Any]:
+def open_model_if_requested(sw: Any, path: str | None, pythoncom: Any, win32_client: Any) -> Any:
+    if not path:
+        return read_member(sw, "ActiveDoc")
+    model_path = str(Path(path).resolve())
+    suffix = Path(model_path).suffix.lower()
+    doc_type = {".sldprt": 1, ".sldasm": 2, ".slddrw": 3}.get(suffix)
+    if doc_type is None:
+        raise ValueError(f"Unsupported SolidWorks file type: {model_path}")
+    errors = win32_client.VARIANT(pythoncom.VT_BYREF | pythoncom.VT_I4, 0)
+    warnings = win32_client.VARIANT(pythoncom.VT_BYREF | pythoncom.VT_I4, 0)
+    model = sw.OpenDoc6(model_path, doc_type, 0, "", errors, warnings)
+    if model is None:
+        raise RuntimeError(f"OpenDoc6 failed: errors={errors.value}, warnings={warnings.value}, path={model_path}")
+    return model
+
+
+def inspect(allow_start: bool, feature_limit: int, component_limit: int, dimension_limit: int, model_path: str | None = None) -> dict[str, Any]:
+    pythoncom, win32_client = load_pywin32()
     pythoncom.CoInitialize()
     sw, started_by_probe = attach_solidworks(allow_start)
     report: dict[str, Any] = {
@@ -177,7 +211,7 @@ def inspect(allow_start: bool, feature_limit: int, component_limit: int, dimensi
         "visible": read_member(sw, "Visible"),
     }
 
-    model = read_member(sw, "ActiveDoc")
+    model = open_model_if_requested(sw, model_path, pythoncom, win32_client)
     if isinstance(model, dict) or model is None:
         report["active_document"] = None
         report["note"] = "No active SolidWorks document detected."
@@ -214,12 +248,13 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--start", action="store_true", help="Allow launching SolidWorks if it is not running")
     parser.add_argument("--out", default="tools/solidworks_codex/reports/assembly_inspect.json")
+    parser.add_argument("--model", default=None, help="Optional SolidWorks file to open before inspection")
     parser.add_argument("--feature-limit", type=int, default=300)
     parser.add_argument("--component-limit", type=int, default=500)
     parser.add_argument("--dimension-limit", type=int, default=500)
     args = parser.parse_args()
 
-    result = inspect(args.start, args.feature_limit, args.component_limit, args.dimension_limit)
+    result = inspect(args.start, args.feature_limit, args.component_limit, args.dimension_limit, args.model)
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
