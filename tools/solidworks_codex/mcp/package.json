@@ -1,0 +1,12 @@
+{
+  "name": "solidworks-codex-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local MCP wrapper around Codex SolidWorks swctl tools",
+  "type": "commonjs",
+  "main": "server.cjs",
+  "scripts": {
+    "smoke": "node smoke-test.cjs"
+  },
+  "dependencies": {}
+}

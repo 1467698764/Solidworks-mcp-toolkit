@@ -1,0 +1,106 @@
+{
+  "timestamp": "2026-06-01T21:45:52",
+  "ok": true,
+  "focus": "current model evidence, constraints, clearance, and manufacturing gaps",
+  "source_report": "tools/solidworks_codex/sandbox/report_after.json",
+  "document": {
+    "title": "sample_machine.SLDASM",
+    "path": "C:/cad/projects/sample_machine/sample_machine.SLDASM",
+    "type": "assembly",
+    "components": [
+      {
+        "name2": "drive_unit-1",
+        "path": "C:/cad/projects/sample_machine/drive_unit.SLDPRT",
+        "suppressed": false,
+        "hidden": false,
+        "fixed": false
+      },
+      {
+        "name2": "support_bushing-1",
+        "path": "C:/cad/projects/sample_machine/support_bushing.SLDPRT",
+        "suppressed": true,
+        "hidden": false,
+        "fixed": false
+      },
+      {
+        "name2": "reference_sensor-1",
+        "path": "C:/cad/projects/sample_machine/reference_sensor.SLDPRT",
+        "suppressed": false,
+        "hidden": false,
+        "fixed": false
+      }
+    ],
+    "dimensions": [
+      {
+        "full_name": "D1@Sketch1@plate.SLDPRT",
+        "system_value_m": 0.012,
+        "feature": "Sketch1"
+      },
+      {
+        "full_name": "D2@Sketch1@plate.SLDPRT",
+        "system_value_m": 0.02,
+        "feature": "Sketch1"
+      }
+    ],
+    "features": [
+      {
+        "name": "MateGroup",
+        "type": "MateGroup"
+      },
+      {
+        "name": "Cut-Extrude1",
+        "type": "Cut"
+      },
+      {
+        "name": "Fillet1",
+        "type": "Fillet"
+      }
+    ]
+  },
+  "files": {
+    "README.md": "handoff instructions",
+    "inspect.json": "copied source inspect report",
+    "context.md": "human-readable context pack",
+    "context.json": "machine-readable context pack",
+    "worklog.jsonl": "copied durable event log",
+    "worklog.md": "human-readable worklog summary"
+  },
+  "suggested_inputs": [
+    "audit_latest.json",
+    "tools/solidworks_codex/reports/audit_latest.json",
+    "tools/solidworks_codex/reports/final_readiness.json",
+    "latest session-snapshot directory"
+  ],
+  "context_counts": {
+    "component_count": 3,
+    "dimension_count": 2,
+    "feature_count": 3,
+    "suppressed_components": [
+      "support_bushing-1"
+    ],
+    "hidden_components": [],
+    "floating_components": [
+      "drive_unit-1",
+      "reference_sensor-1"
+    ]
+  },
+  "commands": [
+    {
+      "cmd": [
+        "<python>",
+        "<repo>\\tools\\solidworks_codex\\scripts\\sw_report_context.py",
+        "--report",
+        "<repo>\\docs\\demo\\offline\\handoff\\inspect.json",
+        "--focus",
+        "current model evidence, constraints, clearance, and manufacturing gaps",
+        "--out",
+        "<repo>\\docs\\demo\\offline\\handoff\\context.md",
+        "--json-out",
+        "<repo>\\docs\\demo\\offline\\handoff\\context.json"
+      ],
+      "returncode": 0,
+      "stdout": "{\n  \"ok\": true,\n  \"out\": \"C:\\\\Users\\\\Alphahui\\\\Documents\\\\Solidworks\\\\docs\\\\demo\\\\offline\\\\handoff\\\\context.md\",\n  \"json_out\": \"C:\\\\Users\\\\Alphahui\\\\Documents\\\\Solidworks\\\\docs\\\\demo\\\\offline\\\\handoff\\\\context.json\",\n  \"risks\": 4,\n  \"anchors\": 8\n}\n",
+      "stderr": ""
+    }
+  ]
+}

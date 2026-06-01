@@ -1,0 +1,24 @@
+﻿# Generated/runtime artifacts
+solidworks-mcp.log
+
+# Local dependency/reference downloads (large, reproducible)
+tools/mcp-solidworks-ts/
+tools/_packages/
+tools/_external/
+
+# SolidWorks Codex generated outputs
+tools/solidworks_codex/backups/
+tools/solidworks_codex/reports/
+tools/solidworks_codex/exports/
+tools/solidworks_codex/logs/
+tools/solidworks_codex/sandbox/*
+!tools/solidworks_codex/sandbox/report_before.json
+!tools/solidworks_codex/sandbox/report_after.json
+!tools/solidworks_codex/sandbox/compare_fixture.json
+tools/solidworks_codex/scripts/__pycache__/
+
+# Generated VBA macro outputs; regenerate via swctl template-macro/mate-macro
+tools/solidworks_codex/macros/*.swp.vba
+
+# Python test caches
+tests/**/__pycache__/

@@ -1,0 +1,20 @@
+{
+  "timestamp": "before",
+  "active_document": {
+    "title": "sample_machine.SLDASM",
+    "path": "C:/cad/projects/sample_machine/sample_machine.SLDASM",
+    "type": "assembly",
+    "components": [
+      {"name2": "drive_unit-1", "path": "C:/cad/projects/sample_machine/drive_unit.SLDPRT", "suppressed": false, "hidden": false, "fixed": true},
+      {"name2": "support_bushing-1", "path": "C:/cad/projects/sample_machine/support_bushing.SLDPRT", "suppressed": false, "hidden": false, "fixed": false}
+    ],
+    "dimensions": [
+      {"full_name": "D1@Sketch1@plate.SLDPRT", "system_value_m": 0.01, "feature": "Sketch1"},
+      {"full_name": "D2@Sketch1@plate.SLDPRT", "system_value_m": 0.02, "feature": "Sketch1"}
+    ],
+    "features": [
+      {"name": "MateGroup", "type": "MateGroup"},
+      {"name": "Cut-Extrude1", "type": "Cut"}
+    ]
+  }
+}

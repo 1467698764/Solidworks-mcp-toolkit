@@ -1,0 +1,44 @@
+name: SolidWorks Codex Offline Checks
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  offline:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Python unit tests
+        run: python -m unittest discover -s tests -p "test_*.py" -v
+      - name: Python compile
+        shell: pwsh
+        run: |
+          $files = Get-ChildItem tools\solidworks_codex\scripts\*.py | ForEach-Object { $_.FullName }
+          python -m py_compile @files
+      - name: Node syntax
+        run: |
+          node --check tools/solidworks_codex/mcp/server.cjs
+          node --check tools/solidworks_codex/mcp/smoke-test.cjs
+      - name: GitHub readiness
+        run: python tools/solidworks_codex/scripts/sw_github_readiness.py --out tools/solidworks_codex/reports/github_readiness.json
+      - name: Repository health
+        run: python tools/solidworks_codex/scripts/sw_repo_health.py --out tools/solidworks_codex/reports/repo_health.json
+      - name: Public copy guard
+        run: python tools/solidworks_codex/scripts/sw_public_copy_guard.py --out tools/solidworks_codex/reports/public_copy_guard.json
+      - name: Release tree audit
+        run: python tools/solidworks_codex/scripts/sw_release_tree.py --out tools/solidworks_codex/reports/release_tree.json
+      - name: Offline audit
+        run: python tools/solidworks_codex/scripts/sw_audit.py --out tools/solidworks_codex/reports/audit_latest.json
+      - name: Final readiness JSON parse
+        shell: pwsh
+        run: |
+          python tools/solidworks_codex/scripts/sw_finalize.py --out docs/solidworks-codex-final-readiness.md --json-out tools/solidworks_codex/reports/final_readiness.json
+          $j = Get-Content -Raw tools/solidworks_codex/reports/final_readiness.json | ConvertFrom-Json
+          if (-not $j.audit_ok) { throw "final readiness audit_ok was false" }

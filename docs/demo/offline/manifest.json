@@ -1,0 +1,88 @@
+{
+  "timestamp": "2026-06-01T21:45:52",
+  "ok": true,
+  "out_dir": "docs/demo/offline",
+  "files": [
+    "README.md",
+    "tool_catalog.md",
+    "tool_catalog.json",
+    "context.md",
+    "context.json",
+    "worklog.jsonl",
+    "worklog.md",
+    "handoff/README.md",
+    "handoff/manifest.json"
+  ],
+  "commands": [
+    {
+      "cmd": [
+        "<python>",
+        "tools/solidworks_codex/scripts/sw_tool_catalog.py",
+        "--out",
+        "docs/demo/offline/tool_catalog.md",
+        "--json-out",
+        "docs/demo/offline/tool_catalog.json"
+      ],
+      "returncode": 0,
+      "stdout": "{\n  \"ok\": true,\n  \"count\": 35,\n  \"out\": \"<repo>\\\\docs\\\\demo\\\\offline\\\\tool_catalog.md\",\n  \"json_out\": \"<repo>\\\\docs\\\\demo\\\\offline\\\\tool_catalog.json\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "cmd": [
+        "<python>",
+        "tools/solidworks_codex/scripts/sw_report_context.py",
+        "--report",
+        "tools/solidworks_codex/sandbox/report_after.json",
+        "--focus",
+        "current model evidence, constraints, clearance, and manufacturing gaps",
+        "--out",
+        "docs/demo/offline/context.md",
+        "--json-out",
+        "docs/demo/offline/context.json"
+      ],
+      "returncode": 0,
+      "stdout": "{\n  \"ok\": true,\n  \"out\": \"<repo>\\\\docs\\\\demo\\\\offline\\\\context.md\",\n  \"json_out\": \"<repo>\\\\docs\\\\demo\\\\offline\\\\context.json\",\n  \"risks\": 4,\n  \"anchors\": 8\n}\n",
+      "stderr": ""
+    },
+    {
+      "cmd": [
+        "<python>",
+        "tools/solidworks_codex/scripts/sw_worklog.py",
+        "--log",
+        "docs/demo/offline/worklog.jsonl",
+        "--summary-out",
+        "docs/demo/offline/worklog.md",
+        "--session",
+        "offline-demo",
+        "--event",
+        "decision",
+        "--message",
+        "Use report-context and tool-catalog before any template or write operation",
+        "--artifact",
+        "context.md",
+        "--next",
+        "Generate handoff bundle"
+      ],
+      "returncode": 0,
+      "stdout": "{\n  \"ok\": true,\n  \"log\": \"<repo>\\\\docs\\\\demo\\\\offline\\\\worklog.jsonl\",\n  \"summary\": \"<repo>\\\\docs\\\\demo\\\\offline\\\\worklog.md\",\n  \"events\": 6\n}\n",
+      "stderr": ""
+    },
+    {
+      "cmd": [
+        "<python>",
+        "tools/solidworks_codex/scripts/sw_handoff_bundle.py",
+        "--report",
+        "tools/solidworks_codex/sandbox/report_after.json",
+        "--worklog",
+        "docs/demo/offline/worklog.jsonl",
+        "--focus",
+        "current model evidence, constraints, clearance, and manufacturing gaps",
+        "--out-dir",
+        "docs/demo/offline/handoff"
+      ],
+      "returncode": 0,
+      "stdout": "{\n  \"ok\": true,\n  \"out_dir\": \"<repo>\\\\docs\\\\demo\\\\offline\\\\handoff\",\n  \"manifest\": \"<repo>\\\\docs\\\\demo\\\\offline\\\\handoff\\\\manifest.json\"\n}\n",
+      "stderr": ""
+    }
+  ]
+}

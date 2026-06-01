@@ -1,0 +1,69 @@
+{
+  "document": {
+    "before_title": "sample_machine.SLDASM",
+    "after_title": "sample_machine.SLDASM",
+    "before_path": "C:/cad/projects/sample_machine/sample_machine.SLDASM",
+    "after_path": "C:/cad/projects/sample_machine/sample_machine.SLDASM"
+  },
+  "components": {
+    "added": [
+      {
+        "name2": "reference_sensor-1",
+        "path": "C:/cad/projects/sample_machine/reference_sensor.SLDPRT",
+        "suppressed": false,
+        "hidden": false,
+        "fixed": false
+      }
+    ],
+    "removed": [],
+    "changed": [
+      {
+        "key": "drive_unit-1",
+        "changes": {
+          "fixed": {
+            "before": true,
+            "after": false
+          }
+        }
+      },
+      {
+        "key": "support_bushing-1",
+        "changes": {
+          "suppressed": {
+            "before": false,
+            "after": true
+          }
+        }
+      }
+    ]
+  },
+  "dimensions": {
+    "added": [],
+    "removed": [],
+    "changed": [
+      {
+        "key": "D1@Sketch1@plate.SLDPRT",
+        "before_m": 0.01,
+        "after_m": 0.012
+      }
+    ]
+  },
+  "features": {
+    "before_counts": {
+      "Cut": 1,
+      "MateGroup": 1
+    },
+    "after_counts": {
+      "Cut": 1,
+      "Fillet": 1,
+      "MateGroup": 1
+    },
+    "count_changes": [
+      {
+        "type": "Fillet",
+        "before": 0,
+        "after": 1
+      }
+    ]
+  }
+}

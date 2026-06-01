@@ -1,0 +1,8 @@
+﻿# Example only. Do not paste blindly if your paths differ.
+# Add this to your Codex MCP configuration after reviewing the path.
+
+[mcp_servers.solidworks-codex]
+command = "node"
+args = ["C:\\Users\\Alphahui\\Documents\\Solidworks\\tools\\solidworks_codex\\mcp\\server.cjs"]
+env = {}
+

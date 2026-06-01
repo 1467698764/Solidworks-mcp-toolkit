@@ -1,0 +1,511 @@
+{
+  "timestamp": "2026-06-01T21:45:52",
+  "count": 35,
+  "tools": [
+    {
+      "name": "solidworks_audit",
+      "group": "export_verify",
+      "description": "Run the offline verification gate for this SolidWorks Codex toolchain.",
+      "required": [],
+      "properties": [
+        "out"
+      ]
+    },
+    {
+      "name": "solidworks_backup",
+      "group": "write_guarded",
+      "description": "Create timestamped backups of .SLDPRT/.SLDASM/.SLDDRW files before modification.",
+      "required": [
+        "files"
+      ],
+      "properties": [
+        "files",
+        "out"
+      ]
+    },
+    {
+      "name": "solidworks_backup_status",
+      "group": "write_guarded",
+      "description": "Inspect a backup report and classify source files as unchanged, changed, missing, or restorable.",
+      "required": [
+        "report"
+      ],
+      "properties": [
+        "out",
+        "report"
+      ]
+    },
+    {
+      "name": "solidworks_change_plan",
+      "group": "analysis",
+      "description": "Generate a flexible evidence-first mechanical CAD change plan from an inspect JSON report and natural-language goal.",
+      "required": [
+        "report",
+        "goal"
+      ],
+      "properties": [
+        "goal",
+        "json_out",
+        "out",
+        "report",
+        "session_name"
+      ]
+    },
+    {
+      "name": "solidworks_change_verify",
+      "group": "other",
+      "description": "Verify a compare delta contains only expected dimensions, component changes, additions/removals, or feature type count changes.",
+      "required": [
+        "delta"
+      ],
+      "properties": [
+        "allow_component",
+        "allow_component_added",
+        "allow_component_removed",
+        "allow_dimension",
+        "allow_feature_type",
+        "delta",
+        "out"
+      ]
+    },
+    {
+      "name": "solidworks_compare_reports",
+      "group": "export_verify",
+      "description": "Compare two SolidWorks Codex inspect JSON reports.",
+      "required": [
+        "before",
+        "after"
+      ],
+      "properties": [
+        "after",
+        "before",
+        "json_out",
+        "out"
+      ]
+    },
+    {
+      "name": "solidworks_component_state",
+      "group": "write_guarded",
+      "description": "Change assembly component state by Component2.Name2: hide/show/suppress/unsuppress/fix/float.",
+      "required": [
+        "component",
+        "action"
+      ],
+      "properties": [
+        "action",
+        "component",
+        "out",
+        "save"
+      ]
+    },
+    {
+      "name": "solidworks_design_review",
+      "group": "analysis",
+      "description": "Generate a generic evidence-first mechanical CAD review from an inspect JSON report: findings, open questions, and candidate actions.",
+      "required": [
+        "report"
+      ],
+      "properties": [
+        "intent",
+        "json_out",
+        "out",
+        "report"
+      ]
+    },
+    {
+      "name": "solidworks_existing_mcp_tools",
+      "group": "external_reference",
+      "description": "List tools exposed by installed npm solidworks-mcp-server in mock mode.",
+      "required": [],
+      "properties": []
+    },
+    {
+      "name": "solidworks_export",
+      "group": "export_verify",
+      "description": "Export active or specified SolidWorks document to target path. Format follows suffix.",
+      "required": [
+        "target"
+      ],
+      "properties": [
+        "model",
+        "out",
+        "target"
+      ]
+    },
+    {
+      "name": "solidworks_finalize",
+      "group": "export_verify",
+      "description": "Generate the final readiness Markdown/JSON report after running audit.",
+      "required": [],
+      "properties": [
+        "json_out",
+        "out"
+      ]
+    },
+    {
+      "name": "solidworks_handoff_bundle",
+      "group": "handoff",
+      "description": "Create a compact handoff bundle with inspect JSON, context pack, worklog summary, README, and manifest.",
+      "required": [
+        "report"
+      ],
+      "properties": [
+        "focus",
+        "out_dir",
+        "report",
+        "worklog"
+      ]
+    },
+    {
+      "name": "solidworks_inspect",
+      "group": "read_only",
+      "description": "Deep read-only inspect of active part/assembly: features, dimensions, components.",
+      "required": [],
+      "properties": [
+        "out"
+      ]
+    },
+    {
+      "name": "solidworks_interference_check",
+      "group": "export_verify",
+      "description": "Run conservative SolidWorks assembly interference detection and emit JSON.",
+      "required": [],
+      "properties": [
+        "out"
+      ]
+    },
+    {
+      "name": "solidworks_issue_report",
+      "group": "analysis",
+      "description": "Generate a practical issue/recommendation report from an inspect JSON report.",
+      "required": [
+        "report"
+      ],
+      "properties": [
+        "json_out",
+        "out",
+        "report"
+      ]
+    },
+    {
+      "name": "solidworks_mass_properties",
+      "group": "read_only",
+      "description": "Report mass properties for active or specified SolidWorks document.",
+      "required": [],
+      "properties": [
+        "model",
+        "out"
+      ]
+    },
+    {
+      "name": "solidworks_mate_macro",
+      "group": "macro_generation",
+      "description": "Generate reviewable VBA macro for adding a mate between two preselected entities.",
+      "required": [
+        "mate"
+      ],
+      "properties": [
+        "angle_deg",
+        "distance_mm",
+        "flip",
+        "manifest",
+        "mate",
+        "out"
+      ]
+    },
+    {
+      "name": "solidworks_model_understand",
+      "group": "other",
+      "description": "Build a compact task-scoped model understanding pack from an inspect report: baseline facts, relevant CAD objects, relationship hypotheses, risks, and next minimal queries.",
+      "required": [
+        "report"
+      ],
+      "properties": [
+        "json_out",
+        "out",
+        "report",
+        "task",
+        "view"
+      ]
+    },
+    {
+      "name": "solidworks_offline_demo",
+      "group": "other",
+      "description": "Generate a 5-minute offline demo bundle for GitHub readers without requiring SolidWorks to be open.",
+      "required": [],
+      "properties": [
+        "out_dir"
+      ]
+    },
+    {
+      "name": "solidworks_preflight",
+      "group": "export_verify",
+      "description": "Run deterministic environment/toolchain preflight before touching a real SolidWorks model.",
+      "required": [],
+      "properties": [
+        "out"
+      ]
+    },
+    {
+      "name": "solidworks_probe",
+      "group": "read_only",
+      "description": "Read-only attach to an already-running SolidWorks instance and summarize active document.",
+      "required": [],
+      "properties": [
+        "out"
+      ]
+    },
+    {
+      "name": "solidworks_rebuild",
+      "group": "write_guarded",
+      "description": "Rebuild active or specified SolidWorks document; optionally save.",
+      "required": [],
+      "properties": [
+        "model",
+        "out",
+        "save"
+      ]
+    },
+    {
+      "name": "solidworks_report_context",
+      "group": "analysis",
+      "description": "Build a freeform handoff/context pack from an inspect report: inventory, risks, anchors, and next commands.",
+      "required": [
+        "report"
+      ],
+      "properties": [
+        "focus",
+        "json_out",
+        "out",
+        "report"
+      ]
+    },
+    {
+      "name": "solidworks_report_search",
+      "group": "analysis",
+      "description": "Search an inspect JSON report for components, dimensions, and features by text/state when names are messy.",
+      "required": [
+        "report"
+      ],
+      "properties": [
+        "json_out",
+        "kind",
+        "out",
+        "query",
+        "report",
+        "state"
+      ]
+    },
+    {
+      "name": "solidworks_report_summary",
+      "group": "read_only",
+      "description": "Summarize a SolidWorks Codex JSON probe/inspect report into Markdown.",
+      "required": [
+        "report"
+      ],
+      "properties": [
+        "out",
+        "report"
+      ]
+    },
+    {
+      "name": "solidworks_restore_backup",
+      "group": "write_guarded",
+      "description": "Dry-run or apply restoration from a SolidWorks Codex backup report. apply=false only validates and plans.",
+      "required": [
+        "report"
+      ],
+      "properties": [
+        "apply",
+        "out",
+        "report"
+      ]
+    },
+    {
+      "name": "solidworks_safe_set_dimension",
+      "group": "write_guarded",
+      "description": "Run a guarded one-dimension edit pipeline: backup, inspect, set dimension, rebuild, inspect, compare, and verify only that dimension changed.",
+      "required": [
+        "model",
+        "dimension",
+        "value_m"
+      ],
+      "properties": [
+        "dimension",
+        "model",
+        "out",
+        "out_dir",
+        "save",
+        "value_m"
+      ]
+    },
+    {
+      "name": "solidworks_selection_report",
+      "group": "read_only",
+      "description": "Report current SolidWorks selection set for safe preselected-entity mate workflows.",
+      "required": [],
+      "properties": [
+        "out",
+        "start"
+      ]
+    },
+    {
+      "name": "solidworks_session_snapshot",
+      "group": "other",
+      "description": "Create a work-session package: inspect JSON, summary Markdown, issue report, manifest.",
+      "required": [],
+      "properties": [
+        "from_report",
+        "name",
+        "out_dir",
+        "start"
+      ]
+    },
+    {
+      "name": "solidworks_set_dimension",
+      "group": "write_guarded",
+      "description": "Set one SolidWorks dimension by full parameter name. Value is SystemValue in meters. Use save only after backup.",
+      "required": [
+        "dimension",
+        "value_m"
+      ],
+      "properties": [
+        "dimension",
+        "model",
+        "out",
+        "save",
+        "value_m"
+      ]
+    },
+    {
+      "name": "solidworks_start_inspect",
+      "group": "read_only",
+      "description": "Allow COM launch of SolidWorks, then run deep read-only inspect.",
+      "required": [],
+      "properties": [
+        "out"
+      ]
+    },
+    {
+      "name": "solidworks_start_probe",
+      "group": "read_only",
+      "description": "Allow COM launch of SolidWorks, then summarize active document.",
+      "required": [],
+      "properties": [
+        "out"
+      ]
+    },
+    {
+      "name": "solidworks_template_macro",
+      "group": "macro_generation",
+      "description": "Generate reviewable VBA macro for common mechanical part templates such as sleeve, spacer, flange, endcap, adapter, and retainer.",
+      "required": [
+        "template"
+      ],
+      "properties": [
+        "bearing_outer_diameter_mm",
+        "center_bore_mm",
+        "hole_count",
+        "hole_diameter_mm",
+        "hole_pcd_mm",
+        "inner_diameter_mm",
+        "length_mm",
+        "manifest",
+        "motor_hole_x_mm",
+        "motor_hole_y_mm",
+        "out",
+        "outer_diameter_mm",
+        "plate_height_mm",
+        "plate_width_mm",
+        "recess_depth_mm",
+        "template",
+        "thickness_mm"
+      ]
+    },
+    {
+      "name": "solidworks_tool_catalog",
+      "group": "other",
+      "description": "Generate a grouped catalog of all SolidWorks Codex MCP tools and when to use them.",
+      "required": [],
+      "properties": [
+        "json_out",
+        "out"
+      ]
+    },
+    {
+      "name": "solidworks_worklog",
+      "group": "handoff",
+      "description": "Append a durable worklog event for multi-turn decisions, assumptions, verification, failures, and next steps.",
+      "required": [
+        "message"
+      ],
+      "properties": [
+        "artifact",
+        "event",
+        "log",
+        "message",
+        "next",
+        "session_name",
+        "summary_out"
+      ]
+    }
+  ],
+  "groups": {
+    "export_verify": [
+      "solidworks_audit",
+      "solidworks_compare_reports",
+      "solidworks_export",
+      "solidworks_finalize",
+      "solidworks_interference_check",
+      "solidworks_preflight"
+    ],
+    "write_guarded": [
+      "solidworks_backup",
+      "solidworks_backup_status",
+      "solidworks_component_state",
+      "solidworks_rebuild",
+      "solidworks_restore_backup",
+      "solidworks_safe_set_dimension",
+      "solidworks_set_dimension"
+    ],
+    "analysis": [
+      "solidworks_change_plan",
+      "solidworks_design_review",
+      "solidworks_issue_report",
+      "solidworks_report_context",
+      "solidworks_report_search"
+    ],
+    "other": [
+      "solidworks_change_verify",
+      "solidworks_model_understand",
+      "solidworks_offline_demo",
+      "solidworks_session_snapshot",
+      "solidworks_tool_catalog"
+    ],
+    "external_reference": [
+      "solidworks_existing_mcp_tools"
+    ],
+    "handoff": [
+      "solidworks_handoff_bundle",
+      "solidworks_worklog"
+    ],
+    "read_only": [
+      "solidworks_inspect",
+      "solidworks_mass_properties",
+      "solidworks_probe",
+      "solidworks_report_summary",
+      "solidworks_selection_report",
+      "solidworks_start_inspect",
+      "solidworks_start_probe"
+    ],
+    "macro_generation": [
+      "solidworks_mate_macro",
+      "solidworks_template_macro"
+    ]
+  },
+  "operator_notes": [
+    "Do not blindly replay templates: inspect the current report, context, worklog, and handoff artifacts before choosing a tool.",
+    "Before write operations, create a backup; change one variable at a time; then rebuild, inspect, and compare.",
+    "Use handoff-bundle for pauses, session changes, and review handoff; use audit/finalize as release gates."
+  ]
+}
