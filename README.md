@@ -1,25 +1,25 @@
 ﻿# SolidWorks Codex MCP
 
-A practical SolidWorks MCP/control layer for general AI-assisted mechanical CAD work.
+[English](README.en.md)
 
-The project focuses on helping a strong model understand the current SolidWorks state before acting: components, dimensions, mates, transforms, spatial relationships, hole/manufacturing evidence, risks, and evidence gaps. It intentionally avoids a rigid "one prompt, one template" workflow.
+一个面向通用机械 CAD 工作的 SolidWorks MCP / 控制层，也可以理解为 practical SolidWorks MCP/control layer。项目重点不是把 AI 固定成某个建模模板，而是先把当前 SolidWorks 模型状态整理成足够可靠、足够紧凑的证据，让强模型能够理解装配、尺寸、约束、空间关系和制造风险之后，再做小步、可验证的操作。
 
-## What this is
+## 项目定位
 
-- A local MCP server plus PowerShell/Python control layer for SolidWorks.
-- A report-first workflow for messy real assemblies where names, mates, and design intent are often incomplete.
-- A guarded edit path: backup, one-variable change, rebuild, inspect, compare, and verify.
-- A handoff system so future AI turns can continue from evidence instead of re-guessing the project.
+- 本地 MCP 服务器，加上 PowerShell / Python 工具链，用于连接 SolidWorks 自动化能力。
+- 面向真实机械装配场景：零件命名不一定规范，约束和设计意图可能不完整，模型状态需要先被理解。
+- 先报告、再计划、再修改：备份、单变量修改、重建、复查、对比、验证。
+- 支持跨会话交接，让后续 AI 对话基于已有证据继续工作，而不是每次重新猜测项目状态。
 
-## What makes it useful
+## 核心能力
 
-- **35 conservative MCP tools** backed by a tested CLI path.
-- **Model understanding, not just automation:** `model-understand` builds task-aware CAD evidence graphs with components, dimensions, mate evidence, transforms, spatial relationships, manufacturing hole groups, readiness, and evidence gaps.
-- **Flexible reasoning:** `report-context`, `report-search`, `worklog`, `handoff-bundle`, and `tool-catalog` give the model enough context without forcing one fixed output schema or domain-specific workflow.
-- **Mechanical CAD generality:** examples and fixtures target general assemblies: plates, housings, locating interfaces, hole patterns, fasteners, clearances, transforms, and manufacturability evidence.
-- **Safety gates:** `preflight`, `audit`, `release-tree`, `public-copy-guard`, `repo-health`, `github-readiness`, and MCP smoke tests catch common release and runtime mistakes.
+- **35 个保守 MCP 工具**，由本地 CLI 路径和测试覆盖支撑。
+- **模型理解，而不只是自动化建模**：`model-understand` 会生成任务相关的 CAD 证据图，覆盖组件、尺寸、mate 证据、transform、空间关系、孔系/制造证据、决策就绪度和缺失信息。
+- **不束缚强模型推理**：`report-context`、`report-search`、`worklog`、`handoff-bundle`、`tool-catalog` 提供上下文和检索能力，但不强行规定单一输出格式或固定领域流程。
+- **机械通用性**：示例和 fixture 聚焦通用机械结构，例如板件、壳体、定位界面、孔系、紧固件、间隙、坐标变换和可制造性证据，不绑定单一行业案例或个人课题场景。
+- **安全修改闭环**：`preflight`、`audit`、`release-tree`、`public-copy-guard`、`repo-health`、`github-readiness` 和 MCP smoke test 用于捕获常见发布与运行问题。
 
-## Quick start
+## 快速开始
 
 ```powershell
 cd <repo>
@@ -28,7 +28,7 @@ cd <repo>
 .\tools\solidworks_codex\swctl.ps1 tool-catalog -Out tools\solidworks_codex\reports\tool_catalog.md -JsonOut tools\solidworks_codex\reports\tool_catalog.json
 ```
 
-Open a `.SLDASM` or `.SLDPRT` in SolidWorks, then capture evidence:
+在 SolidWorks 中打开 `.SLDASM` 或 `.SLDPRT` 后，采集当前模型证据：
 
 ```powershell
 .\tools\solidworks_codex\swctl.ps1 session-snapshot -SessionName assembly-baseline
@@ -44,62 +44,102 @@ Open a `.SLDASM` or `.SLDPRT` in SolidWorks, then capture evidence:
   -Out tools\solidworks_codex\reports\context.md
 ```
 
-## Typical workflow
+## 典型工作流
 
-1. `inspect` or `session-snapshot` to capture current state.
-2. `model-understand` to build a compact evidence graph.
-3. `report-search` to find uncertain dimensions, features, mates, or components.
-4. `change-plan` if a modification is needed.
-5. `safe-set-dimension` or another guarded write tool for one narrow change.
-6. `rebuild`, `inspect`, `compare`, `change-verify`, and optionally `interference` / `export`.
-7. `worklog` and `handoff-bundle` before pausing or switching AI sessions.
+1. 用 `inspect` 或 `session-snapshot` 捕获当前状态。
+2. 用 `model-understand` 构建紧凑的证据图。
+3. 用 `report-search` 查找不确定的尺寸、特征、mate 或组件。
+4. 需要修改时，先用 `change-plan` 生成修改计划。
+5. 用 `safe-set-dimension` 或其他受控写入工具完成一次窄范围修改。
+6. 执行 `rebuild`、`inspect`、`compare`、`change-verify`，必要时再跑 `interference` / `export`。
+7. 暂停或切换 AI 会话前，用 `worklog` 和 `handoff-bundle` 记录交接证据。
 
-## MCP tool groups
+## MCP 工具分组
 
-- Read-only: `solidworks_probe`, `solidworks_inspect`, `solidworks_report_summary`, `solidworks_selection_report`
-- Understanding/analysis: `solidworks_model_understand`, `solidworks_design_review`, `solidworks_change_plan`, `solidworks_report_search`, `solidworks_report_context`
-- Guarded writes: `solidworks_backup`, `solidworks_backup_status`, `solidworks_restore_backup`, `solidworks_set_dimension`, `solidworks_safe_set_dimension`, `solidworks_component_state`, `solidworks_rebuild`
-- Verification/export: `solidworks_compare_reports`, `solidworks_change_verify`, `solidworks_interference_check`, `solidworks_mass_properties`, `solidworks_export`
-- Handoff: `solidworks_worklog`, `solidworks_handoff_bundle`, `solidworks_tool_catalog`, `solidworks_offline_demo`
-- Release gates: `solidworks_preflight`, `solidworks_audit`, `solidworks_finalize`, `solidworks_existing_mcp_tools`
+### 只读检查
 
-Generate the exact current catalog with:
+- `solidworks_probe`
+- `solidworks_inspect`
+- `solidworks_report_summary`
+- `solidworks_selection_report`
+
+### 理解与分析
+
+- `solidworks_model_understand`
+- `solidworks_design_review`
+- `solidworks_change_plan`
+- `solidworks_report_search`
+- `solidworks_report_context`
+
+### 受控写入
+
+- `solidworks_backup`
+- `solidworks_backup_status`
+- `solidworks_restore_backup`
+- `solidworks_set_dimension`
+- `solidworks_safe_set_dimension`
+- `solidworks_component_state`
+- `solidworks_rebuild`
+
+### 验证与导出
+
+- `solidworks_compare_reports`
+- `solidworks_change_verify`
+- `solidworks_interference_check`
+- `solidworks_mass_properties`
+- `solidworks_export`
+
+### 交接
+
+- `solidworks_worklog`
+- `solidworks_handoff_bundle`
+- `solidworks_tool_catalog`
+- `solidworks_offline_demo`
+
+### 发布检查
+
+- `solidworks_preflight`
+- `solidworks_audit`
+- `solidworks_finalize`
+- `solidworks_existing_mcp_tools`
+
+生成当前完整工具目录：
 
 ```powershell
 .\tools\solidworks_codex\swctl.ps1 tool-catalog -Out tools\solidworks_codex\reports\tool_catalog.md -JsonOut tools\solidworks_codex\reports\tool_catalog.json
 ```
 
-## MCP configuration
+## MCP 配置
 
-Copy and adapt:
+复制并按需修改：
 
 ```text
 examples/codex-mcp-config.example.toml
 ```
 
-The MCP server entry point is:
+MCP server 入口：
 
 ```text
 tools/solidworks_codex/mcp/server.cjs
 ```
 
-This repository does not edit your global Codex config automatically.
+本仓库不会自动修改你的全局 Codex 配置。
 
-## Documentation
+## 文档
 
-- Usage guide: `docs/solidworks-codex-usage.md`
-- Architecture: `docs/architecture.md`
-- Project principles for future AI sessions: `docs/project-principles.md`
-- Troubleshooting: `docs/troubleshooting.md`
-- Offline demo: `docs/demo/README.md`
-- Copyable workflows: `docs/workflows/README.md`
-- Capability matrix: `docs/capability-matrix.md`
-- Prompt library: `docs/prompts.md`
-- Release checklist: `docs/github-release-checklist.md`
-- Changelog: `CHANGELOG.md`
-- Roadmap: `ROADMAP.md`
+- 使用指南：`docs/solidworks-codex-usage.md`
+- 架构说明：`docs/architecture.md`
+- 项目原则 / 给未来 AI 会话的偏好：`docs/project-principles.md`
+- 故障排查：`docs/troubleshooting.md`
+- 离线 demo：`docs/demo/README.md`
+- 可复制工作流：`docs/workflows/README.md`
+- 能力矩阵：`docs/capability-matrix.md`
+- Prompt library / Prompt 库：`docs/prompts.md`
+- 发布检查清单：`docs/github-release-checklist.md`
+- 更新日志：`CHANGELOG.md`
+- 路线图：`ROADMAP.md`
 
-## Verification before commit or release
+## 提交或发布前验证
 
 ```powershell
 python -m unittest discover -s tests -p "test_*.py" -v
@@ -108,17 +148,16 @@ node tools\solidworks_codex\mcp\smoke-test.cjs
 .\tools\solidworks_codex\swctl.ps1 release-tree -Out tools\solidworks_codex\reports\release_tree.json
 ```
 
-Or run:
+也可以运行：
 
 ```powershell
 .\scripts\verify-all.ps1
 ```
 
-Generated reports, backups, exports, macros, caches, and logs are runtime artifacts and should not be staged unless intentionally promoted as fixtures or demo assets.
+生成的 reports、backups、exports、宏、缓存和日志属于运行产物，通常不应提交，除非明确提升为 fixture 或 demo 资产。
 
-## Design stance
+## 设计立场
 
-The goal is not to constrain AI into a narrow CAD macro template. The goal is to give a strong model enough accurate SolidWorks evidence to reason independently, ask for missing evidence when needed, and make small verified changes when appropriate.
+这个项目的目标不是把 AI 限制在狭窄的 CAD 宏模板里，而是给强模型足够准确的 SolidWorks 证据，让它能够自主理解当前机械项目，在证据不足时主动提出缺口，并在合适时执行小步、可验证的修改。
 
-Engineering review still matters. These tools improve evidence capture, reasoning, repeatability, and handoff; they do not replace final mechanical validation, simulation, tolerance analysis, or manufacturing review.
-
+工程审查仍然必要。本工具链提升的是证据采集、空间/约束理解、可重复修改和交接质量；它不能替代最终机械校核、仿真、尺寸链/公差分析或制造评审。
