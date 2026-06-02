@@ -678,6 +678,11 @@ class LiveValidationGateSpecTests(unittest.TestCase):
         shaper_script = ROOT / "tools" / "solidworks_codex" / "scripts" / "sw_create_complete_shaper_fixture.py"
         self.assertIn(shaper_script, expectations["live_session_smoke"].source_paths)
 
+    def test_console_json_is_safe_for_gbk_stdout(self):
+        text = self.module.console_json({"relationship": "ram↔way", "ok": False})
+        text.encode("gbk")
+        self.assertIn("\\u2194", text)
+
 
 if __name__ == "__main__":
     unittest.main()

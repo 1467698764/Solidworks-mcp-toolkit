@@ -445,7 +445,16 @@ def preflight_solidworks_runtime(
             (com_attach_probe or probe_solidworks_com_attach_only)()
         except Exception as exc:
             failed.append("solidworks_com_unreachable")
-            return {"ok": False, "failed": failed, "processes": snapshots, "lock_files": lock_files, "com_error": f"{type(exc).__name__}: {exc}"}
+            diagnosis = "unhealthy_process_without_com" if high or hung else "responsive_process_without_com"
+            return {
+                "ok": False,
+                "failed": failed,
+                "processes": snapshots,
+                "lock_files": lock_files,
+                "com_error": f"{type(exc).__name__}: {exc}",
+                "diagnosis": diagnosis,
+                "recommended_action": "restart SolidWorks or close the stale SLDWORKS.exe before running live validation",
+            }
     return {"ok": not failed, "failed": failed, "processes": snapshots, "lock_files": lock_files, "out_dir": str(out_dir) if out_dir is not None else None, "max_private_memory_bytes": max_private_memory_bytes}
 
 

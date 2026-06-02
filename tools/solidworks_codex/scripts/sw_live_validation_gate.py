@@ -733,6 +733,10 @@ def write_gate_report(path: Path, payload: dict[str, Any]) -> None:
     path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
+def console_json(payload: dict[str, Any]) -> str:
+    return json.dumps(payload, indent=2, ensure_ascii=True)
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--contract-only", action="store_true")
@@ -749,7 +753,7 @@ def main() -> int:
     if args.contract_only:
         payload = {"ok": True, "contract": asdict(contract), "stale_fixture_cleanup": cleanup_stale_fixtures(False)}
         write_gate_report(out, payload)
-        print(json.dumps(payload, indent=2, ensure_ascii=False))
+        print(console_json(payload))
         return 0
 
     executions: list[dict[str, Any]] = []
@@ -778,7 +782,7 @@ def main() -> int:
         "failed": failed,
     }
     write_gate_report(out, payload)
-    print(json.dumps(payload, indent=2, ensure_ascii=False))
+    print(console_json(payload))
     return 0 if payload["ok"] else 2
 
 

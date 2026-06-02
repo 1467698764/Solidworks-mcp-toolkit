@@ -309,6 +309,14 @@ class CompleteShaperSpecTests(unittest.TestCase):
         result = self.module.preflight_solidworks_runtime(process_snapshots=low, com_attach_probe=lambda: (_ for _ in ()).throw(RuntimeError("COM unavailable")))
         self.assertFalse(result["ok"])
         self.assertIn("solidworks_com_unreachable", result["failed"])
+        self.assertEqual("responsive_process_without_com", result["diagnosis"])
+        self.assertIn("restart SolidWorks", result["recommended_action"])
+
+        result = self.module.preflight_solidworks_runtime(process_snapshots=high, max_private_memory_bytes=1_500_000_000, com_attach_probe=lambda: (_ for _ in ()).throw(RuntimeError("COM unavailable")))
+        self.assertFalse(result["ok"])
+        self.assertIn("solidworks_memory_high", result["failed"])
+        self.assertIn("solidworks_com_unreachable", result["failed"])
+        self.assertEqual("unhealthy_process_without_com", result["diagnosis"])
 
     def test_inspect_and_model_understanding_are_hard_shaper_gates(self):
         base = {
