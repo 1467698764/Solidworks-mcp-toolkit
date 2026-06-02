@@ -40,6 +40,7 @@ WORKFLOW_BY_CLI = {
     "preflight": "release_gate",
     "audit": "release_gate",
     "finalize": "release_gate",
+    "live-gate": "release_gate",
     "github-readiness": "release_gate",
     "repo-health": "release_gate",
     "release-tree": "release_gate",

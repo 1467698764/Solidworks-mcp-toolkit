@@ -1,6 +1,6 @@
 param(
     [Parameter(Position=0)]
-    [ValidateSet('probe','inspect','backup','backup-status','restore-backup','set-dimension','safe-set-dimension','mcp-tools','start-probe','start-inspect','summary','compare','change-verify','rebuild','start-rebuild','export','mass','start-mass','audit','component-state','start-component-state','interference','start-interference','template-macro','issue-report','mate-macro','selection-report','start-selection-report','session-snapshot','start-session-snapshot','preflight','design-review','change-plan','report-search','report-context','model-understand','worklog','handoff-bundle','tool-catalog','offline-demo','public-copy-guard','github-readiness','repo-health','release-tree','capability-matrix','finalize')]
+    [ValidateSet('probe','inspect','backup','backup-status','restore-backup','set-dimension','safe-set-dimension','mcp-tools','start-probe','start-inspect','summary','compare','change-verify','rebuild','start-rebuild','export','mass','start-mass','audit','component-state','start-component-state','interference','start-interference','template-macro','issue-report','mate-macro','selection-report','start-selection-report','session-snapshot','start-session-snapshot','preflight','design-review','change-plan','report-search','report-context','model-understand','worklog','handoff-bundle','tool-catalog','offline-demo','public-copy-guard','github-readiness','repo-health','release-tree','capability-matrix','finalize','live-gate')]
     [string]$Command = 'probe',
 
     [string]$Out = '', [string]$Model = '', [string]$Dimension = '', [double]$ValueM = [double]::NaN,
@@ -16,7 +16,7 @@ param(
     [string]$SessionName = 'session', [string]$FromReport = '', [string]$OutDir = '',
     [string]$Message = '', [string]$Next = '', [string[]]$Artifact = @(),
     [string[]]$AllowDimension = @(), [string[]]$AllowComponent = @(), [string[]]$AllowComponentAdded = @(), [string[]]$AllowComponentRemoved = @(), [string[]]$AllowFeatureType = @(),
-    [switch]$RequireAllowedChange
+    [switch]$RequireAllowedChange, [switch]$ContractOnly, [switch]$ValidateOnly, [switch]$CleanupStale
 )
 
 $Root = Split-Path -Parent $PSCommandPath
@@ -114,6 +114,7 @@ switch ($Command) {
     'repo-health' { $outPath = if ($Out) { $Out } else { DefaultOut 'repo_health.json' }; exit (Invoke-SwPython @((Join-Path $Root 'scripts/sw_repo_health.py'), '--out', $outPath)) }
     'release-tree' { $outPath = if ($Out) { $Out } else { DefaultOut 'release_tree.json' }; exit (Invoke-SwPython @((Join-Path $Root 'scripts/sw_release_tree.py'), '--out', $outPath)) }
     'capability-matrix' { $outPath = if ($Out) { $Out } else { 'docs/capability-matrix.md' }; $jsonTarget = if ($JsonOut) { $JsonOut } else { 'docs/capability-matrix.json' }; exit (Invoke-SwPython @((Join-Path $Root 'scripts/sw_capability_matrix.py'), '--out', $outPath, '--json-out', $jsonTarget)) }
+    'live-gate' { $outPath = if ($Out) { $Out } else { DefaultOut 'live_validation_gate.json' }; $argsList = @((Join-Path $Root 'scripts/sw_live_validation_gate.py'), '--out', $outPath); if ($ContractOnly) { $argsList += '--contract-only' }; if ($ValidateOnly) { $argsList += '--validate-only' }; if ($CleanupStale) { $argsList += '--cleanup-stale' }; exit (Invoke-SwPython $argsList) }
     'finalize' { $outPath = if ($Out) { $Out } else { 'docs/solidworks-codex-final-readiness.md' }; $jsonTarget = if ($JsonOut) { $JsonOut } else { DefaultOut 'final_readiness.json' }; exit (Invoke-SwPython @((Join-Path $Root 'scripts/sw_finalize.py'), '--run-audit', '--out', $outPath, '--json-out', $jsonTarget)) }
     'audit' { $outPath = if ($Out) { $Out } else { DefaultOut 'audit_latest.json' }; exit (Invoke-SwPython @((Join-Path $Root 'scripts/sw_audit.py'), '--out', $outPath)) }
     'mcp-tools' { node (Join-Path $Workspace 'tools/mcp-solidworks-ts/list-tools.cjs'); exit $LASTEXITCODE }

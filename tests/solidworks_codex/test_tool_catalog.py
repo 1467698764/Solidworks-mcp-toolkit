@@ -59,7 +59,10 @@ class ToolCatalogTests(unittest.TestCase):
             by_cli = {item["cli"]: item for item in data["capabilities"]}
             self.assertIn("SolidWorks Codex Capability Matrix", text)
             self.assertEqual(data["count"], len(data["capabilities"]))
-            self.assertGreaterEqual(data["count"], 30)
+            self.assertGreaterEqual(data["count"], 31)
+            self.assertEqual(by_cli["live-gate"]["workflow"], "release_gate")
+            self.assertEqual(by_cli["live-gate"]["safety"], "offline_gate")
+            self.assertTrue(by_cli["live-gate"]["solidworks_required"])
             self.assertEqual(by_cli["backup"]["safety"], "guarded_write")
             self.assertEqual(by_cli["backup-status"]["mcp"], "solidworks_backup_status")
 
