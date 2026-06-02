@@ -116,4 +116,19 @@ D1@Sketch1@plate.SLDPRT
 .\tools\solidworks_codex\swctl.ps1 offline-demo -OutDir docs\demo\offline
 ```
 
+## Live gate：真实 SolidWorks 能力验收
+
+当需要确认不是“离线字符串测试”而是真实 SolidWorks COM 能力可用时，运行：
+
+```powershell
+.\tools\solidworks_codex\swctl.ps1 live-gate -CleanupStale -Out tools\solidworks_codex\reports\live_validation_gate.json
+```
+
+live gate 是 opt-in，不默认放进普通 CI；它需要本机 SolidWorks、可导入 `pythoncom/win32com.client` 的 Python，并会尽量设置 `sw.Visible = False` 以减少窗口和内存干扰。它串行运行，不并行启动多个 SolidWorks 会话。它验证的交付物是原生 `.SLDASM/.SLDPRT`：
+
+- 会话 smoke：两个小零件 + 一个装配 + 距离配合；inspect 必须读到 mate 参与组件，干涉为 0，退出后无锁。
+- 功能套件：拉伸/切除/旋转拉伸/旋转切除/草图尺寸修改/读取修改重建/装配插入/配合/干涉/质量/cleanup。
+- 牛头刨床：`tools/solidworks_codex/live_fixture/shaper_machine_v5/bullhead_shaper_complete.SLDASM`，严格检查零件数、组件数、mate 语义和参与组件、质量、0 干涉、inspect/model-understanding 证据、文件锁。
+
+STEP 导出只保留为 optional smoke，不能替代 `.SLDASM/.SLDPRT` 验收。旧失败生成物可用 `-CleanupStale` 清理；清理范围只包括 `shaper_machine`、`shaper_machine_v2`、`shaper_machine_v3`、`shaper_machine_v4`，不会触碰 `shaper_machine_v5`、`live_capability_suite` 或其它仓库目录。live gate 会在启动前和每个 check 之间扫描生成目录下的 `~$` 锁文件；重型 check 超时时会记录 cleanup 结果，并只终止无响应或超过内存阈值的 `SLDWORKS.exe`。
 

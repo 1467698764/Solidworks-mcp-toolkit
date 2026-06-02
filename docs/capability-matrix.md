@@ -1,11 +1,11 @@
 # SolidWorks Codex Capability Matrix
 
-- Timestamp: `2026-06-01T23:42:34`
-- Capability count: `46`
+- Timestamp: `2026-06-02T14:02:43`
+- Capability count: `47`
 
 ## Coverage
 
-- CLI commands: `46`
+- CLI commands: `47`
 - MCP tools: `35`
 - MCP tools mapped to CLI: `35`
 - CLI for every local MCP tool: `True`
@@ -38,6 +38,7 @@
 | `inspect` | `solidworks_inspect` | `discover` | `read_only` | `True` | `-` |
 | `interference` | `solidworks_interference_check` | `verify_export` | `verification_or_export` | `True` | `-` |
 | `issue-report` | `solidworks_issue_report` | `analysis` | `read_only` | `False` | `report` |
+| `live-gate` | `-` | `release_gate` | `offline_gate` | `True` | `-` |
 | `mass` | `solidworks_mass_properties` | `discover` | `read_only` | `True` | `-` |
 | `mate-macro` | `solidworks_mate_macro` | `macro_generation` | `generated_reviewable_artifact` | `False` | `mate` |
 | `mcp-tools` | `solidworks_existing_mcp_tools` | `external_reference` | `offline_reference` | `False` | `-` |

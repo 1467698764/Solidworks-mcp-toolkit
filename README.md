@@ -165,3 +165,21 @@ node tools\solidworks_codex\mcp\smoke-test.cjs
 这个项目的目标不是把 AI 限制在狭窄的 CAD 宏模板里，而是给强模型足够准确的 SolidWorks 证据，让它能够自主理解当前机械项目，在证据不足时主动提出缺口，并在合适时执行小步、可验证的修改。
 
 工程审查仍然必要。本工具链提升的是证据采集、空间/约束理解、可重复修改和交接质量；它不能替代最终机械校核、仿真、尺寸链/公差分析或制造评审。
+
+## Live SolidWorks gate（可选但用于真实能力验收）
+
+离线单测、MCP smoke 和 `verify-all.ps1` 只证明仓库语法、工具映射与报告逻辑。要验证真实 SolidWorks 建模/装配能力，请在装有 SolidWorks + pywin32 的本机串行运行 live gate：
+
+```powershell
+.\tools\solidworks_codex\swctl.ps1 live-gate -CleanupStale -Out tools\solidworks_codex\reports\live_validation_gate.json
+```
+
+该 gate 会隐藏 SolidWorks 窗口并串行执行三个层级的 live 验证，避免多开窗口和并行 COM 会话：
+
+- `live_session_smoke`：最小实机链路，生成两个小零件和一个装配，创建距离配合，直接 inspect 当前 ModelDoc2，不启动第二个 SolidWorks 会话；要求 mate 回读到参与组件、干涉为 0、退出后无锁文件。
+- `live_capability_suite`：验证拉伸、拉伸切除、旋转拉伸、旋转切除、草图尺寸读取/修改/rebuild/save、装配插入、同心配合、距离配合、干涉回调、质量回调、关闭文档和文件锁探测。
+- `complete_shaper_v5`：生成原生牛头刨床装配体 `tools/solidworks_codex/live_fixture/shaper_machine_v5/bullhead_shaper_complete.SLDASM`，并校验 24 个零件、58 个组件实例、4 个语义配合及其参与组件、质量、干涉为 0、inspect/model-understanding 证据、post-cleanup 无锁文件。
+
+验收主产物始终是原生 `.SLDASM/.SLDPRT`；STEP 只作为 optional smoke，不作为交付判定。`-CleanupStale` 只会删除已知旧失败生成目录 `shaper_machine`/`shaper_machine_v2`/`shaper_machine_v3`/`shaper_machine_v4`，不会触碰 `shaper_machine_v5`、`live_capability_suite` 或仓库其它目录。gate 运行前和每个 live check 之间都会检查 `tools/solidworks_codex/live_fixture/**/~$*`；如果重型 check 超时，会记录 timeout cleanup 结果并只清理无响应或超过内存阈值的 `SLDWORKS.exe`。
+
+Direct Python form (same cleanup flag behind swctl): `python tools/solidworks_codex/scripts/sw_live_validation_gate.py --cleanup-stale --out tools/solidworks_codex/reports/live_validation_gate.json`.
