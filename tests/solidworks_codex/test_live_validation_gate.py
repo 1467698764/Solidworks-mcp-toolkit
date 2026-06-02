@@ -146,32 +146,9 @@ def shaper_mates():
 
 
 def shaper_primary_components():
-    placements = {
-        "cast_bed_with_t_slots": (0.00, 0.00, 0.000),
-        "column_frame_with_window": (-0.22, 0.095, 0.056),
-        "left_dovetail_way": (0.03, 0.245, 0.105),
-        "right_dovetail_way": (0.03, 0.245, 0.145),
-        "ram_with_dovetail_and_tool_mount": (0.10, 0.285, 0.198),
-        "front_gib_plate": (0.10, 0.222, 0.232),
-        "rear_gib_plate": (0.10, 0.222, 0.252),
-        "clapper_tool_head": (0.315, 0.255, 0.274),
-        "single_point_cutting_tool": (0.350, 0.160, 0.316),
-        "bull_gear_crank_disk": (-0.245, 0.115, 0.102),
-        "crank_center_shaft": (-0.245, 0.115, 0.125),
-        "eccentric_crank_pin": (-0.198, 0.115, 0.196),
-        "bronze_sliding_die_block": (-0.055, 0.205, 0.292),
-        "slotted_rocker_arm": (-0.145, 0.205, 0.245),
-        "rocker_pivot_bracket": (-0.205, 0.105, 0.318),
-        "rocker_pivot_shaft": (-0.205, 0.105, 0.377),
-        "ram_drive_link": (0.055, 0.245, 0.363),
-        "table_cross_slide": (0.08, 0.085, 0.142),
-        "work_table_with_t_slots": (0.10, 0.125, 0.207),
-        "vise_jaw_fixed": (0.045, 0.170, 0.383),
-        "vise_jaw_movable": (0.165, 0.170, 0.406),
-    }
     return [
         {"name2": f"{name}-1", "transform": {"origin_m": list(origin)}, "suppressed": False}
-        for name, origin in placements.items()
+        for name, origin in load_module()._expected_shaper_component_origins().items()
     ]
 
 
@@ -340,19 +317,19 @@ class LiveValidationGateSpecTests(unittest.TestCase):
                     "save": {"ok": True, "errors": 0, "warnings": 0},
                 },
                 "operation_context": with_readbacks({
-                    "extrude": {"document": "extrude_cut_plate.SLDPRT", "active_title": "零件1", "saved_path": "C:/generated/extrude_cut_plate.SLDPRT", "operations": {
+                    "extrude": {"document": "extrude_cut_plate.SLDPRT", "active_title": "闆朵欢1", "saved_path": "C:/generated/extrude_cut_plate.SLDPRT", "operations": {
                         "Body_Plate": {"sketch": "Sketch1", "profile": "rectangle", "geometry": {"lines": 4, "circles": 0, "centerlines": 0}, "feature_type": "Extrusion", "api": "FeatureExtrusion2"},
                         "Round_Through_Hole": {"sketch": "Sketch2", "profile": "circle", "geometry": {"lines": 0, "circles": 1, "centerlines": 0}, "feature_type": "ICE", "api": "FeatureCut3"},
                         "Rectangular_Window_Cut": {"sketch": "Sketch3", "profile": "rectangle", "geometry": {"lines": 4, "circles": 0, "centerlines": 0}, "feature_type": "ICE", "api": "FeatureCut3"},
                     }},
-                    "revolve": {"document": "revolve_boss_part.SLDPRT", "active_title": "零件2", "saved_path": "C:/generated/revolve_boss_part.SLDPRT", "operations": {
+                    "revolve": {"document": "revolve_boss_part.SLDPRT", "active_title": "闆朵欢2", "saved_path": "C:/generated/revolve_boss_part.SLDPRT", "operations": {
                         "Revolve_Boss_Profile": {"sketch": "Sketch1", "profile": "closed_revolve_profile_with_centerline", "geometry": {"lines": 5, "circles": 0, "centerlines": 1}, "feature_type": "Revolution", "api": "FeatureRevolve2"},
                     }},
-                    "revolve_cut": {"document": "revolve_cut_part.SLDPRT", "active_title": "零件3", "saved_path": "C:/generated/revolve_cut_part.SLDPRT", "operations": {
+                    "revolve_cut": {"document": "revolve_cut_part.SLDPRT", "active_title": "闆朵欢3", "saved_path": "C:/generated/revolve_cut_part.SLDPRT", "operations": {
                         "Revolve_Boss_Profile": {"sketch": "Sketch1", "profile": "closed_revolve_profile_with_centerline", "geometry": {"lines": 5, "circles": 0, "centerlines": 1}, "feature_type": "Revolution", "api": "FeatureRevolve2"},
                         "Revolve_Cut_Bore": {"sketch": "Sketch2", "profile": "closed_cut_profile_with_centerline", "geometry": {"lines": 4, "circles": 0, "centerlines": 1}, "feature_type": "RevCut", "api": "FeatureRevolveCut2"},
                     }},
-                    "editable": {"document": "editable_dimension_plate.SLDPRT", "active_title": "零件4", "saved_path": "C:/generated/editable_dimension_plate.SLDPRT", "operations": {
+                    "editable": {"document": "editable_dimension_plate.SLDPRT", "active_title": "闆朵欢4", "saved_path": "C:/generated/editable_dimension_plate.SLDPRT", "operations": {
                         "Body_Editable_Plate": {"sketch": "Sketch1", "profile": "rectangle", "geometry": {"lines": 4, "circles": 0, "centerlines": 0}, "feature_type": "Extrusion", "api": "FeatureExtrusion2"},
                         "Edited_Sketch_Dimension": {"sketch": "Sketch2", "profile": "circle", "geometry": {"lines": 0, "circles": 1, "centerlines": 0}, "feature_type": "ICE", "api": "FeatureCut3", "dimension": "D1@Edited_Sketch_Dimension"},
                     }},

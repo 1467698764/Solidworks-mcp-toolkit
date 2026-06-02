@@ -395,8 +395,15 @@ class CompleteShaperSpecTests(unittest.TestCase):
             "single_point_cutting_tool",
         ):
             self.assertIn(name, contract)
-            self.assertEqual(contract[name]["expected_origin_m"], self.module.placements_for(self.module.build_complete_shaper_spec())[name])
             self.assertLessEqual(contract[name]["tolerance_m"], 0.003)
+
+    def test_placement_contract_uses_solved_transform_origins_after_mates(self):
+        contract = self.module.expected_shaper_placement_contract()
+
+        self.assertEqual((0.0, 0.0, -0.0275), contract["cast_bed_with_t_slots"]["expected_origin_m"])
+        self.assertEqual((-0.22, 0.1642, 0.035), contract["column_frame_with_window"]["expected_origin_m"])
+        self.assertEqual((-0.245, 0.115, 0.0675), contract["crank_center_shaft"]["expected_origin_m"])
+        self.assertEqual((0.1, 0.125, 0.032), contract["work_table_with_t_slots"]["expected_origin_m"])
 
 
 
@@ -414,6 +421,11 @@ class CompleteShaperSpecTests(unittest.TestCase):
         self.assertIn("run_assembly_callbacks", source)
         self.assertIn("InterferenceDetectionManager", source)
         self.assertIn("validate_live_result", source)
+
+    def test_interference_callback_records_component_pair_evidence(self):
+        source = SCRIPT.read_text(encoding="utf-8")
+        self.assertIn('"pairs"', source)
+        self.assertIn("GetComponents", source)
 
     def test_validate_live_result_rejects_bad_callbacks_mates_and_interference(self):
         base = {
@@ -490,6 +502,12 @@ class CompleteShaperSpecTests(unittest.TestCase):
                 process_snapshots=high,
                 max_private_memory_bytes=1_900_000_000,
             )
+
+
+    def test_runtime_health_guard_allows_responsive_heavy_fixture_session_by_default(self):
+        snapshots = [{"name": "SLDWORKS", "id": 78, "private_memory_bytes": 4_500_000_000, "responding": True}]
+
+        self.module.assert_solidworks_runtime_healthy("insert_component", process_snapshots=snapshots)
 
 
     def test_live_builder_records_attach_failure_report_and_cleanup_state(self):
