@@ -218,6 +218,9 @@ def mate_reference_components_from(feat: Any, reader: Any) -> list[str]:
     if specific is None or isinstance(specific, dict):
         return []
     entities = reader(specific, "GetEntities")
+    if (entities is None or isinstance(entities, dict)) and not isinstance(reader(specific, "GetMateEntityCount"), dict):
+        count = int(reader(specific, "GetMateEntityCount") or 0)
+        entities = [reader(specific, "MateEntity", index) for index in range(count)]
     if entities is None or isinstance(entities, dict):
         return []
     names: list[str] = []

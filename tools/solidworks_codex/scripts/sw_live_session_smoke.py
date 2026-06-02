@@ -35,6 +35,15 @@ def validate_session_smoke_result(result: dict[str, Any]) -> dict[str, Any]:
         failed.append("inspect_current_assembly")
     if not asm_doc.get("mate_like_features"):
         failed.append("assembly_mate_evidence")
+    smoke_mates = {
+        str(mate.get("name", "")): mate
+        for mate in asm_doc.get("mate_like_features", [])
+        if isinstance(mate, dict)
+    }
+    smoke_mate = smoke_mates.get("Smoke_Distance_Mate", {})
+    smoke_components = "\n".join(str(item) for item in smoke_mate.get("components", []) if isinstance(smoke_mate.get("components"), list))
+    if "session_smoke_left" not in smoke_components or "session_smoke_right" not in smoke_components:
+        failed.append("assembly_mate_component_evidence")
     inter = (result.get("callbacks") or {}).get("interference", {})
     if inter.get("available") is not True or inter.get("count") != 0:
         failed.append("interference_callback")

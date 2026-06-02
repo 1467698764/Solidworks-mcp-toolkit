@@ -168,6 +168,12 @@ def _strict_check_failed(data: dict[str, Any], check: str) -> bool:
         asm_doc = (data.get("assembly_inspect") or {}).get("active_document", {}) if isinstance(data.get("assembly_inspect"), dict) else {}
         inter = (data.get("callbacks") or {}).get("interference", {}) if isinstance(data.get("callbacks"), dict) else {}
         post = data.get("post_cleanup", {})
+        smoke_mates = {
+            str(mate.get("name", "")): mate
+            for mate in asm_doc.get("mate_like_features", [])
+            if isinstance(mate, dict)
+        }
+        smoke_mate = smoke_mates.get("Smoke_Distance_Mate", {})
         return (
             data.get("ok") is not True
             or data.get("started_second_session") is not False
@@ -175,6 +181,7 @@ def _strict_check_failed(data: dict[str, Any], check: str) -> bool:
             or asm_doc.get("type") != "assembly"
             or int(asm_doc.get("component_count_sampled", 0) or 0) < 2
             or not asm_doc.get("mate_like_features")
+            or not _component_pair_matches(smoke_mate.get("components"), ["session_smoke_left", "session_smoke_right"])
             or inter.get("available") is not True
             or inter.get("count") != 0
             or "post_cleanup" not in data

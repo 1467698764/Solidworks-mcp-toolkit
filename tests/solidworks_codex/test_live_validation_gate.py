@@ -107,7 +107,7 @@ class LiveValidationGateSpecTests(unittest.TestCase):
 
 
     def test_session_smoke_strict_check_rejects_second_session_or_lock_leak(self):
-        good = {"ok": True, "started_second_session": False, "part_inspect": {"active_document": {"type": "part"}}, "assembly_inspect": {"active_document": {"type": "assembly", "component_count_sampled": 2, "mate_like_features": [{"name": "Smoke_Distance_Mate"}]}}, "callbacks": {"interference": {"available": True, "count": 0}}, "post_cleanup": {"locked_files": [], "lock_files": []}, "validation": {"ok": True, "failed": []}}
+        good = {"ok": True, "started_second_session": False, "part_inspect": {"active_document": {"type": "part"}}, "assembly_inspect": {"active_document": {"type": "assembly", "component_count_sampled": 2, "mate_like_features": [{"name": "Smoke_Distance_Mate", "components": ["session_smoke_left-1", "session_smoke_right-1"]}]}}, "callbacks": {"interference": {"available": True, "count": 0}}, "post_cleanup": {"locked_files": [], "lock_files": []}, "validation": {"ok": True, "failed": []}}
         self.assertFalse(self.module._strict_check_failed(good, "single_session_smoke"))
         bad = dict(good, started_second_session=True)
         self.assertTrue(self.module._strict_check_failed(bad, "single_session_smoke"))
@@ -115,6 +115,8 @@ class LiveValidationGateSpecTests(unittest.TestCase):
         self.assertTrue(self.module._strict_check_failed(bad_asm, "single_session_smoke"))
         bad_lock = dict(good, post_cleanup={"locked_files": ["session_smoke.SLDPRT"], "lock_files": []})
         self.assertTrue(self.module._strict_check_failed(bad_lock, "single_session_smoke"))
+        bad_mate_details = dict(good, assembly_inspect={"active_document": {"type": "assembly", "component_count_sampled": 2, "mate_like_features": [{"name": "Smoke_Distance_Mate"}]}})
+        self.assertTrue(self.module._strict_check_failed(bad_mate_details, "single_session_smoke"))
 
     def test_default_report_expectations_use_strict_live_checks(self):
         contract = self.module.build_gate_contract()
