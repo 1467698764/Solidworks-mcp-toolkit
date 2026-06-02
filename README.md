@@ -86,7 +86,7 @@ cd <repo>
 
 - `solidworks_compare_reports`
 - `solidworks_change_verify`
-- `assembly-contract`（CLI）：离线校验 inspect 报告是否满足装配合约，包括组件前缀、Transform2/origin 位置、语义 mate 类型、mate 参与组件和 suppressed 状态；用于把牛头刨床这类复杂试刀石的验收条件抽成可复用机制。
+- `assembly-contract`（CLI）：离线校验 inspect 报告是否满足装配合约，包括组件前缀、Transform2/origin 位置、语义 mate 类型、mate 参与组件和 suppressed 状态；用于把牛头刨床这类复杂试刀石的验收条件抽成可复用机制。`complete_shaper_v5` 每次 spec/live 运行都会写出 `tools/solidworks_codex/reports/shaper_machine_v5/complete_shaper_assembly_contract.json`，可直接配合对应 inspect 报告做离线复验。
 - `solidworks_interference_check`
 - `solidworks_mass_properties`
 - `solidworks_export`

@@ -185,6 +185,36 @@ def mate_component_evidence_ok(mate: dict[str, Any], semantic_pair: list[str]) -
 
 
 
+
+
+def build_shaper_assembly_contract() -> dict[str, Any]:
+    """Return a reusable offline assembly contract for the bullhead shaper.
+
+    This mirrors the strict live shaper gates but uses the generic
+    sw_assembly_contract.py schema so an inspect report can be validated without
+    rerunning SolidWorks generation. The contract intentionally covers spatial
+    placement and semantic mates; file creation alone is not acceptance evidence.
+    """
+    placements = placements_for(build_complete_shaper_spec())
+    return {
+        "document_type": "assembly",
+        "minimum_component_count": expected_assembly_component_minimum(),
+        "default_origin_tolerance_m": 0.004,
+        "components": {
+            name: {"required": True, "origin_m": list(origin), "tolerance_m": 0.004}
+            for name, origin in placements.items()
+        },
+        "mates": {
+            name: {
+                "type": expected_inspect_mate_type(expected["type"]),
+                "semantic_pair": list(expected["semantic_pair"]),
+                "functional_group": expected.get("functional_group"),
+            }
+            for name, expected in expected_shaper_mate_contract().items()
+        },
+    }
+
+
 def validate_semantic_mate_network(mates: Any, contract: dict[str, dict[str, Any]]) -> list[str]:
     """Validate a generic semantic mate network from live mate evidence.
 
@@ -1546,11 +1576,15 @@ def main() -> int:
     manifest_path = Path(args.manifest) if args.manifest else Path(args.reports_dir) / "complete_shaper_manifest.json"
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     manifest_path.write_text(json.dumps(spec_to_manifest(spec), indent=2), encoding="utf-8")
+    assembly_contract_path = Path(args.reports_dir) / "complete_shaper_assembly_contract.json"
+    assembly_contract_path.parent.mkdir(parents=True, exist_ok=True)
+    assembly_contract_path.write_text(json.dumps(build_shaper_assembly_contract(), indent=2, ensure_ascii=False), encoding="utf-8")
     if args.spec_only:
-        print(json.dumps({"ok": True, "manifest": str(manifest_path), "spec_only": True}, indent=2))
+        print(json.dumps({"ok": True, "manifest": str(manifest_path), "assembly_contract": str(assembly_contract_path), "spec_only": True}, indent=2))
         return 0
     result = construct_live_fixture(spec, Path(args.out_dir), Path(args.reports_dir), args.force)
     result["manifest"] = str(manifest_path)
+    result["assembly_contract"] = str(assembly_contract_path)
     print(json.dumps(result, indent=2))
     return 0 if result.get("ok") else 1
 

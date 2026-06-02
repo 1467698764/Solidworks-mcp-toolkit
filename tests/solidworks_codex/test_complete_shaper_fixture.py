@@ -199,6 +199,19 @@ class CompleteShaperSpecTests(unittest.TestCase):
         broken[1] = dict(broken[1], components=["wrong-1", "bearing_block-1"])
         self.assertIn("mate_components:Shaft_Bearing_Concentric", self.module.validate_semantic_mate_network(broken, contract))
 
+
+    def test_shaper_exports_generic_assembly_contract_for_reusable_validation(self):
+        contract = self.module.build_shaper_assembly_contract()
+
+        self.assertEqual("assembly", contract["document_type"])
+        self.assertEqual(self.module.expected_assembly_component_minimum(), contract["minimum_component_count"])
+        self.assertIn("cast_bed_with_t_slots", contract["components"])
+        self.assertIn("origin_m", contract["components"]["cast_bed_with_t_slots"])
+        self.assertIn("Bed_Column_Distance_Mate", contract["mates"])
+        self.assertEqual("MateDistanceDim", contract["mates"]["Bed_Column_Distance_Mate"]["type"])
+        self.assertEqual(["cast_bed_with_t_slots", "column_frame_with_window"], contract["mates"]["Bed_Column_Distance_Mate"]["semantic_pair"])
+        self.assertEqual(set(self.module.expected_shaper_mate_contract()), set(contract["mates"]))
+
     def test_complete_shaper_requires_semantic_mate_network_not_single_distance_mate(self):
         expected = self.module.expected_shaper_mate_contract()
         self.assertGreaterEqual(len(expected), 4)
@@ -385,6 +398,13 @@ class CompleteShaperSpecTests(unittest.TestCase):
             self.assertEqual(contract[name]["expected_origin_m"], self.module.placements_for(self.module.build_complete_shaper_spec())[name])
             self.assertLessEqual(contract[name]["tolerance_m"], 0.003)
 
+
+
+    def test_live_script_writes_shaper_assembly_contract_artifact(self):
+        source = SCRIPT.read_text(encoding="utf-8")
+        self.assertIn("complete_shaper_assembly_contract.json", source)
+        self.assertIn("build_shaper_assembly_contract()", source)
+        self.assertIn('result["assembly_contract"]', source)
 
     def test_builder_runs_hidden_and_has_mate_and_interference_callbacks(self):
         source = SCRIPT.read_text(encoding="utf-8")
