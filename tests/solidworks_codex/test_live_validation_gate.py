@@ -319,12 +319,13 @@ class LiveValidationGateSpecTests(unittest.TestCase):
             result = self.module.run_check(
                 self.module.LiveCheck("complete_shaper_v5", ("python", "heavy.py"), "heavy.json", "slow"),
                 timeout_seconds=3,
-                timeout_cleanup=lambda check: calls.append(check.name),
+                timeout_cleanup=lambda check: (calls.append(check.name) or {"terminated_pids": [77]}),
             )
         finally:
             self.module.subprocess.run = original_run
         self.assertEqual(["complete_shaper_v5"], calls)
         self.assertTrue(result["timeout_cleanup_requested"])
+        self.assertEqual({"terminated_pids": [77]}, result["timeout_cleanup"])
 
     def test_timeout_cleanup_only_terminates_unhealthy_solidworks_processes(self):
         killed = []

@@ -485,8 +485,9 @@ def run_check(check: LiveCheck, timeout_seconds: int = 900, timeout_cleanup: Any
         )
     except subprocess.TimeoutExpired as exc:
         cleanup_requested = False
+        cleanup_result = None
         if timeout_cleanup is not None:
-            timeout_cleanup(check)
+            cleanup_result = timeout_cleanup(check)
             cleanup_requested = True
         return {
             "name": check.name,
@@ -496,6 +497,7 @@ def run_check(check: LiveCheck, timeout_seconds: int = 900, timeout_cleanup: Any
             "command": list(check.command),
             "timeout_seconds": timeout_seconds,
             "timeout_cleanup_requested": cleanup_requested,
+            "timeout_cleanup": cleanup_result,
         }
     return {
         "name": check.name,

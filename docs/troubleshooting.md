@@ -119,6 +119,25 @@ Useful commands:
 .\tools\solidworks_codex\swctl.ps1 compare -Before tools\solidworks_codex\reports\before.json -After tools\solidworks_codex\reports\after.json -Out tools\solidworks_codex\reports\delta.md
 ```
 
+## Live gate times out or SolidWorks becomes unresponsive
+
+Symptoms include `timeout_after_<seconds>s`, `SLDWORKS.exe Responding=False`, high private memory, or generated `~$*.SLDPRT` / `~$*.SLDASM` lock files under `tools\solidworks_codex\live_fixture`.
+
+Recommended sequence:
+
+1. Do not immediately rerun the heavy check.
+2. Inspect `tools\solidworks_codex\reports\live_validation_gate.json`; timeout entries include `timeout_cleanup` with any terminated PIDs.
+3. Confirm no generated lock files remain:
+
+```powershell
+Get-ChildItem tools\solidworks_codex\live_fixture -Filter '~$*' -Recurse -Force
+```
+
+4. If lock files remain only under generated fixture directories and no `SLDWORKS.exe` is running, remove those generated locks before rerunning.
+5. Rerun the minimal session smoke or `live-gate -ValidateOnly` before attempting the full gate again.
+
+The live gate intentionally runs checks serially, refuses stale generated locks before launching SolidWorks, and only terminates SolidWorks on timeout when the process is not responding or exceeds the configured memory threshold.
+
 ## Release gates fail
 
 Run the focused gate directly:
