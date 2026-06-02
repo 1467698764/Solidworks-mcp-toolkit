@@ -1,4 +1,4 @@
-﻿import importlib.util
+import importlib.util
 import sys
 import unittest
 from pathlib import Path
@@ -167,13 +167,49 @@ class CompleteShaperSpecTests(unittest.TestCase):
         self.assertGreaterEqual(validation["component_count"], self.module.expected_assembly_component_minimum())
 
 
+
+    def test_semantic_mate_network_validator_is_generic_not_shaper_name_bound(self):
+        contract = {
+            "Base_Cover_Distance": {"type": "distance", "semantic_pair": ["base_plate", "cover_plate"]},
+            "Shaft_Bearing_Concentric": {"type": "concentric", "semantic_pair": ["drive_shaft", "bearing_block"]},
+        }
+        mates = [
+            {
+                "name": "Base_Cover_Distance",
+                "ok": True,
+                "kind": "distance",
+                "semantic_pair": ["base_plate", "cover_plate"],
+                "components": ["base_plate-1", "cover_plate-1"],
+                "selected_entities": 2,
+                "selection_guard": {"cleared_selection_count": 0, "selection_count_before_mate": 2, "component_pair": ["base_plate-1", "cover_plate-1"]},
+            },
+            {
+                "name": "Shaft_Bearing_Concentric",
+                "ok": True,
+                "kind": "concentric",
+                "semantic_pair": ["drive_shaft", "bearing_block"],
+                "components": ["drive_shaft-1", "bearing_block-1"],
+                "selected_entities": 2,
+                "selection_guard": {"cleared_selection_count": 0, "selection_count_before_mate": 2, "component_pair": ["drive_shaft-1", "bearing_block-1"]},
+            },
+        ]
+        self.assertEqual([], self.module.validate_semantic_mate_network(mates, contract))
+
+        broken = list(mates)
+        broken[1] = dict(broken[1], components=["wrong-1", "bearing_block-1"])
+        self.assertIn("mate_components:Shaft_Bearing_Concentric", self.module.validate_semantic_mate_network(broken, contract))
+
     def test_complete_shaper_requires_semantic_mate_network_not_single_distance_mate(self):
         expected = self.module.expected_shaper_mate_contract()
         self.assertGreaterEqual(len(expected), 4)
         self.assertIn("Bed_Column_Distance_Mate", expected)
+        self.assertIn("Ram_LeftWay_Guidance_Distance_Mate", expected)
+        self.assertIn("ToolHead_Ram_Distance_Mate", expected)
+        self.assertIn("Table_CrossSlide_Distance_Mate", expected)
         self.assertIn("BullGear_CrankShaft_Concentric_Mate", expected)
         self.assertIn("Crank_Link_Concentric_Mate", expected)
         self.assertIn("Rocker_Pivot_Concentric_Mate", expected)
+        self.assertGreaterEqual(len(expected), 7)
 
         spatial = self.module.expected_shaper_spatial_contract()
         self.assertIn("structural_stack", spatial)
@@ -182,6 +218,10 @@ class CompleteShaperSpecTests(unittest.TestCase):
         self.assertIn("quick_return_drive", spatial)
         self.assertIn("ram_with_dovetail_and_tool_mount", spatial["ram_guidance"])
         self.assertIn("single_point_cutting_tool", spatial["tool_head"])
+
+        self.assertEqual(expected["Ram_LeftWay_Guidance_Distance_Mate"]["semantic_pair"], ["ram_with_dovetail_and_tool_mount", "left_dovetail_way"])
+        self.assertEqual(expected["ToolHead_Ram_Distance_Mate"]["semantic_pair"], ["clapper_tool_head", "ram_with_dovetail_and_tool_mount"])
+        self.assertEqual(expected["Table_CrossSlide_Distance_Mate"]["semantic_pair"], ["work_table_with_t_slots", "table_cross_slide"])
 
         only_one = {
             "ok": True,
@@ -198,6 +238,34 @@ class CompleteShaperSpecTests(unittest.TestCase):
 
 
 
+
+
+    def test_complete_shaper_rejects_missing_guidance_toolhead_and_table_mates(self):
+        base = {
+            "ok": True,
+            "part_count": 24,
+            "component_count": self.module.expected_assembly_component_minimum(),
+            "layout": {"ok": True},
+            "mates": sample_shaper_mates(self.module),
+            "callbacks": {"mass": {"available": True, "mass_kg": 14.81}, "interference": {"available": True, "count": 0}},
+            "post_cleanup": {"locked_files": [], "lock_files": []},
+            "inspect": self.module.sample_expected_shaper_inspect_evidence(),
+            "model_understanding": self.module.sample_expected_shaper_understanding_evidence(),
+        }
+        self.assertTrue(self.module.validate_live_result(base)["ok"])
+
+        missing = dict(base)
+        missing["mates"] = [
+            mate for mate in sample_shaper_mates(self.module)
+            if mate["name"] not in {
+                "Ram_LeftWay_Guidance_Distance_Mate",
+                "ToolHead_Ram_Distance_Mate",
+                "Table_CrossSlide_Distance_Mate",
+            }
+        ]
+        validation = self.module.validate_live_result(missing)
+        self.assertFalse(validation["ok"])
+        self.assertIn("mate_network", validation["failed"])
 
     def test_live_inspect_reuses_current_assembly_and_cleanup_after_exit(self):
         source = SCRIPT.read_text(encoding="utf-8")

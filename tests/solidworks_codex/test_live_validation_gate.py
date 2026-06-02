@@ -89,6 +89,33 @@ def shaper_mates():
             "ok": True,
         },
         {
+            "name": "Ram_LeftWay_Guidance_Distance_Mate",
+            "kind": "distance",
+            "semantic_pair": ["ram_with_dovetail_and_tool_mount", "left_dovetail_way"],
+            "components": ["ram_with_dovetail_and_tool_mount-1", "left_dovetail_way-1"],
+            "selected_entities": 2,
+            "selection_guard": {"cleared_selection_count": 0, "selection_count_before_mate": 2, "component_pair": ["ram_with_dovetail_and_tool_mount-1", "left_dovetail_way-1"]},
+            "ok": True,
+        },
+        {
+            "name": "ToolHead_Ram_Distance_Mate",
+            "kind": "distance",
+            "semantic_pair": ["clapper_tool_head", "ram_with_dovetail_and_tool_mount"],
+            "components": ["clapper_tool_head-1", "ram_with_dovetail_and_tool_mount-1"],
+            "selected_entities": 2,
+            "selection_guard": {"cleared_selection_count": 0, "selection_count_before_mate": 2, "component_pair": ["clapper_tool_head-1", "ram_with_dovetail_and_tool_mount-1"]},
+            "ok": True,
+        },
+        {
+            "name": "Table_CrossSlide_Distance_Mate",
+            "kind": "distance",
+            "semantic_pair": ["work_table_with_t_slots", "table_cross_slide"],
+            "components": ["work_table_with_t_slots-1", "table_cross_slide-1"],
+            "selected_entities": 2,
+            "selection_guard": {"cleared_selection_count": 0, "selection_count_before_mate": 2, "component_pair": ["work_table_with_t_slots-1", "table_cross_slide-1"]},
+            "ok": True,
+        },
+        {
             "name": "BullGear_CrankShaft_Concentric_Mate",
             "kind": "concentric",
             "semantic_pair": ["bull_gear_crank_disk", "crank_center_shaft"],
@@ -151,6 +178,9 @@ def shaper_primary_components():
 def shaper_inspect_evidence():
     return {"active_document": {"type": "assembly", "component_count_sampled": 58, "components": shaper_primary_components(), "mate_like_features": [
         {"name": "Bed_Column_Distance_Mate", "type": "MateDistanceDim", "components": ["cast_bed_with_t_slots-1", "column_frame_with_window-1"], "suppressed": False},
+        {"name": "Ram_LeftWay_Guidance_Distance_Mate", "type": "MateDistanceDim", "components": ["ram_with_dovetail_and_tool_mount-1", "left_dovetail_way-1"], "suppressed": False},
+        {"name": "ToolHead_Ram_Distance_Mate", "type": "MateDistanceDim", "components": ["clapper_tool_head-1", "ram_with_dovetail_and_tool_mount-1"], "suppressed": False},
+        {"name": "Table_CrossSlide_Distance_Mate", "type": "MateDistanceDim", "components": ["work_table_with_t_slots-1", "table_cross_slide-1"], "suppressed": False},
         {"name": "BullGear_CrankShaft_Concentric_Mate", "type": "MateConcentric", "components": ["bull_gear_crank_disk-1", "crank_center_shaft-1"], "suppressed": False},
         {"name": "Crank_Link_Concentric_Mate", "type": "MateConcentric", "components": ["eccentric_crank_pin-1", "ram_drive_link-1"], "suppressed": False},
         {"name": "Rocker_Pivot_Concentric_Mate", "type": "MateConcentric", "components": ["slotted_rocker_arm-1", "rocker_pivot_shaft-1"], "suppressed": False}
@@ -359,6 +389,21 @@ class LiveValidationGateSpecTests(unittest.TestCase):
 
         report["mates"] = shaper_mates()
         report["mates"][1]["selection_guard"]["component_pair"] = ["wrong-1", "crank_center_shaft-1"]
+        self.assertTrue(self.module._strict_check_failed(report, "mate_semantics"))
+
+
+    def test_shaper_gate_requires_guidance_toolhead_and_table_mates(self):
+        report = {"mates": shaper_mates()}
+        self.assertFalse(self.module._strict_check_failed(report, "mate_semantics"))
+
+        report["mates"] = [
+            mate for mate in shaper_mates()
+            if mate["name"] not in {
+                "Ram_LeftWay_Guidance_Distance_Mate",
+                "ToolHead_Ram_Distance_Mate",
+                "Table_CrossSlide_Distance_Mate",
+            }
+        ]
         self.assertTrue(self.module._strict_check_failed(report, "mate_semantics"))
 
     def test_capability_gate_rejects_mates_without_selection_and_component_evidence(self):

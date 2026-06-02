@@ -126,11 +126,21 @@ def expected_live_feature_names() -> dict[str, tuple[str, ...]]:
 
 
 def expected_shaper_mate_contract() -> dict[str, dict[str, Any]]:
+    """Semantic mate network used by the shaper fixture acceptance gate.
+
+    The shaper is a stress fixture for the generic project capability: a useful
+    assembly must prove constraints across functional subassemblies, not merely
+    create a few mate features. Each entry names the intended pair so validators
+    can reject plausible-looking but mechanically unconnected assemblies.
+    """
     return {
-        "Bed_Column_Distance_Mate": {"type": "distance", "semantic_pair": ["cast_bed_with_t_slots", "column_frame_with_window"]},
-        "BullGear_CrankShaft_Concentric_Mate": {"type": "concentric", "semantic_pair": ["bull_gear_crank_disk", "crank_center_shaft"]},
-        "Crank_Link_Concentric_Mate": {"type": "concentric", "semantic_pair": ["eccentric_crank_pin", "ram_drive_link"]},
-        "Rocker_Pivot_Concentric_Mate": {"type": "concentric", "semantic_pair": ["slotted_rocker_arm", "rocker_pivot_shaft"]},
+        "Bed_Column_Distance_Mate": {"type": "distance", "semantic_pair": ["cast_bed_with_t_slots", "column_frame_with_window"], "functional_group": "structural_stack"},
+        "Ram_LeftWay_Guidance_Distance_Mate": {"type": "distance", "semantic_pair": ["ram_with_dovetail_and_tool_mount", "left_dovetail_way"], "functional_group": "ram_guidance"},
+        "ToolHead_Ram_Distance_Mate": {"type": "distance", "semantic_pair": ["clapper_tool_head", "ram_with_dovetail_and_tool_mount"], "functional_group": "tool_head"},
+        "Table_CrossSlide_Distance_Mate": {"type": "distance", "semantic_pair": ["work_table_with_t_slots", "table_cross_slide"], "functional_group": "workholding_stack"},
+        "BullGear_CrankShaft_Concentric_Mate": {"type": "concentric", "semantic_pair": ["bull_gear_crank_disk", "crank_center_shaft"], "functional_group": "quick_return_drive"},
+        "Crank_Link_Concentric_Mate": {"type": "concentric", "semantic_pair": ["eccentric_crank_pin", "ram_drive_link"], "functional_group": "quick_return_drive"},
+        "Rocker_Pivot_Concentric_Mate": {"type": "concentric", "semantic_pair": ["slotted_rocker_arm", "rocker_pivot_shaft"], "functional_group": "quick_return_drive"},
     }
 
 
@@ -174,9 +184,46 @@ def mate_component_evidence_ok(mate: dict[str, Any], semantic_pair: list[str]) -
     return component_pair_matches_semantic_pair(components, semantic_pair)
 
 
+
+def validate_semantic_mate_network(mates: Any, contract: dict[str, dict[str, Any]]) -> list[str]:
+    """Validate a generic semantic mate network from live mate evidence.
+
+    This is deliberately not shaper-specific: any mechanical fixture can provide a
+    contract mapping mate names to expected kind and semantic component pair. The
+    live evidence must prove API success, selection isolation, and component
+    readback for every required mate.
+    """
+    failed: list[str] = []
+    if not isinstance(mates, list) or not mates:
+        return ["mate:missing", "mate_network"]
+    mate_by_name = {mate.get("name"): mate for mate in mates if isinstance(mate, dict)}
+    missing_contract_mates = sorted(set(contract) - set(mate_by_name))
+    if missing_contract_mates:
+        failed.append("mate_network")
+    for name, expected in contract.items():
+        mate = mate_by_name.get(name)
+        if not mate:
+            continue
+        semantic_pair = list(expected["semantic_pair"])
+        if not mate.get("ok"):
+            failed.append(f"mate:{name}")
+        if mate.get("semantic_pair") != semantic_pair:
+            failed.append(f"mate_semantics:{name}")
+        if mate.get("kind") != expected["type"]:
+            failed.append(f"mate_type:{name}")
+        if mate.get("mate_error") not in (0, 1, None):
+            failed.append(f"mate_error:{name}")
+        if not mate_selection_evidence_ok(mate):
+            failed.append(f"mate_selection:{name}")
+        if not mate_component_evidence_ok(mate, semantic_pair):
+            failed.append(f"mate_components:{name}")
+    return failed
+
+
 def expected_shaper_spatial_contract() -> dict[str, list[str]]:
     return {
         "structural_stack": ["cast_bed_with_t_slots", "column_frame_with_window", "table_cross_slide", "work_table_with_t_slots"],
+        "workholding_stack": ["table_cross_slide", "work_table_with_t_slots", "vise_jaw_fixed", "vise_jaw_movable"],
         "ram_guidance": ["left_dovetail_way", "right_dovetail_way", "ram_with_dovetail_and_tool_mount", "front_gib_plate", "rear_gib_plate"],
         "tool_head": ["ram_with_dovetail_and_tool_mount", "clapper_tool_head", "single_point_cutting_tool"],
         "quick_return_drive": ["bull_gear_crank_disk", "crank_center_shaft", "eccentric_crank_pin", "ram_drive_link", "bronze_sliding_die_block", "slotted_rocker_arm", "rocker_pivot_shaft"],
@@ -1311,30 +1358,7 @@ def validate_live_result(result: dict[str, Any]) -> dict[str, Any]:
         failed.append("component_count")
     if result.get("layout", {}).get("ok") is not True:
         failed.append("nominal_layout")
-    mates = result.get("mates", [])
-    if not mates:
-        failed.append("mate:missing")
-    mate_contract = expected_shaper_mate_contract()
-    mate_by_name = {mate.get("name"): mate for mate in mates if isinstance(mate, dict)}
-    missing_contract_mates = sorted(set(mate_contract) - set(mate_by_name))
-    if missing_contract_mates:
-        failed.append("mate_network")
-    for name, expected in mate_contract.items():
-        mate = mate_by_name.get(name)
-        if not mate:
-            continue
-        if not mate.get("ok"):
-            failed.append(f"mate:{name}")
-        if mate.get("semantic_pair") != expected["semantic_pair"]:
-            failed.append(f"mate_semantics:{name}")
-        if mate.get("kind") != expected["type"]:
-            failed.append(f"mate_type:{name}")
-        if mate.get("mate_error") not in (0, 1):
-            failed.append(f"mate_error:{name}")
-        if not mate_selection_evidence_ok(mate):
-            failed.append(f"mate_selection:{name}")
-        if not mate_component_evidence_ok(mate, list(expected["semantic_pair"])):
-            failed.append(f"mate_components:{name}")
+    failed.extend(validate_semantic_mate_network(result.get("mates", []), expected_shaper_mate_contract()))
     callbacks = result.get("callbacks", {})
     mass = callbacks.get("mass", {})
     mass_kg = float(mass.get("mass_kg", 0) or 0)

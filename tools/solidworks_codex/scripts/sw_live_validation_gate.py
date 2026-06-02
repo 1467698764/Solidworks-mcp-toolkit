@@ -149,6 +149,9 @@ def shaper_v5_strict_checks() -> tuple[str, ...]:
 def _expected_inspect_mates() -> dict[str, tuple[str, list[str]]]:
     return {
         "Bed_Column_Distance_Mate": ("MateDistanceDim", ["cast_bed_with_t_slots", "column_frame_with_window"]),
+        "Ram_LeftWay_Guidance_Distance_Mate": ("MateDistanceDim", ["ram_with_dovetail_and_tool_mount", "left_dovetail_way"]),
+        "ToolHead_Ram_Distance_Mate": ("MateDistanceDim", ["clapper_tool_head", "ram_with_dovetail_and_tool_mount"]),
+        "Table_CrossSlide_Distance_Mate": ("MateDistanceDim", ["work_table_with_t_slots", "table_cross_slide"]),
         "BullGear_CrankShaft_Concentric_Mate": ("MateConcentric", ["bull_gear_crank_disk", "crank_center_shaft"]),
         "Crank_Link_Concentric_Mate": ("MateConcentric", ["eccentric_crank_pin", "ram_drive_link"]),
         "Rocker_Pivot_Concentric_Mate": ("MateConcentric", ["slotted_rocker_arm", "rocker_pivot_shaft"]),
@@ -384,6 +387,9 @@ def _strict_check_failed(data: dict[str, Any], check: str) -> bool:
         mates = data.get("mates", [])
         required = {
             "Bed_Column_Distance_Mate": ("distance", ["cast_bed_with_t_slots", "column_frame_with_window"]),
+            "Ram_LeftWay_Guidance_Distance_Mate": ("distance", ["ram_with_dovetail_and_tool_mount", "left_dovetail_way"]),
+            "ToolHead_Ram_Distance_Mate": ("distance", ["clapper_tool_head", "ram_with_dovetail_and_tool_mount"]),
+            "Table_CrossSlide_Distance_Mate": ("distance", ["work_table_with_t_slots", "table_cross_slide"]),
             "BullGear_CrankShaft_Concentric_Mate": ("concentric", ["bull_gear_crank_disk", "crank_center_shaft"]),
             "Crank_Link_Concentric_Mate": ("concentric", ["eccentric_crank_pin", "ram_drive_link"]),
             "Rocker_Pivot_Concentric_Mate": ("concentric", ["slotted_rocker_arm", "rocker_pivot_shaft"]),
