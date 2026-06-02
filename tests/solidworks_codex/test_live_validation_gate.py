@@ -290,6 +290,23 @@ class LiveValidationGateSpecTests(unittest.TestCase):
         self.assertFalse(self.module.is_safe_stale_fixture_dir(current))
         self.assertFalse(self.module.is_safe_stale_fixture_dir(unrelated))
 
+    def test_run_check_reports_timeout_without_hanging_gate(self):
+        def fake_run(*args, **kwargs):
+            raise self.module.subprocess.TimeoutExpired(cmd=args[0], timeout=kwargs.get("timeout"))
+
+        original_run = self.module.subprocess.run
+        try:
+            self.module.subprocess.run = fake_run
+            result = self.module.run_check(
+                self.module.LiveCheck("heavy", ("python", "heavy.py"), "heavy.json", "slow"),
+                timeout_seconds=3,
+            )
+        finally:
+            self.module.subprocess.run = original_run
+        self.assertEqual("heavy", result["name"])
+        self.assertEqual(124, result["returncode"])
+        self.assertIn("timeout_after_3s", result["stderr_tail"])
+
 
     def test_gate_preflight_blocks_any_generated_lock_files_before_running_checks(self):
         with TemporaryDirectory() as tmp:

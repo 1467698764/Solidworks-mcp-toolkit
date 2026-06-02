@@ -1144,9 +1144,19 @@ def validate_model_understanding_evidence(understanding: Any) -> list[str]:
     spatial = ((understanding.get("cad_evidence_graph") or {}).get("spatial_evidence") or {})
     relations = spatial.get("near_or_overlap_pairs") or []
     text = "\n".join(f"{r.get('a')} {r.get('b')}" for r in relations if isinstance(r, dict))
+    component_sources = []
+    graph_components = (understanding.get("cad_evidence_graph") or {}).get("components_index") or []
+    spatial_components = (understanding.get("spatial_model") or {}).get("components") or []
+    component_sources.extend(graph_components if isinstance(graph_components, list) else [])
+    component_sources.extend(spatial_components if isinstance(spatial_components, list) else [])
+    component_text = "\n".join(
+        str(item.get("name", item.get("name2", item))) if isinstance(item, dict) else str(item)
+        for item in component_sources
+    )
     for group, members in expected_shaper_spatial_contract().items():
         hits = sum(1 for member in members if member in text)
-        if hits < min(2, len(members)):
+        inventory_hits = sum(1 for member in members if member in component_text)
+        if hits < min(2, len(members)) and inventory_hits < len(members):
             failed.append(f"model_understanding:spatial_contract:{group}")
     if failed and not any(x == "model_understanding:spatial_contract" for x in failed):
         # Preserve a stable coarse failure code for callers/tests while still

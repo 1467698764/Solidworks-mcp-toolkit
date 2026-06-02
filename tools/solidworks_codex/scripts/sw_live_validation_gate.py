@@ -406,15 +406,26 @@ def report_expectations(contract: GateContract, executions: Iterable[dict[str, A
     )
 
 
-def run_check(check: LiveCheck) -> dict[str, Any]:
-    proc = subprocess.run(
-        check.command,
-        cwd=ROOT,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        check=False,
-    )
+def run_check(check: LiveCheck, timeout_seconds: int = 900) -> dict[str, Any]:
+    try:
+        proc = subprocess.run(
+            check.command,
+            cwd=ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+            timeout=timeout_seconds,
+        )
+    except subprocess.TimeoutExpired as exc:
+        return {
+            "name": check.name,
+            "returncode": 124,
+            "stdout_tail": str(exc.stdout or "")[-6000:],
+            "stderr_tail": f"timeout_after_{timeout_seconds}s",
+            "command": list(check.command),
+            "timeout_seconds": timeout_seconds,
+        }
     return {
         "name": check.name,
         "returncode": proc.returncode,

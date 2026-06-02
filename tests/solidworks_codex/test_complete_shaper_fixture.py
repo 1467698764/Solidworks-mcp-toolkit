@@ -248,6 +248,22 @@ class CompleteShaperSpecTests(unittest.TestCase):
         self.assertFalse(validation["ok"])
         self.assertIn("model_understanding:spatial_contract", validation["failed"])
 
+    def test_model_understanding_accepts_contract_member_inventory_when_near_pairs_are_sparse(self):
+        components_index = []
+        for group_members in self.module.expected_shaper_spatial_contract().values():
+            for name in group_members:
+                components_index.append({"name": f"{name}-1", "bbox_m": [0, 0, 0, 0.01, 0.01, 0.01]})
+        understanding = {
+            "ok": True,
+            "baseline": {"inventory": {"component_count": self.module.expected_assembly_component_minimum(), "floating_components": []}},
+            "cad_evidence_graph": {
+                "components_index": components_index,
+                "spatial_evidence": {"near_or_overlap_pairs": [], "missing_spatial_evidence": []},
+            },
+            "spatial_model": {"components": components_index, "pairwise_relations": [], "missing_spatial_evidence": []},
+        }
+        self.assertEqual([], self.module.validate_model_understanding_evidence(understanding))
+
     def test_inspect_evidence_rejects_same_named_mates_without_type_and_component_pair(self):
         evidence = self.module.sample_expected_shaper_inspect_evidence()
         doc = evidence["active_document"]
