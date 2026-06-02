@@ -24,6 +24,12 @@ def sample_operation_context(module):
         part["saved_path"] = f"C:/generated/{part['document']}"
         for op_name, op in part["operations"].items():
             op["sketch"] = f"Sketch_for_{op_name}"
+            op["selection_guard"] = {
+                "active_title": f"Temporary title for {part_key}",
+                "cleared_selection_count": 0,
+                "selected_sketch": f"Sketch_for_{op_name}",
+                "selection_count_before_feature": 1,
+            }
             op["readback"] = {
                 "sketch": f"Sketch_for_{op_name}",
                 "geometry": dict(op["geometry"]),
@@ -138,6 +144,49 @@ class LiveCapabilitySuiteSpecTests(unittest.TestCase):
         self.assertEqual(guards["revolve"]["operations"]["Revolve_Boss_Profile"]["geometry"]["centerlines"], 1)
         self.assertEqual(guards["revolve_cut"]["operations"]["Revolve_Cut_Bore"]["feature_type"], "RevCut")
         self.assertEqual(guards["editable"]["operations"]["Edited_Sketch_Dimension"]["dimension"], "D1@Edited_Sketch_Dimension")
+        for part in guards.values():
+            for op in part["operations"].values():
+                self.assertTrue(op["selection_guard"]["active_title"])
+                self.assertEqual(op["selection_guard"]["cleared_selection_count"], 0)
+                self.assertEqual(op["selection_guard"]["selection_count_before_feature"], 1)
+
+    def test_validate_operation_context_rejects_missing_or_wrong_selection_guard(self):
+        context = sample_operation_context(self.module)
+
+        del context["extrude"]["operations"]["Round_Through_Hole"]["selection_guard"]
+        validation = self.module.validate_operation_context(context)
+        self.assertFalse(validation["ok"])
+        self.assertIn("extrude:Round_Through_Hole:selection_guard", validation["failed"])
+
+        context = sample_operation_context(self.module)
+        context["extrude"]["operations"]["Round_Through_Hole"]["selection_guard"]["selected_sketch"] = "Sketch_from_previous_operation"
+        validation = self.module.validate_operation_context(context)
+        self.assertFalse(validation["ok"])
+        self.assertIn("extrude:Round_Through_Hole:selection_guard:selected_sketch", validation["failed"])
+
+        context = sample_operation_context(self.module)
+        context["revolve_cut"]["operations"]["Revolve_Cut_Bore"]["selection_guard"]["selection_count_before_feature"] = 2
+        validation = self.module.validate_operation_context(context)
+        self.assertFalse(validation["ok"])
+        self.assertIn("revolve_cut:Revolve_Cut_Bore:selection_guard:selection_count_before_feature", validation["failed"])
+
+        context = sample_operation_context(self.module)
+        context["editable"]["operations"]["Edited_Sketch_Dimension"]["selection_guard"]["selection_count_before_feature"] = None
+        validation = self.module.validate_operation_context(context)
+        self.assertFalse(validation["ok"])
+        self.assertIn("editable:Edited_Sketch_Dimension:selection_guard:selection_count_before_feature", validation["failed"])
+
+        context = sample_operation_context(self.module)
+        context["revolve"]["operations"]["Revolve_Boss_Profile"]["selection_guard"]["cleared_selection_count"] = None
+        validation = self.module.validate_operation_context(context)
+        self.assertFalse(validation["ok"])
+        self.assertIn("revolve:Revolve_Boss_Profile:selection_guard:cleared_selection_count", validation["failed"])
+
+        context = sample_operation_context(self.module)
+        context["extrude"]["operations"]["Body_Plate"]["selection_guard"]["active_title"] = ""
+        validation = self.module.validate_operation_context(context)
+        self.assertFalse(validation["ok"])
+        self.assertIn("extrude:Body_Plate:selection_guard:active_title", validation["failed"])
 
 
     def test_reopened_feature_readback_reports_actual_consumed_sketch_name_and_geometry(self):

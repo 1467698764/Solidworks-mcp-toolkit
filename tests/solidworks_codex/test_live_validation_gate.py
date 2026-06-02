@@ -22,6 +22,12 @@ def load_module():
 def with_readbacks(context):
     for part in context.values():
         for op in part["operations"].values():
+            op["selection_guard"] = {
+                "active_title": part.get("active_title"),
+                "cleared_selection_count": 0,
+                "selected_sketch": op["sketch"],
+                "selection_count_before_feature": 1,
+            }
             op["readback"] = {
                 "source": "reopened_feature_tree",
                 "sketch": op["sketch"],
@@ -103,6 +109,30 @@ class LiveValidationGateSpecTests(unittest.TestCase):
         self.assertIn("strict:live_capability_suite:assembly_mates_persisted", result["failed"])
         self.assertIn("strict:live_capability_suite:open_existing_modify_reopen", result["failed"])
         self.assertIn("strict:live_capability_suite:operation_context_guards", result["failed"])
+
+    def test_operation_context_strict_check_rejects_null_selection_guard_without_crashing(self):
+        report = {
+            "operation_context": with_readbacks({
+                "extrude": {"document": "extrude_cut_plate.SLDPRT", "active_title": "Part1", "saved_path": "C:/generated/extrude_cut_plate.SLDPRT", "operations": {
+                    "Body_Plate": {"sketch": "Sketch1", "profile": "rectangle", "geometry": {"lines": 4, "circles": 0, "centerlines": 0}, "feature_type": "Extrusion", "api": "FeatureExtrusion2"},
+                    "Round_Through_Hole": {"sketch": "Sketch2", "profile": "circle", "geometry": {"lines": 0, "circles": 1, "centerlines": 0}, "feature_type": "ICE", "api": "FeatureCut3"},
+                    "Rectangular_Window_Cut": {"sketch": "Sketch3", "profile": "rectangle", "geometry": {"lines": 4, "circles": 0, "centerlines": 0}, "feature_type": "ICE", "api": "FeatureCut3"},
+                }},
+                "revolve": {"document": "revolve_boss_part.SLDPRT", "active_title": "Part2", "saved_path": "C:/generated/revolve_boss_part.SLDPRT", "operations": {
+                    "Revolve_Boss_Profile": {"sketch": "Sketch1", "profile": "closed_revolve_profile_with_centerline", "geometry": {"lines": 5, "circles": 0, "centerlines": 1}, "feature_type": "Revolution", "api": "FeatureRevolve2"},
+                }},
+                "revolve_cut": {"document": "revolve_cut_part.SLDPRT", "active_title": "Part3", "saved_path": "C:/generated/revolve_cut_part.SLDPRT", "operations": {
+                    "Revolve_Boss_Profile": {"sketch": "Sketch1", "profile": "closed_revolve_profile_with_centerline", "geometry": {"lines": 5, "circles": 0, "centerlines": 1}, "feature_type": "Revolution", "api": "FeatureRevolve2"},
+                    "Revolve_Cut_Bore": {"sketch": "Sketch2", "profile": "closed_cut_profile_with_centerline", "geometry": {"lines": 4, "circles": 0, "centerlines": 1}, "feature_type": "RevCut", "api": "FeatureRevolveCut2"},
+                }},
+                "editable": {"document": "editable_dimension_plate.SLDPRT", "active_title": "Part4", "saved_path": "C:/generated/editable_dimension_plate.SLDPRT", "operations": {
+                    "Body_Editable_Plate": {"sketch": "Sketch1", "profile": "rectangle", "geometry": {"lines": 4, "circles": 0, "centerlines": 0}, "feature_type": "Extrusion", "api": "FeatureExtrusion2"},
+                    "Edited_Sketch_Dimension": {"sketch": "Sketch2", "profile": "circle", "geometry": {"lines": 0, "circles": 1, "centerlines": 0}, "feature_type": "ICE", "api": "FeatureCut3", "dimension": "D1@Edited_Sketch_Dimension"},
+                }},
+            })
+        }
+        report["operation_context"]["editable"]["operations"]["Edited_Sketch_Dimension"]["selection_guard"]["selection_count_before_feature"] = None
+        self.assertTrue(self.module._strict_check_failed(report, "operation_context_guards"))
 
 
 

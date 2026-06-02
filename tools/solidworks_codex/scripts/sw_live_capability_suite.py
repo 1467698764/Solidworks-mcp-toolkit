@@ -78,8 +78,20 @@ def expected_live_contract() -> dict[str, Any]:
     }
 
 
+def _with_expected_selection_guards(context: dict[str, Any]) -> dict[str, Any]:
+    for part in context.values():
+        for op in part.get("operations", {}).values():
+            op["selection_guard"] = {
+                "active_title": "<non-empty active document title>",
+                "cleared_selection_count": 0,
+                "selected_sketch": "<matches operation sketch>",
+                "selection_count_before_feature": 1,
+            }
+    return context
+
+
 def expected_operation_context() -> dict[str, Any]:
-    return {
+    return _with_expected_selection_guards({
         "extrude": {
             "document": "extrude_cut_plate.SLDPRT",
             "operations": {
@@ -108,12 +120,19 @@ def expected_operation_context() -> dict[str, Any]:
                 "Edited_Sketch_Dimension": {"profile": "circle", "geometry": {"lines": 0, "circles": 1, "centerlines": 0}, "feature_type": "ICE", "api": "FeatureCut3", "dimension": "D1@Edited_Sketch_Dimension"},
             },
         },
-    }
+    })
 
 
 def validate_operation_context(actual: dict[str, Any]) -> dict[str, Any]:
     failed: list[str] = []
     details: dict[str, Any] = {}
+
+    def int_equals(value: Any, expected: int) -> bool:
+        try:
+            return int(value) == expected
+        except (TypeError, ValueError):
+            return False
+
     for part_key, part_expected in expected_operation_context().items():
         part_actual = actual.get(part_key, {}) if isinstance(actual, dict) else {}
         if part_actual.get("document") != part_expected["document"]:
@@ -133,6 +152,8 @@ def validate_operation_context(actual: dict[str, Any]) -> dict[str, Any]:
                 failed.append(f"{part_key}:{op_name}:sketch")
                 details.setdefault(part_key, {})[op_name] = op_actual
             for field, expected_value in op_expected.items():
+                if field == "selection_guard":
+                    continue
                 if op_actual.get(field) != expected_value:
                     failed.append(f"{part_key}:{op_name}:{field}")
                     details.setdefault(part_key, {})[op_name] = op_actual
@@ -152,6 +173,23 @@ def validate_operation_context(actual: dict[str, Any]) -> dict[str, Any]:
                 details.setdefault(part_key, {})[op_name] = op_actual
             if readback.get("geometry") != op_expected.get("geometry"):
                 failed.append(f"{part_key}:{op_name}:readback:geometry")
+                details.setdefault(part_key, {})[op_name] = op_actual
+            selection_guard = op_actual.get("selection_guard", {}) if isinstance(op_actual, dict) else {}
+            if not selection_guard:
+                failed.append(f"{part_key}:{op_name}:selection_guard")
+                details.setdefault(part_key, {})[op_name] = op_actual
+                continue
+            if selection_guard.get("selected_sketch") != op_actual.get("sketch"):
+                failed.append(f"{part_key}:{op_name}:selection_guard:selected_sketch")
+                details.setdefault(part_key, {})[op_name] = op_actual
+            if not int_equals(selection_guard.get("cleared_selection_count"), 0):
+                failed.append(f"{part_key}:{op_name}:selection_guard:cleared_selection_count")
+                details.setdefault(part_key, {})[op_name] = op_actual
+            if not int_equals(selection_guard.get("selection_count_before_feature"), 1):
+                failed.append(f"{part_key}:{op_name}:selection_guard:selection_count_before_feature")
+                details.setdefault(part_key, {})[op_name] = op_actual
+            if not selection_guard.get("active_title"):
+                failed.append(f"{part_key}:{op_name}:selection_guard:active_title")
                 details.setdefault(part_key, {})[op_name] = op_actual
     return {"ok": not failed, "failed": failed, "details": details}
 
@@ -322,6 +360,11 @@ def feature_names(model: Any) -> set[str]:
 
 
 def select_new_sketch(model: Any, before: set[str]) -> str:
+    name, _guard = select_new_sketch_for_feature(model, before)
+    return name
+
+
+def select_new_sketch_for_feature(model: Any, before: set[str]) -> tuple[str, dict[str, Any]]:
     candidate = None
     feat = read_member(model, "FirstFeature")
     while feat is not None:
@@ -334,9 +377,26 @@ def select_new_sketch(model: Any, before: set[str]) -> str:
         raise RuntimeError("could not find newly created sketch")
     name = read_member(candidate, "Name")
     model.ClearSelection2(True)
+    cleared_count = selected_object_count(model)
     if not candidate.Select2(False, 0):
         raise RuntimeError(f"could not select sketch {name}")
-    return name
+    guard = {
+        "active_title": active_title(model),
+        "cleared_selection_count": cleared_count,
+        "selected_sketch": name,
+        "selection_count_before_feature": selected_object_count(model),
+    }
+    return name, guard
+
+
+def selected_object_count(model: Any) -> int | None:
+    try:
+        selection_manager = read_member(model, "SelectionManager")
+        if selection_manager is None:
+            return None
+        return int(read_member(selection_manager, "GetSelectedObjectCount2", -1) or 0)
+    except Exception:
+        return None
 
 
 def save_as(model: Any, path: Path) -> None:
@@ -440,10 +500,12 @@ def active_title(model: Any) -> str:
     return str(read_member(model, "GetTitle") or "")
 
 
-def operation_report(model: Any, name: str, sketch: str, profile: str, api: str, geometry: dict[str, int], dimension: str | None = None) -> dict[str, Any]:
+def operation_report(model: Any, name: str, sketch: str, profile: str, api: str, geometry: dict[str, int], dimension: str | None = None, selection_guard: dict[str, Any] | None = None) -> dict[str, Any]:
     feat = read_member(model, "FeatureByName", name)
     feature_type = read_member(feat, "GetTypeName2") if feat is not None else None
     report = {"sketch": sketch, "profile": profile, "geometry": geometry, "feature": name, "feature_type": feature_type, "api": api}
+    if selection_guard is not None:
+        report["selection_guard"] = selection_guard
     if dimension:
         report["dimension"] = dimension
     return report
@@ -457,12 +519,12 @@ def extrude_boss_box(model: Any, width: float, height: float, depth: float, name
     if rect is None:
         raise RuntimeError(f"CreateCornerRectangle returned None for {name}")
     model.SketchManager.InsertSketch(True)
-    sketch = select_new_sketch(model, before)
+    sketch, guard = select_new_sketch_for_feature(model, before)
     feat = model.FeatureManager.FeatureExtrusion2(True, False, False, 0, 0, depth, 0, False, False, False, False, 0, 0, False, False, False, False, True, True, True, 0, 0, False)
     if feat is None:
         raise RuntimeError(f"FeatureExtrusion2 returned None for {name}")
     feat.Name = name
-    return operation_report(model, name, sketch, "rectangle", "FeatureExtrusion2", {"lines": 4, "circles": 0, "centerlines": 0})
+    return operation_report(model, name, sketch, "rectangle", "FeatureExtrusion2", {"lines": 4, "circles": 0, "centerlines": 0}, selection_guard=guard)
 
 
 def extrude_cut_circles(model: Any, circles: list[tuple[float, float, float]], depth: float, name: str) -> dict[str, Any]:
@@ -474,12 +536,12 @@ def extrude_cut_circles(model: Any, circles: list[tuple[float, float, float]], d
         if circle is None:
             raise RuntimeError(f"CreateCircleByRadius returned None for {name}")
     model.SketchManager.InsertSketch(True)
-    sketch_name = select_new_sketch(model, before)
+    sketch_name, guard = select_new_sketch_for_feature(model, before)
     feat = model.FeatureManager.FeatureCut3(True, False, True, 0, 0, depth, depth, False, False, False, False, 0, 0, False, False, False, False, False, True, True, True, True, False, 0, 0, False)
     if feat is None:
         raise RuntimeError(f"FeatureCut3 returned None for {name}")
     feat.Name = name
-    return operation_report(model, name, sketch_name, "circle", "FeatureCut3", {"lines": 0, "circles": len(circles), "centerlines": 0})
+    return operation_report(model, name, sketch_name, "circle", "FeatureCut3", {"lines": 0, "circles": len(circles), "centerlines": 0}, selection_guard=guard)
 
 
 def extrude_cut_rect(model: Any, x: float, y: float, width: float, height: float, depth: float, name: str) -> dict[str, Any]:
@@ -490,12 +552,12 @@ def extrude_cut_rect(model: Any, x: float, y: float, width: float, height: float
     if rect is None:
         raise RuntimeError(f"CreateCornerRectangle returned None for {name}")
     model.SketchManager.InsertSketch(True)
-    sketch_name = select_new_sketch(model, before)
+    sketch_name, guard = select_new_sketch_for_feature(model, before)
     feat = model.FeatureManager.FeatureCut3(True, False, True, 0, 0, depth, depth, False, False, False, False, 0, 0, False, False, False, False, False, True, True, True, True, False, 0, 0, False)
     if feat is None:
         raise RuntimeError(f"FeatureCut3 returned None for {name}")
     feat.Name = name
-    return operation_report(model, name, sketch_name, "rectangle", "FeatureCut3", {"lines": 4, "circles": 0, "centerlines": 0})
+    return operation_report(model, name, sketch_name, "rectangle", "FeatureCut3", {"lines": 4, "circles": 0, "centerlines": 0}, selection_guard=guard)
 
 
 def revolve_boss(model: Any, name: str) -> dict[str, Any]:
@@ -511,12 +573,12 @@ def revolve_boss(model: Any, name: str) -> dict[str, Any]:
         if line is None:
             raise RuntimeError(f"CreateLine returned None for revolve {name}")
     model.SketchManager.InsertSketch(True)
-    sketch_name = select_new_sketch(model, before)
+    sketch_name, guard = select_new_sketch_for_feature(model, before)
     feat = model.FeatureManager.FeatureRevolve2(True, True, False, False, False, False, 0, 0, 2 * math.pi, 0, False, False, 0, 0, 0, 0, 0, True, True, True)
     if feat is None:
         raise RuntimeError(f"FeatureRevolve2 returned None for {name}")
     feat.Name = name
-    return operation_report(model, name, sketch_name, "closed_revolve_profile_with_centerline", "FeatureRevolve2", {"lines": 5, "circles": 0, "centerlines": 1})
+    return operation_report(model, name, sketch_name, "closed_revolve_profile_with_centerline", "FeatureRevolve2", {"lines": 5, "circles": 0, "centerlines": 1}, selection_guard=guard)
 
 
 def revolve_cut(model: Any, name: str) -> dict[str, Any]:
@@ -532,12 +594,12 @@ def revolve_cut(model: Any, name: str) -> dict[str, Any]:
         if line is None:
             raise RuntimeError(f"CreateLine returned None for revolve cut {name}")
     model.SketchManager.InsertSketch(True)
-    sketch_name = select_new_sketch(model, before)
+    sketch_name, guard = select_new_sketch_for_feature(model, before)
     feat = model.FeatureManager.FeatureRevolveCut2(True, True, False, False, False, False, 0, 0, 2 * math.pi, 0)
     if feat is None:
         raise RuntimeError(f"FeatureRevolveCut2 returned None for {name}")
     feat.Name = name
-    return operation_report(model, name, sketch_name, "closed_cut_profile_with_centerline", "FeatureRevolveCut2", {"lines": 4, "circles": 0, "centerlines": 1})
+    return operation_report(model, name, sketch_name, "closed_cut_profile_with_centerline", "FeatureRevolveCut2", {"lines": 4, "circles": 0, "centerlines": 1}, selection_guard=guard)
 
 
 def finalized_part_context(model: Any, path: Path, operations: dict[str, dict[str, Any]]) -> dict[str, Any]:
@@ -594,12 +656,12 @@ def create_editable_dimension_plate(sw: Any, out_dir: Path) -> tuple[Path, dict[
     if circle is None:
         raise RuntimeError("CreateCircleByRadius returned None for editable dimension")
     model.SketchManager.InsertSketch(True)
-    sketch_name = select_new_sketch(model, before)
+    sketch_name, guard = select_new_sketch_for_feature(model, before)
     feat = model.FeatureManager.FeatureCut3(True, False, True, 0, 0, 0.020, 0.020, False, False, False, False, 0, 0, False, False, False, False, False, True, True, True, True, False, 0, 0, False)
     if feat is None:
         raise RuntimeError("FeatureCut3 returned None for editable dimension plate")
     feat.Name = "Edited_Sketch_Dimension"
-    operations["Edited_Sketch_Dimension"] = operation_report(model, "Edited_Sketch_Dimension", sketch_name, "circle", "FeatureCut3", {"lines": 0, "circles": 1, "centerlines": 0}, "D1@Edited_Sketch_Dimension")
+    operations["Edited_Sketch_Dimension"] = operation_report(model, "Edited_Sketch_Dimension", sketch_name, "circle", "FeatureCut3", {"lines": 0, "circles": 1, "centerlines": 0}, "D1@Edited_Sketch_Dimension", selection_guard=guard)
     model.ForceRebuild3(False)
     dim = model.Parameter("D1@Edited_Sketch_Dimension")
     before_m = None

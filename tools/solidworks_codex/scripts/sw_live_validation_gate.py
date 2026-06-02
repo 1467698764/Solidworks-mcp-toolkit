@@ -163,6 +163,12 @@ def _component_pair_matches(component_names: Any, semantic_pair: list[str]) -> b
 
 
 def _strict_check_failed(data: dict[str, Any], check: str) -> bool:
+    def int_equals(value: Any, expected: int) -> bool:
+        try:
+            return int(value) == expected
+        except (TypeError, ValueError):
+            return False
+
     if check == "single_session_smoke":
         part_doc = (data.get("part_inspect") or data.get("inspect") or {}).get("active_document", {}) if isinstance(data.get("part_inspect") or data.get("inspect"), dict) else {}
         asm_doc = (data.get("assembly_inspect") or {}).get("active_document", {}) if isinstance(data.get("assembly_inspect"), dict) else {}
@@ -226,6 +232,8 @@ def _strict_check_failed(data: dict[str, Any], check: str) -> bool:
                 if not op_actual.get("sketch"):
                     return True
                 for field, expected_value in op_expected.items():
+                    if field == "selection_guard":
+                        continue
                     if op_actual.get(field) != expected_value:
                         return True
                 readback = op_actual.get("readback", {})
@@ -238,6 +246,17 @@ def _strict_check_failed(data: dict[str, Any], check: str) -> bool:
                 if readback.get("feature_type") != op_expected.get("feature_type"):
                     return True
                 if readback.get("geometry") != op_expected.get("geometry"):
+                    return True
+                selection_guard = op_actual.get("selection_guard", {})
+                if not selection_guard:
+                    return True
+                if selection_guard.get("selected_sketch") != op_actual.get("sketch"):
+                    return True
+                if not int_equals(selection_guard.get("cleared_selection_count"), 0):
+                    return True
+                if not int_equals(selection_guard.get("selection_count_before_feature"), 1):
+                    return True
+                if not selection_guard.get("active_title"):
                     return True
         return False
     if check == "interference_callback":
