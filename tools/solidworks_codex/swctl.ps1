@@ -21,7 +21,7 @@ param(
 
 $Root = Split-Path -Parent $PSCommandPath
 $Workspace = Split-Path -Parent (Split-Path -Parent $Root)
-function DefaultOut([string]$Name) { return "tools/solidworks_codex/reports/$Name" }
+function DefaultOut([string]$Name) { return (Join-Path $Workspace "tools/solidworks_codex/reports/$Name") }
 function Expand-List([string[]]$Items) {
     $result = @()
     foreach ($item in $Items) {
@@ -118,7 +118,7 @@ switch ($Command) {
     'live-gate' { $outPath = if ($Out) { $Out } else { DefaultOut 'live_validation_gate.json' }; $argsList = @((Join-Path $Root 'scripts/sw_live_validation_gate.py'), '--out', $outPath); if ($ContractOnly) { $argsList += '--contract-only' }; if ($ValidateOnly) { $argsList += '--validate-only' }; if ($CleanupStale) { $argsList += '--cleanup-stale' }; if ($FullConsoleJson) { $argsList += '--full-console-json' }; exit (Invoke-SwPython $argsList) }
     'finalize' { $outPath = if ($Out) { $Out } else { 'docs/solidworks-codex-final-readiness.md' }; $jsonTarget = if ($JsonOut) { $JsonOut } else { DefaultOut 'final_readiness.json' }; exit (Invoke-SwPython @((Join-Path $Root 'scripts/sw_finalize.py'), '--run-audit', '--out', $outPath, '--json-out', $jsonTarget)) }
     'audit' { $outPath = if ($Out) { $Out } else { DefaultOut 'audit_latest.json' }; exit (Invoke-SwPython @((Join-Path $Root 'scripts/sw_audit.py'), '--out', $outPath)) }
-    'mcp-tools' { node (Join-Path $Workspace 'tools/mcp-solidworks-ts/list-tools.cjs'); exit $LASTEXITCODE }
+    'mcp-tools' { Push-Location $Workspace; try { node (Join-Path $Workspace 'tools/mcp-solidworks-ts/list-tools.cjs'); $code = $LASTEXITCODE } finally { Pop-Location }; exit $code }
 }
 
 

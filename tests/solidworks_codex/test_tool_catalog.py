@@ -90,6 +90,35 @@ class ToolCatalogTests(unittest.TestCase):
             self.assertTrue(data["coverage"]["has_workflow_for_every_capability"])
 
 
+    def test_swctl_default_reports_are_workspace_relative_without_rewriting_user_relative_inputs(self):
+        with tempfile.TemporaryDirectory() as d:
+            external = Path(d) / "external.SLDPRT"
+            external.write_text("dummy", encoding="utf-8")
+            proc = subprocess.run(
+                [
+                    "powershell.exe",
+                    "-NoProfile",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(ROOT / "tools/solidworks_codex/swctl.ps1"),
+                    "backup",
+                    "-Files",
+                    ".\\external.SLDPRT",
+                ],
+                cwd=d,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+            )
+
+        self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+        data = json.loads(proc.stdout)
+        self.assertEqual(str(external.resolve()), data["files"][0]["source"])
+        report = ROOT / "tools/solidworks_codex/reports/backup.json"
+        self.assertTrue(report.exists())
+
     def test_operator_notes_are_readable_public_copy(self):
         with tempfile.TemporaryDirectory() as d:
             out_md = Path(d) / "catalog.md"

@@ -27,6 +27,8 @@ cd <repo>
 .\tools\solidworks_codex\swctl.ps1 start-inspect -Out tools\solidworks_codex\reports\assembly_before.json
 ```
 
+`swctl.ps1` 的默认报告输出会写回仓库 `tools/solidworks_codex/reports/...`；用户显式传入的相对模型、报告或备份文件路径仍按调用命令时的当前目录解释。跨目录调用时，外部模型路径建议使用绝对路径，仓库产物路径建议使用 `tools\solidworks_codex\...`。
+
 ## 修改前备份
 
 ```powershell
