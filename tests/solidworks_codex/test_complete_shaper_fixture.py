@@ -28,6 +28,13 @@ def sample_shaper_mates(module):
             "kind": expected["type"],
             "mate_error": 1,
             "semantic_pair": list(expected["semantic_pair"]),
+            "components": [f"{expected['semantic_pair'][0]}-1", f"{expected['semantic_pair'][1]}-1"],
+            "selected_entities": 2,
+            "selection_guard": {
+                "cleared_selection_count": 0,
+                "selection_count_before_mate": 2,
+                "component_pair": [f"{expected['semantic_pair'][0]}-1", f"{expected['semantic_pair'][1]}-1"],
+            },
         })
     return mates
 
@@ -313,6 +320,18 @@ class CompleteShaperSpecTests(unittest.TestCase):
         bad_error_mates[0] = dict(bad_error_mates[0], mate_error=4)
         bad_mate_error["mates"] = bad_error_mates
         self.assertIn(f"mate_error:{bad_error_mates[0]['name']}", self.module.validate_live_result(bad_mate_error)["failed"])
+
+        bad_mate_selection = dict(base)
+        bad_selection_mates = sample_shaper_mates(self.module)
+        bad_selection_mates[0] = dict(bad_selection_mates[0], selected_entities=1)
+        bad_mate_selection["mates"] = bad_selection_mates
+        self.assertIn(f"mate_selection:{bad_selection_mates[0]['name']}", self.module.validate_live_result(bad_mate_selection)["failed"])
+
+        bad_mate_components = dict(base)
+        bad_component_mates = sample_shaper_mates(self.module)
+        bad_component_mates[0]["selection_guard"] = dict(bad_component_mates[0]["selection_guard"], component_pair=["wrong-1", "column_frame_with_window-1"])
+        bad_mate_components["mates"] = bad_component_mates
+        self.assertIn(f"mate_components:{bad_component_mates[0]['name']}", self.module.validate_live_result(bad_mate_components)["failed"])
 
         bad_interference = dict(base)
         bad_interference["callbacks"] = {"mass": {"available": True, "mass_kg": 1.0}, "interference": {"available": True, "count": 1}}

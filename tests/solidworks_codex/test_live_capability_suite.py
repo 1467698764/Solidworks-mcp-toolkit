@@ -39,6 +39,33 @@ def sample_operation_context(module):
     return context
 
 
+def sample_mates():
+    return [
+        {
+            "name": "Concentric_Mate",
+            "ok": True,
+            "components": ["revolve_boss_part-1", "revolve_cut_part-1"],
+            "selected_entities": 2,
+            "selection_guard": {
+                "cleared_selection_count": 0,
+                "selection_count_before_mate": 2,
+                "component_pair": ["revolve_boss_part-1", "revolve_cut_part-1"],
+            },
+        },
+        {
+            "name": "Distance_Mate",
+            "ok": True,
+            "components": ["extrude_cut_plate-1", "editable_dimension_plate-1"],
+            "selected_entities": 2,
+            "selection_guard": {
+                "cleared_selection_count": 0,
+                "selection_count_before_mate": 2,
+                "component_pair": ["extrude_cut_plate-1", "editable_dimension_plate-1"],
+            },
+        },
+    ]
+
+
 class FakeSegment:
     def __init__(self, segment_type, construction=False):
         self._segment_type = segment_type
@@ -246,7 +273,7 @@ class LiveCapabilitySuiteSpecTests(unittest.TestCase):
             },
             "dimension_edit": {"dimension": "D1@Edited_Sketch_Dimension", "before_m": 0.02, "after_m": 0.024},
             "reopen_modify": {"dimension": "D1@Edited_Sketch_Dimension", "before_m": 0.024, "target_m": 0.028, "after_reopen_m": 0.028, "persisted": True, "save": {"ok": True, "errors": 0, "warnings": 0}},
-            "assembly_result": {"component_count": 4, "mates": [{"name": "Concentric_Mate", "ok": True}, {"name": "Distance_Mate", "ok": True}]},
+            "assembly_result": {"component_count": 4, "mates": sample_mates()},
             "assembly_features": [{"name": "Concentric_Mate"}, {"name": "Distance_Mate"}],
             "callbacks": {
                 "mass": {"available": True, "mass_kg": 1.0},
@@ -311,7 +338,7 @@ class LiveCapabilitySuiteSpecTests(unittest.TestCase):
             },
             "dimension_edit": {"dimension": "D1@Edited_Sketch_Dimension", "before_m": 0.02, "after_m": 0.024},
             "reopen_modify": {"dimension": "D1@Edited_Sketch_Dimension", "before_m": 0.024, "target_m": 0.028, "after_reopen_m": 0.028, "persisted": True, "save": {"ok": True, "errors": 0, "warnings": 0}},
-            "assembly_result": {"component_count": 4, "mates": [{"name": "Concentric_Mate", "ok": True}, {"name": "Distance_Mate", "ok": True}]},
+            "assembly_result": {"component_count": 4, "mates": sample_mates()},
             "assembly_features": [],
             "callbacks": {
                 "mass": {"available": True, "mass_kg": 1.0},
@@ -332,6 +359,44 @@ class LiveCapabilitySuiteSpecTests(unittest.TestCase):
         self.assertFalse(validation["ok"])
         self.assertIn("post_cleanup_single_session", validation["failed_capabilities"])
 
+    def test_validate_live_result_requires_mate_selection_and_component_evidence(self):
+        result = {
+            "features": {
+                "extrude": [{"name": "Body_Plate"}, {"name": "Round_Through_Hole"}, {"name": "Rectangular_Window_Cut"}],
+                "revolve": [{"name": "Revolve_Boss_Profile"}],
+                "revolve_cut": [{"name": "Revolve_Boss_Profile"}, {"name": "Revolve_Cut_Bore"}],
+                "editable": [{"name": "Body_Editable_Plate"}, {"name": "Edited_Sketch_Dimension"}],
+            },
+            "dimension_edit": {"dimension": "D1@Edited_Sketch_Dimension", "before_m": 0.02, "after_m": 0.024},
+            "reopen_modify": {"dimension": "D1@Edited_Sketch_Dimension", "before_m": 0.024, "target_m": 0.028, "after_reopen_m": 0.028, "persisted": True, "save": {"ok": True, "errors": 0, "warnings": 0}},
+            "assembly_result": {"component_count": 4, "mates": sample_mates()},
+            "assembly_features": [{"name": "Concentric_Mate"}, {"name": "Distance_Mate"}],
+            "callbacks": {"mass": {"available": True, "mass_kg": 1.0}, "interference": {"available": True, "count": 0}},
+            "native_artifacts": {"assembly_exists": True, "part_count": 4, "part_files": ["a.SLDPRT", "b.SLDPRT", "c.SLDPRT", "d.SLDPRT"]},
+            "cleanup": {"locked_files": []},
+            "post_cleanup": {"locked_files": []},
+            "operation_context": sample_operation_context(self.module),
+        }
+        validation = self.module.validate_live_result(result)
+        self.assertTrue(validation["ok"], validation)
+
+        result["assembly_result"]["mates"][0]["selected_entities"] = 1
+        validation = self.module.validate_live_result(result)
+        self.assertFalse(validation["ok"])
+        self.assertIn("mate_selection:Concentric_Mate", validation["failed_capabilities"])
+
+        result["assembly_result"]["mates"] = sample_mates()
+        result["assembly_result"]["mates"][1]["selection_guard"]["component_pair"] = ["wrong_part-1", "editable_dimension_plate-1"]
+        validation = self.module.validate_live_result(result)
+        self.assertFalse(validation["ok"])
+        self.assertIn("mate_components:Distance_Mate", validation["failed_capabilities"])
+
+        result["assembly_result"]["mates"] = sample_mates()
+        result["assembly_result"]["mates"][1]["selection_guard"]["selection_count_before_mate"] = None
+        validation = self.module.validate_live_result(result)
+        self.assertFalse(validation["ok"])
+        self.assertIn("mate_selection:Distance_Mate", validation["failed_capabilities"])
+
 
     def test_validate_live_result_rejects_missing_reopen_persistence(self):
         result = {
@@ -342,7 +407,7 @@ class LiveCapabilitySuiteSpecTests(unittest.TestCase):
                 "editable": [{"name": "Body_Editable_Plate"}, {"name": "Edited_Sketch_Dimension"}],
             },
             "dimension_edit": {"dimension": "D1@Edited_Sketch_Dimension", "before_m": 0.02, "after_m": 0.024},
-            "assembly_result": {"component_count": 4, "mates": [{"name": "Concentric_Mate", "ok": True}, {"name": "Distance_Mate", "ok": True}]},
+            "assembly_result": {"component_count": 4, "mates": sample_mates()},
             "assembly_features": [{"name": "Concentric_Mate"}, {"name": "Distance_Mate"}],
             "callbacks": {"mass": {"available": True, "mass_kg": 1.0}, "interference": {"available": True, "count": 0}},
             "native_artifacts": {"assembly_exists": True, "part_count": 4, "part_files": ["a.SLDPRT", "b.SLDPRT", "c.SLDPRT", "d.SLDPRT"]},
@@ -384,7 +449,7 @@ class LiveCapabilitySuiteSpecTests(unittest.TestCase):
             },
             "dimension_edit": {"dimension": "D1@Edited_Sketch_Dimension", "before_m": 0.02, "after_m": 0.024},
             "reopen_modify": {"dimension": "D1@Edited_Sketch_Dimension", "before_m": 0.024, "target_m": 0.028, "after_reopen_m": 0.028, "persisted": True, "save": {"ok": True, "errors": 0, "warnings": 0}},
-            "assembly_result": {"component_count": 4, "mates": [{"name": "Concentric_Mate", "ok": True}, {"name": "Distance_Mate", "ok": True}]},
+            "assembly_result": {"component_count": 4, "mates": sample_mates()},
             "assembly_features": [{"name": "Concentric_Mate"}, {"name": "Distance_Mate"}],
             "native_artifacts": {"assembly_exists": False, "part_count": 4, "part_files": ["a.SLDPRT", "b.SLDPRT", "c.SLDPRT", "d.SLDPRT"]},
             "callbacks": {

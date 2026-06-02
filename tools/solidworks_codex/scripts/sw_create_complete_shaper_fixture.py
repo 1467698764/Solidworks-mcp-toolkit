@@ -145,6 +145,35 @@ def component_pair_matches_semantic_pair(component_names: Any, semantic_pair: li
     return all(part_name in text for part_name in semantic_pair)
 
 
+def int_equals(value: Any, expected: int) -> bool:
+    try:
+        return int(value) == expected
+    except (TypeError, ValueError):
+        return False
+
+
+def mate_selection_evidence_ok(mate: dict[str, Any]) -> bool:
+    guard = mate.get("selection_guard", {}) if isinstance(mate, dict) else {}
+    return (
+        int_equals(mate.get("selected_entities"), 2)
+        and int_equals(guard.get("cleared_selection_count"), 0)
+        and int_equals(guard.get("selection_count_before_mate"), 2)
+    )
+
+
+def mate_component_evidence_ok(mate: dict[str, Any], semantic_pair: list[str]) -> bool:
+    components = mate.get("components") if isinstance(mate, dict) else None
+    guard = mate.get("selection_guard", {}) if isinstance(mate, dict) else {}
+    component_pair = guard.get("component_pair")
+    if not isinstance(components, list) or len(components) != 2:
+        return False
+    if not isinstance(component_pair, list) or len(component_pair) != 2:
+        return False
+    if [str(item) for item in component_pair] != [str(item) for item in components]:
+        return False
+    return component_pair_matches_semantic_pair(components, semantic_pair)
+
+
 def expected_shaper_spatial_contract() -> dict[str, list[str]]:
     return {
         "structural_stack": ["cast_bed_with_t_slots", "column_frame_with_window", "table_cross_slide", "work_table_with_t_slots"],
@@ -876,12 +905,18 @@ def normals_parallel(a: tuple[float, float, float], b: tuple[float, float, float
     return abs(a[0] * b[0] + a[1] * b[1] + a[2] * b[2]) > 0.99
 
 
-def select_faces(asm: Any, first: Any, second: Any) -> int:
+def select_faces(asm: Any, first: Any, second: Any, component_pair: list[str] | None = None) -> dict[str, Any]:
     asm.ClearSelection2(True)
+    cleared_count = int(asm.SelectionManager.GetSelectedObjectCount2(-1))
     empty = empty_dispatch_variant()
     first.Select4(False, empty)
     second.Select4(True, empty)
-    return int(asm.SelectionManager.GetSelectedObjectCount2(-1))
+    selected_count = int(asm.SelectionManager.GetSelectedObjectCount2(-1))
+    return {
+        "cleared_selection_count": cleared_count,
+        "selection_count_before_mate": selected_count,
+        "component_pair": component_pair or [],
+    }
 
 
 def add_selected_mate(asm: Any, name: str, mate_type: int, distance: float = 0.0) -> dict[str, Any]:
@@ -907,11 +942,13 @@ def add_distance_mate_between_planar_faces(asm: Any, components: list[Any], dist
                 for right_face, right_normal in right_faces:
                     if not normals_parallel(left_normal, right_normal):
                         continue
-                    selected = select_faces(asm, left_face, right_face)
-                    if selected >= 2:
+                    component_pair = [left.Name2, right.Name2]
+                    selection_guard = select_faces(asm, left_face, right_face, component_pair)
+                    if int(selection_guard["selection_count_before_mate"]) >= 2:
                         result = add_selected_mate(asm, name, 5, distance)
-                        result["selected_entities"] = selected
-                        result["components"] = [left.Name2, right.Name2]
+                        result["selected_entities"] = selection_guard["selection_count_before_mate"]
+                        result["selection_guard"] = selection_guard
+                        result["components"] = component_pair
                         if result["ok"]:
                             return result
     return {"name": name, "ok": False, "error": "no planar face pair accepted by AddMate5"}
@@ -960,12 +997,15 @@ def add_semantic_concentric_mate(asm: Any, components: list[Any], name: str, sem
     right_face = first_face(right, "IsCylinder")
     if left_face is None or right_face is None:
         return {"name": name, "ok": False, "kind": "concentric", "semantic_pair": semantic_pair, "error": "cylindrical face missing"}
-    selected = select_faces(asm, left_face, right_face)
+    component_pair = [left.Name2, right.Name2]
+    selection_guard = select_faces(asm, left_face, right_face, component_pair)
+    selected = selection_guard["selection_count_before_mate"]
     if selected < 2:
-        return {"name": name, "ok": False, "kind": "concentric", "semantic_pair": semantic_pair, "selected_entities": selected, "error": "cylindrical faces not selected"}
+        return {"name": name, "ok": False, "kind": "concentric", "semantic_pair": semantic_pair, "selected_entities": selected, "selection_guard": selection_guard, "components": component_pair, "error": "cylindrical faces not selected"}
     result = add_selected_mate(asm, name, 1, 0.0)
     result["selected_entities"] = selected
-    result["components"] = [left.Name2, right.Name2]
+    result["selection_guard"] = selection_guard
+    result["components"] = component_pair
     result["kind"] = "concentric"
     result["semantic_pair"] = semantic_pair
     return result
@@ -1212,6 +1252,10 @@ def validate_live_result(result: dict[str, Any]) -> dict[str, Any]:
             failed.append(f"mate_type:{name}")
         if mate.get("mate_error") not in (0, 1):
             failed.append(f"mate_error:{name}")
+        if not mate_selection_evidence_ok(mate):
+            failed.append(f"mate_selection:{name}")
+        if not mate_component_evidence_ok(mate, list(expected["semantic_pair"])):
+            failed.append(f"mate_components:{name}")
     callbacks = result.get("callbacks", {})
     mass = callbacks.get("mass", {})
     mass_kg = float(mass.get("mass_kg", 0) or 0)

@@ -37,6 +37,74 @@ def with_readbacks(context):
     return context
 
 
+def capability_mates():
+    return [
+        {
+            "name": "Concentric_Mate",
+            "ok": True,
+            "components": ["revolve_boss_part-1", "revolve_cut_part-1"],
+            "selected_entities": 2,
+            "selection_guard": {
+                "cleared_selection_count": 0,
+                "selection_count_before_mate": 2,
+                "component_pair": ["revolve_boss_part-1", "revolve_cut_part-1"],
+            },
+        },
+        {
+            "name": "Distance_Mate",
+            "ok": True,
+            "components": ["extrude_cut_plate-1", "editable_dimension_plate-1"],
+            "selected_entities": 2,
+            "selection_guard": {
+                "cleared_selection_count": 0,
+                "selection_count_before_mate": 2,
+                "component_pair": ["extrude_cut_plate-1", "editable_dimension_plate-1"],
+            },
+        },
+    ]
+
+
+def shaper_mates():
+    return [
+        {
+            "name": "Bed_Column_Distance_Mate",
+            "kind": "distance",
+            "semantic_pair": ["cast_bed_with_t_slots", "column_frame_with_window"],
+            "components": ["cast_bed_with_t_slots-1", "column_frame_with_window-1"],
+            "selected_entities": 2,
+            "selection_guard": {"cleared_selection_count": 0, "selection_count_before_mate": 2, "component_pair": ["cast_bed_with_t_slots-1", "column_frame_with_window-1"]},
+            "ok": True,
+        },
+        {
+            "name": "BullGear_CrankShaft_Concentric_Mate",
+            "kind": "concentric",
+            "semantic_pair": ["bull_gear_crank_disk", "crank_center_shaft"],
+            "components": ["bull_gear_crank_disk-1", "crank_center_shaft-1"],
+            "selected_entities": 2,
+            "selection_guard": {"cleared_selection_count": 0, "selection_count_before_mate": 2, "component_pair": ["bull_gear_crank_disk-1", "crank_center_shaft-1"]},
+            "ok": True,
+        },
+        {
+            "name": "Crank_Link_Concentric_Mate",
+            "kind": "concentric",
+            "semantic_pair": ["eccentric_crank_pin", "ram_drive_link"],
+            "components": ["eccentric_crank_pin-1", "ram_drive_link-1"],
+            "selected_entities": 2,
+            "selection_guard": {"cleared_selection_count": 0, "selection_count_before_mate": 2, "component_pair": ["eccentric_crank_pin-1", "ram_drive_link-1"]},
+            "ok": True,
+        },
+        {
+            "name": "Rocker_Pivot_Concentric_Mate",
+            "kind": "concentric",
+            "semantic_pair": ["slotted_rocker_arm", "rocker_pivot_shaft"],
+            "components": ["slotted_rocker_arm-1", "rocker_pivot_shaft-1"],
+            "selected_entities": 2,
+            "selection_guard": {"cleared_selection_count": 0, "selection_count_before_mate": 2, "component_pair": ["slotted_rocker_arm-1", "rocker_pivot_shaft-1"]},
+            "ok": True,
+        },
+    ]
+
+
 class LiveValidationGateSpecTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -168,6 +236,7 @@ class LiveValidationGateSpecTests(unittest.TestCase):
                 "ok": True,
                 "native_artifacts": {"assembly_exists": True, "part_count": 4, "primary": True},
                 "assembly_features": [{"name": "Concentric_Mate"}, {"name": "Distance_Mate"}],
+                "assembly_result": {"component_count": 4, "mates": capability_mates()},
                 "reopen_modify": {
                     "dimension": "D1@Edited_Sketch_Dimension",
                     "after_reopen_m": 0.028,
@@ -200,12 +269,7 @@ class LiveValidationGateSpecTests(unittest.TestCase):
                 "ok": True,
                 "part_count": 24,
                 "component_count": 58,
-                "mates": [
-                    {"name": "Bed_Column_Distance_Mate", "kind": "distance", "semantic_pair": ["cast_bed_with_t_slots", "column_frame_with_window"], "ok": True},
-                    {"name": "BullGear_CrankShaft_Concentric_Mate", "kind": "concentric", "semantic_pair": ["bull_gear_crank_disk", "crank_center_shaft"], "ok": True},
-                    {"name": "Crank_Link_Concentric_Mate", "kind": "concentric", "semantic_pair": ["eccentric_crank_pin", "ram_drive_link"], "ok": True},
-                    {"name": "Rocker_Pivot_Concentric_Mate", "kind": "concentric", "semantic_pair": ["slotted_rocker_arm", "rocker_pivot_shaft"], "ok": True},
-                ],
+                "mates": shaper_mates(),
                 "callbacks": {"interference": {"available": True, "count": 0}, "mass": {"available": True, "mass_kg": 15.125546510666322}},
                 "inspect": {"active_document": {"type": "assembly", "component_count_sampled": 58, "mate_like_features": [
                     {"name": "Bed_Column_Distance_Mate", "type": "MateDistanceDim", "components": ["cast_bed_with_t_slots-1", "column_frame_with_window-1"], "suppressed": False},
@@ -222,7 +286,33 @@ class LiveValidationGateSpecTests(unittest.TestCase):
                 self.module.ReportExpectation("complete_shaper_v5", shaper, ("ok",), self.module.shaper_v5_strict_checks()),
             ])
         self.assertTrue(result["ok"], result)
-        self.assertEqual([], result["failed"])
+
+    def test_shaper_gate_rejects_mates_without_selection_and_component_evidence(self):
+        report = {
+            "mates": shaper_mates(),
+        }
+        self.assertFalse(self.module._strict_check_failed(report, "mate_semantics"))
+
+        report["mates"][0]["selected_entities"] = 1
+        self.assertTrue(self.module._strict_check_failed(report, "mate_semantics"))
+
+        report["mates"] = shaper_mates()
+        report["mates"][1]["selection_guard"]["component_pair"] = ["wrong-1", "crank_center_shaft-1"]
+        self.assertTrue(self.module._strict_check_failed(report, "mate_semantics"))
+
+    def test_capability_gate_rejects_mates_without_selection_and_component_evidence(self):
+        report = {
+            "assembly_features": [{"name": "Concentric_Mate"}, {"name": "Distance_Mate"}],
+            "assembly_result": {"component_count": 4, "mates": capability_mates()},
+        }
+        self.assertFalse(self.module._strict_check_failed(report, "assembly_mates_persisted"))
+
+        report["assembly_result"]["mates"][0]["selected_entities"] = 1
+        self.assertTrue(self.module._strict_check_failed(report, "assembly_mates_persisted"))
+
+        report["assembly_result"]["mates"] = capability_mates()
+        report["assembly_result"]["mates"][1]["selection_guard"]["component_pair"] = ["wrong-1", "editable_dimension_plate-1"]
+        self.assertTrue(self.module._strict_check_failed(report, "assembly_mates_persisted"))
 
     def test_shaper_strict_inspect_rejects_same_named_mates_without_details(self):
         report = {

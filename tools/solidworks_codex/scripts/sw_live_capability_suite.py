@@ -194,6 +194,33 @@ def validate_operation_context(actual: dict[str, Any]) -> dict[str, Any]:
     return {"ok": not failed, "failed": failed, "details": details}
 
 
+def int_equals(value: Any, expected: int) -> bool:
+    try:
+        return int(value) == expected
+    except (TypeError, ValueError):
+        return False
+
+
+def mate_component_evidence_ok(mate: dict[str, Any]) -> bool:
+    components = mate.get("components")
+    guard = mate.get("selection_guard", {}) if isinstance(mate, dict) else {}
+    component_pair = guard.get("component_pair")
+    if not isinstance(components, list) or len(components) != 2:
+        return False
+    if not isinstance(component_pair, list) or len(component_pair) != 2:
+        return False
+    return [str(item) for item in component_pair] == [str(item) for item in components]
+
+
+def mate_selection_evidence_ok(mate: dict[str, Any]) -> bool:
+    guard = mate.get("selection_guard", {}) if isinstance(mate, dict) else {}
+    return (
+        int_equals(mate.get("selected_entities"), 2)
+        and int_equals(guard.get("cleared_selection_count"), 0)
+        and int_equals(guard.get("selection_count_before_mate"), 2)
+    )
+
+
 def _feature_name_set(result: dict[str, Any], key: str) -> set[str]:
     return {str(item.get("name", "")) for item in result.get("features", {}).get(key, []) if isinstance(item, dict)}
 
@@ -240,6 +267,13 @@ def validate_live_result(result: dict[str, Any]) -> dict[str, Any]:
         if not mates.get(name, {}).get("ok"):
             failed.append(f"mate:{name}")
             details[f"mate:{name}"] = mates.get(name)
+            continue
+        if not mate_selection_evidence_ok(mates[name]):
+            failed.append(f"mate_selection:{name}")
+            details[f"mate_selection:{name}"] = mates.get(name)
+        if not mate_component_evidence_ok(mates[name]):
+            failed.append(f"mate_components:{name}")
+            details[f"mate_components:{name}"] = mates.get(name)
     assembly_feature_names = {str(item.get("name", "")) for item in result.get("assembly_features", []) if isinstance(item, dict)}
     missing_mate_features = sorted({"Concentric_Mate", "Distance_Mate"} - assembly_feature_names)
     if missing_mate_features:
@@ -829,12 +863,18 @@ def first_face(component: Any, predicate: str) -> Any | None:
     return None
 
 
-def select_faces(asm: Any, first: Any, second: Any) -> int:
+def select_faces(asm: Any, first: Any, second: Any, component_pair: list[str] | None = None) -> dict[str, Any]:
     asm.ClearSelection2(True)
+    cleared_count = int(asm.SelectionManager.GetSelectedObjectCount2(-1))
     empty = empty_dispatch_variant()
     first.Select4(False, empty)
     second.Select4(True, empty)
-    return int(asm.SelectionManager.GetSelectedObjectCount2(-1))
+    selected_count = int(asm.SelectionManager.GetSelectedObjectCount2(-1))
+    return {
+        "cleared_selection_count": cleared_count,
+        "selection_count_before_mate": selected_count,
+        "component_pair": component_pair or [],
+    }
 
 
 def add_selected_mate(asm: Any, name: str, mate_type: int, distance: float = 0.0) -> dict[str, Any]:
@@ -880,11 +920,13 @@ def add_distance_mate_between_planar_faces(asm: Any, components: list[Any], dist
                 for right_face, right_normal in right_faces:
                     if not normals_parallel(left_normal, right_normal):
                         continue
-                    selected = select_faces(asm, left_face, right_face)
-                    if selected >= 2:
+                    component_pair = [left.Name2, right.Name2]
+                    selection_guard = select_faces(asm, left_face, right_face, component_pair)
+                    if int(selection_guard["selection_count_before_mate"]) >= 2:
                         result = add_selected_mate(asm, "Distance_Mate", 5, distance)
-                        result["selected_entities"] = selected
-                        result["components"] = [left.Name2, right.Name2]
+                        result["selected_entities"] = selection_guard["selection_count_before_mate"]
+                        result["selection_guard"] = selection_guard
+                        result["components"] = component_pair
                         result["parallel_normals"] = [left_normal, right_normal]
                         if result["ok"]:
                             return result
@@ -900,11 +942,13 @@ def add_concentric_mate_between_cylinders(asm: Any, components: list[Any]) -> di
             right_face = first_face(right, "IsCylinder")
             if right_face is None:
                 continue
-            selected = select_faces(asm, left_face, right_face)
-            if selected >= 2:
+            component_pair = [left.Name2, right.Name2]
+            selection_guard = select_faces(asm, left_face, right_face, component_pair)
+            if int(selection_guard["selection_count_before_mate"]) >= 2:
                 result = add_selected_mate(asm, "Concentric_Mate", 1, 0.0)
-                result["selected_entities"] = selected
-                result["components"] = [left.Name2, right.Name2]
+                result["selected_entities"] = selection_guard["selection_count_before_mate"]
+                result["selection_guard"] = selection_guard
+                result["components"] = component_pair
                 if result["ok"]:
                     return result
     return {"name": "Concentric_Mate", "ok": False, "error": "no cylindrical face pair accepted by AddMate5"}

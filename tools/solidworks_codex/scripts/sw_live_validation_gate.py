@@ -169,6 +169,24 @@ def _strict_check_failed(data: dict[str, Any], check: str) -> bool:
         except (TypeError, ValueError):
             return False
 
+    def mate_selection_ok(mate: dict[str, Any]) -> bool:
+        guard = mate.get("selection_guard", {}) if isinstance(mate, dict) else {}
+        return (
+            int_equals(mate.get("selected_entities"), 2)
+            and int_equals(guard.get("cleared_selection_count"), 0)
+            and int_equals(guard.get("selection_count_before_mate"), 2)
+        )
+
+    def mate_components_ok(mate: dict[str, Any]) -> bool:
+        components = mate.get("components") if isinstance(mate, dict) else None
+        guard = mate.get("selection_guard", {}) if isinstance(mate, dict) else {}
+        pair = guard.get("component_pair")
+        if not isinstance(components, list) or len(components) != 2:
+            return False
+        if not isinstance(pair, list) or len(pair) != 2:
+            return False
+        return [str(item) for item in pair] == [str(item) for item in components]
+
     if check == "single_session_smoke":
         part_doc = (data.get("part_inspect") or data.get("inspect") or {}).get("active_document", {}) if isinstance(data.get("part_inspect") or data.get("inspect"), dict) else {}
         asm_doc = (data.get("assembly_inspect") or {}).get("active_document", {}) if isinstance(data.get("assembly_inspect"), dict) else {}
@@ -199,7 +217,14 @@ def _strict_check_failed(data: dict[str, Any], check: str) -> bool:
         return not native.get("assembly_exists") or int(native.get("part_count", 0) or 0) < 4 or not native.get("primary")
     if check == "assembly_mates_persisted":
         names = {str(item.get("name", "")) for item in data.get("assembly_features", []) if isinstance(item, dict)}
-        return not {"Concentric_Mate", "Distance_Mate"}.issubset(names)
+        if not {"Concentric_Mate", "Distance_Mate"}.issubset(names):
+            return True
+        mates = {str(item.get("name", "")): item for item in data.get("assembly_result", {}).get("mates", []) if isinstance(item, dict)}
+        for name in ("Concentric_Mate", "Distance_Mate"):
+            mate = mates.get(name)
+            if not mate or mate.get("ok") is not True or not mate_selection_ok(mate) or not mate_components_ok(mate):
+                return True
+        return False
     if check == "open_existing_modify_reopen":
         reopen = data.get("reopen_modify", {})
         save = reopen.get("save", {}) if isinstance(reopen, dict) else {}
@@ -287,6 +312,12 @@ def _strict_check_failed(data: dict[str, Any], check: str) -> bool:
         for name, (kind, pair) in required.items():
             mate = by_name.get(name)
             if not mate or not mate.get("ok") or mate.get("kind") != kind or mate.get("semantic_pair") != pair:
+                return True
+            if not mate_selection_ok(mate):
+                return True
+            if not mate_components_ok(mate):
+                return True
+            if not _component_pair_matches(mate.get("components"), pair):
                 return True
         return False
     if check == "inspect_model_understand":
