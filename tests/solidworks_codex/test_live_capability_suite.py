@@ -1,4 +1,4 @@
-﻿import importlib.util
+import importlib.util
 import sys
 import unittest
 from pathlib import Path
@@ -32,6 +32,7 @@ class LiveCapabilitySuiteSpecTests(unittest.TestCase):
             "revolve_cut",
             "sketch_edit_dimension",
             "read_modify_rebuild",
+            "open_existing_modify_reopen",
             "assembly_insert_component",
             "assembly_mate_concentric",
             "assembly_mate_distance",
@@ -61,6 +62,13 @@ class LiveCapabilitySuiteSpecTests(unittest.TestCase):
         self.assertIn("Distance_Mate", contract["mates"])
         self.assertGreaterEqual(contract["minimum_component_count"], 3)
 
+
+    def test_expected_contract_includes_reopen_persistence_check(self):
+        contract = self.module.expected_live_contract()
+        self.assertIn("open_existing_modify_reopen", contract)
+        self.assertEqual(contract["open_existing_modify_reopen"]["dimension"], "D1@Edited_Sketch_Dimension")
+        self.assertEqual(contract["open_existing_modify_reopen"]["expected_after_reopen_m"], 0.028)
+
     def test_cleanup_policy_is_explicit_and_keeps_generated_outputs_separate(self):
         matrix = self.module.build_capability_matrix()
         self.assertIn("live_capability_suite", matrix.output_dir)
@@ -79,6 +87,7 @@ class LiveCapabilitySuiteSpecTests(unittest.TestCase):
                 "editable": [{"name": "Body_Editable_Plate"}, {"name": "Edited_Sketch_Dimension"}],
             },
             "dimension_edit": {"dimension": "D1@Edited_Sketch_Dimension", "before_m": 0.02, "after_m": 0.024},
+            "reopen_modify": {"dimension": "D1@Edited_Sketch_Dimension", "before_m": 0.024, "target_m": 0.028, "after_reopen_m": 0.028, "persisted": True, "save": {"ok": True, "errors": 0, "warnings": 0}},
             "assembly_result": {"component_count": 4, "mates": [{"name": "Concentric_Mate", "ok": False}, {"name": "Distance_Mate", "ok": False}]},
             "callbacks": {
                 "mass": {"available": True, "mass_kg": 1.0},
@@ -102,6 +111,7 @@ class LiveCapabilitySuiteSpecTests(unittest.TestCase):
                 "editable": [{"name": "Body_Editable_Plate"}, {"name": "Edited_Sketch_Dimension"}],
             },
             "dimension_edit": {"dimension": "D1@Edited_Sketch_Dimension", "before_m": 0.02, "after_m": 0.024},
+            "reopen_modify": {"dimension": "D1@Edited_Sketch_Dimension", "before_m": 0.024, "target_m": 0.028, "after_reopen_m": 0.028, "persisted": True, "save": {"ok": True, "errors": 0, "warnings": 0}},
             "assembly_result": {"component_count": 4, "mates": [{"name": "Concentric_Mate", "ok": True}, {"name": "Distance_Mate", "ok": True}]},
             "assembly_features": [{"name": "Concentric_Mate"}, {"name": "Distance_Mate"}],
             "callbacks": {
@@ -132,6 +142,7 @@ class LiveCapabilitySuiteSpecTests(unittest.TestCase):
                 "editable": [{"name": "Body_Editable_Plate"}, {"name": "Edited_Sketch_Dimension"}],
             },
             "dimension_edit": {"dimension": "D1@Edited_Sketch_Dimension", "before_m": 0.02, "after_m": 0.024},
+            "reopen_modify": {"dimension": "D1@Edited_Sketch_Dimension", "before_m": 0.024, "target_m": 0.028, "after_reopen_m": 0.028, "persisted": True, "save": {"ok": True, "errors": 0, "warnings": 0}},
             "assembly_result": {"component_count": 4, "mates": [{"name": "Concentric_Mate", "ok": True}, {"name": "Distance_Mate", "ok": True}]},
             "assembly_features": [],
             "callbacks": {
@@ -153,6 +164,37 @@ class LiveCapabilitySuiteSpecTests(unittest.TestCase):
         self.assertFalse(validation["ok"])
         self.assertIn("post_cleanup_single_session", validation["failed_capabilities"])
 
+
+    def test_validate_live_result_rejects_missing_reopen_persistence(self):
+        result = {
+            "features": {
+                "extrude": [{"name": "Body_Plate"}, {"name": "Round_Through_Hole"}, {"name": "Rectangular_Window_Cut"}],
+                "revolve": [{"name": "Revolve_Boss_Profile"}],
+                "revolve_cut": [{"name": "Revolve_Boss_Profile"}, {"name": "Revolve_Cut_Bore"}],
+                "editable": [{"name": "Body_Editable_Plate"}, {"name": "Edited_Sketch_Dimension"}],
+            },
+            "dimension_edit": {"dimension": "D1@Edited_Sketch_Dimension", "before_m": 0.02, "after_m": 0.024},
+            "assembly_result": {"component_count": 4, "mates": [{"name": "Concentric_Mate", "ok": True}, {"name": "Distance_Mate", "ok": True}]},
+            "assembly_features": [{"name": "Concentric_Mate"}, {"name": "Distance_Mate"}],
+            "callbacks": {"mass": {"available": True, "mass_kg": 1.0}, "interference": {"available": True, "count": 0}},
+            "native_artifacts": {"assembly_exists": True, "part_count": 4, "part_files": ["a.SLDPRT", "b.SLDPRT", "c.SLDPRT", "d.SLDPRT"]},
+            "cleanup": {"locked_files": []},
+            "post_cleanup": {"locked_files": []},
+        }
+        validation = self.module.validate_live_result(result)
+        self.assertFalse(validation["ok"])
+        self.assertIn("open_existing_modify_reopen", validation["failed_capabilities"])
+
+        result["reopen_modify"] = {"dimension": "D1@Edited_Sketch_Dimension", "before_m": 0.024, "target_m": 0.028, "after_reopen_m": 0.027, "persisted": False}
+        validation = self.module.validate_live_result(result)
+        self.assertFalse(validation["ok"])
+        self.assertIn("open_existing_modify_reopen", validation["failed_capabilities"])
+
+        result["reopen_modify"] = {"dimension": "D1@Edited_Sketch_Dimension", "before_m": 0.024, "target_m": 0.028, "after_reopen_m": 0.028, "persisted": True, "save": {"ok": False, "errors": 8192, "warnings": 0}}
+        validation = self.module.validate_live_result(result)
+        self.assertFalse(validation["ok"])
+        self.assertIn("open_existing_modify_reopen", validation["failed_capabilities"])
+
     def test_native_solidworks_artifacts_are_primary_not_step(self):
         matrix = self.module.build_capability_matrix()
         by_name = {capability.name: capability for capability in matrix.capabilities}
@@ -173,6 +215,7 @@ class LiveCapabilitySuiteSpecTests(unittest.TestCase):
                 "editable": [{"name": "Body_Editable_Plate"}, {"name": "Edited_Sketch_Dimension"}],
             },
             "dimension_edit": {"dimension": "D1@Edited_Sketch_Dimension", "before_m": 0.02, "after_m": 0.024},
+            "reopen_modify": {"dimension": "D1@Edited_Sketch_Dimension", "before_m": 0.024, "target_m": 0.028, "after_reopen_m": 0.028, "persisted": True, "save": {"ok": True, "errors": 0, "warnings": 0}},
             "assembly_result": {"component_count": 4, "mates": [{"name": "Concentric_Mate", "ok": True}, {"name": "Distance_Mate", "ok": True}]},
             "assembly_features": [{"name": "Concentric_Mate"}, {"name": "Distance_Mate"}],
             "native_artifacts": {"assembly_exists": False, "part_count": 4, "part_files": ["a.SLDPRT", "b.SLDPRT", "c.SLDPRT", "d.SLDPRT"]},

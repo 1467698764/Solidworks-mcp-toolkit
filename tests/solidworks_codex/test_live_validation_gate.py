@@ -79,6 +79,7 @@ class LiveValidationGateSpecTests(unittest.TestCase):
         self.assertIn("strict:live_capability_suite:native_solidworks_artifacts", result["failed"])
         self.assertIn("strict:live_capability_suite:interference_callback", result["failed"])
         self.assertIn("strict:live_capability_suite:assembly_mates_persisted", result["failed"])
+        self.assertIn("strict:live_capability_suite:open_existing_modify_reopen", result["failed"])
 
 
     def test_default_report_expectations_use_strict_live_checks(self):
@@ -86,6 +87,7 @@ class LiveValidationGateSpecTests(unittest.TestCase):
         expectations = {item.name: item for item in self.module.report_expectations(contract)}
         self.assertIn("native_solidworks_artifacts", expectations["live_capability_suite"].strict_checks)
         self.assertIn("assembly_mates_persisted", expectations["live_capability_suite"].strict_checks)
+        self.assertIn("open_existing_modify_reopen", expectations["live_capability_suite"].strict_checks)
         self.assertIn("part_count", expectations["complete_shaper_v5"].strict_checks)
         self.assertIn("component_count", expectations["complete_shaper_v5"].strict_checks)
         self.assertIn("mate_semantics", expectations["complete_shaper_v5"].strict_checks)
@@ -98,6 +100,13 @@ class LiveValidationGateSpecTests(unittest.TestCase):
             suite.write_text(json.dumps({
                 "ok": True,
                 "native_artifacts": {"assembly_exists": True, "part_count": 4, "primary": True},
+                "assembly_features": [{"name": "Concentric_Mate"}, {"name": "Distance_Mate"}],
+                "reopen_modify": {
+                    "dimension": "D1@Edited_Sketch_Dimension",
+                    "after_reopen_m": 0.028,
+                    "persisted": True,
+                    "save": {"ok": True, "errors": 0, "warnings": 0},
+                },
                 "callbacks": {"interference": {"available": True, "count": 0}, "mass": {"available": True, "mass_kg": 0.2}},
                 "post_cleanup": {"locked_files": []},
                 "validation": {"ok": True, "failed_capabilities": []},
@@ -106,16 +115,41 @@ class LiveValidationGateSpecTests(unittest.TestCase):
                 "ok": True,
                 "part_count": 24,
                 "component_count": 58,
+                "mates": [{"name": "Shaper_Distance_Mate", "semantic_pair": ["cast_bed_with_t_slots", "column_frame_with_window"], "ok": True}],
                 "callbacks": {"interference": {"available": True, "count": 0}, "mass": {"available": True, "mass_kg": 15.125546510666322}},
                 "post_cleanup": {"locked_files": [], "lock_files": []},
                 "validation": {"ok": True, "failed": []},
             }), encoding="utf-8")
             result = self.module.validate_gate_reports([
-                self.module.ReportExpectation("live_capability_suite", suite, ("ok", "native_artifacts.primary")),
-                self.module.ReportExpectation("complete_shaper_v5", shaper, ("ok",)),
+                self.module.ReportExpectation("live_capability_suite", suite, ("ok", "native_artifacts.primary"), self.module.capability_suite_strict_checks()),
+                self.module.ReportExpectation("complete_shaper_v5", shaper, ("ok",), self.module.shaper_v5_strict_checks()),
             ])
         self.assertTrue(result["ok"], result)
         self.assertEqual([], result["failed"])
+
+    def test_validate_gate_rejects_reopen_persistence_when_save3_failed(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            suite = root / "live_capability_suite.json"
+            suite.write_text(json.dumps({
+                "ok": True,
+                "native_artifacts": {"assembly_exists": True, "part_count": 4, "primary": True},
+                "assembly_features": [{"name": "Concentric_Mate"}, {"name": "Distance_Mate"}],
+                "reopen_modify": {
+                    "dimension": "D1@Edited_Sketch_Dimension",
+                    "after_reopen_m": 0.028,
+                    "persisted": True,
+                    "save": {"ok": False, "errors": 8192, "warnings": 0},
+                },
+                "callbacks": {"interference": {"available": True, "count": 0}, "mass": {"available": True, "mass_kg": 0.2}},
+                "post_cleanup": {"locked_files": []},
+                "validation": {"ok": True, "failed_capabilities": []},
+            }), encoding="utf-8")
+            result = self.module.validate_gate_reports([
+                self.module.ReportExpectation("live_capability_suite", suite, ("ok", "native_artifacts.primary"), self.module.capability_suite_strict_checks()),
+            ])
+        self.assertFalse(result["ok"])
+        self.assertIn("strict:live_capability_suite:open_existing_modify_reopen", result["failed"])
 
 
     def test_readme_documents_live_gate_native_outputs_and_stale_cleanup(self):
@@ -168,5 +202,3 @@ class LiveValidationGateSpecTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
-

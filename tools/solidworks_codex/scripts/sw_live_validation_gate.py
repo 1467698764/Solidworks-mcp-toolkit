@@ -103,6 +103,7 @@ def capability_suite_strict_checks() -> tuple[str, ...]:
     return (
         "native_solidworks_artifacts",
         "assembly_mates_persisted",
+        "open_existing_modify_reopen",
         "interference_callback",
         "mass_callback",
         "post_cleanup_single_session",
@@ -127,6 +128,16 @@ def _strict_check_failed(data: dict[str, Any], check: str) -> bool:
     if check == "assembly_mates_persisted":
         names = {str(item.get("name", "")) for item in data.get("assembly_features", []) if isinstance(item, dict)}
         return not {"Concentric_Mate", "Distance_Mate"}.issubset(names)
+    if check == "open_existing_modify_reopen":
+        reopen = data.get("reopen_modify", {})
+        save = reopen.get("save", {}) if isinstance(reopen, dict) else {}
+        return (
+            reopen.get("dimension") != "D1@Edited_Sketch_Dimension"
+            or reopen.get("persisted") is not True
+            or abs(float(reopen.get("after_reopen_m", 0) or 0) - 0.028) > 1e-6
+            or save.get("ok") is not True
+            or int(save.get("errors", 0) or 0) != 0
+        )
     if check == "interference_callback":
         inter = data.get("callbacks", {}).get("interference", {})
         return not inter.get("available") or inter.get("count") is None

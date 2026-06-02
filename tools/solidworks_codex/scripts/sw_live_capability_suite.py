@@ -49,6 +49,7 @@ def build_capability_matrix() -> CapabilityMatrix:
         C("revolve_cut", "revolve_cut_part.SLDPRT", ("Revolve_Cut_Bore",), "revolved cut groove/bore from selected sketch"),
         C("sketch_edit_dimension", "editable_dimension_plate.SLDPRT", ("Edited_Sketch_Dimension", "dimension_after_m"), "create dimension, edit it, rebuild, read back"),
         C("read_modify_rebuild", "editable_dimension_plate.SLDPRT", ("before_after_dimension_delta",), "read existing parameter, modify, rebuild and save"),
+        C("open_existing_modify_reopen", "editable_dimension_plate.SLDPRT", ("open_existing", "modify_save", "reopen_persisted"), "open a saved native part, read/modify/save a dimension, close it, and reopen to prove persistence"),
         C("assembly_insert_component", "capability_suite.SLDASM", ("component_count>=3",), "insert generated components into assembly"),
         C("assembly_mate_concentric", "capability_suite.SLDASM", ("Concentric_Mate",), "add at least one concentric mate or record mate API error"),
         C("assembly_mate_distance", "capability_suite.SLDASM", ("Distance_Mate",), "add at least one distance mate or record mate API error"),
@@ -72,6 +73,7 @@ def expected_live_contract() -> dict[str, Any]:
         "dimensions": ("Edited_Sketch_Dimension", "D1@Edited_Sketch_Dimension"),
         "mates": ("Concentric_Mate", "Distance_Mate"),
         "minimum_component_count": 3,
+        "open_existing_modify_reopen": {"dimension": "D1@Edited_Sketch_Dimension", "expected_after_reopen_m": 0.028},
     }
 
 
@@ -100,6 +102,17 @@ def validate_live_result(result: dict[str, Any]) -> dict[str, Any]:
     if dim.get("dimension") != "D1@Edited_Sketch_Dimension" or dim.get("before_m") == dim.get("after_m") or dim.get("after_m") is None:
         failed.append("sketch_edit_dimension")
         details["sketch_edit_dimension"] = dim
+    reopen = result.get("reopen_modify", {})
+    reopen_save = reopen.get("save", {}) if isinstance(reopen, dict) else {}
+    if (
+        reopen.get("dimension") != "D1@Edited_Sketch_Dimension"
+        or reopen.get("persisted") is not True
+        or abs(float(reopen.get("after_reopen_m", 0) or 0) - 0.028) > 1e-6
+        or reopen_save.get("ok") is not True
+        or int(reopen_save.get("errors", 0) or 0) != 0
+    ):
+        failed.append("open_existing_modify_reopen")
+        details["open_existing_modify_reopen"] = reopen
 
     asm = result.get("assembly_result", {})
     if int(asm.get("component_count", 0) or 0) < 3:
@@ -487,6 +500,53 @@ def create_editable_dimension_plate(sw: Any, out_dir: Path) -> tuple[Path, dict[
     return path, {"dimension": "D1@Edited_Sketch_Dimension", "before_m": before_m, "after_m": after_m}
 
 
+
+def save_model(model: Any) -> dict[str, Any]:
+    pythoncom, win32_client = require_pywin32()
+    errors = win32_client.VARIANT(pythoncom.VT_BYREF | pythoncom.VT_I4, 0)
+    warnings = win32_client.VARIANT(pythoncom.VT_BYREF | pythoncom.VT_I4, 0)
+    ok = model.Save3(1, errors, warnings)
+    return {"ok": bool(ok), "errors": getattr(errors, "value", errors), "warnings": getattr(warnings, "value", warnings)}
+
+
+def reopen_modify_dimension(sw: Any, path: Path, dimension: str = "D1@Edited_Sketch_Dimension", target_m: float = 0.028) -> dict[str, Any]:
+    model = open_for_component(sw, path)
+    before_m = None
+    after_set_m = None
+    save_result: dict[str, Any] | None = None
+    try:
+        dim = model.Parameter(dimension)
+        if dim is None:
+            raise RuntimeError(f"could not read existing dimension {dimension} in {path}")
+        before_m = dim.SystemValue
+        dim.SystemValue = target_m
+        after_set_m = dim.SystemValue
+        model.ForceRebuild3(False)
+        save_result = save_model(model)
+        if not save_result.get("ok"):
+            raise RuntimeError(f"Save3 failed after modifying {dimension}: {save_result}")
+    finally:
+        close_doc(sw, model)
+    reopened = open_for_component(sw, path)
+    after_reopen_m = None
+    try:
+        dim = reopened.Parameter(dimension)
+        if dim is None:
+            raise RuntimeError(f"could not read reopened dimension {dimension} in {path}")
+        after_reopen_m = dim.SystemValue
+    finally:
+        close_doc(sw, reopened)
+    return {
+        "dimension": dimension,
+        "path": str(path.resolve()),
+        "before_m": before_m,
+        "target_m": target_m,
+        "after_set_m": after_set_m,
+        "after_reopen_m": after_reopen_m,
+        "persisted": after_reopen_m is not None and abs(float(after_reopen_m) - target_m) <= 1e-6,
+        "save": save_result,
+    }
+
 def open_for_component(sw: Any, path: Path) -> Any:
     pythoncom, win32_client = require_pywin32()
     errors = win32_client.VARIANT(pythoncom.VT_BYREF | pythoncom.VT_I4, 0)
@@ -766,6 +826,7 @@ def run_live(out_dir: Path, reports_dir: Path, export_dir: Path, force: bool, st
     part_paths["revolve_cut"] = create_revolve_cut_part(sw, out_dir)
     editable_path, dimension_result = create_editable_dimension_plate(sw, out_dir)
     part_paths["editable"] = editable_path
+    reopen_modify_result = reopen_modify_dimension(sw, editable_path)
     asm_path, asm_result = create_assembly(sw, out_dir, part_paths)
     feature_reports = {
         key: inspect_features(sw, path, 1)
@@ -797,6 +858,7 @@ def run_live(out_dir: Path, reports_dir: Path, export_dir: Path, force: bool, st
         "assembly_features": assembly_features,
         "native_artifacts": native_artifacts,
         "dimension_edit": dimension_result,
+        "reopen_modify": reopen_modify_result,
         "assembly_result": asm_result,
         "callbacks": callbacks,
         "contract": expected_live_contract(),
