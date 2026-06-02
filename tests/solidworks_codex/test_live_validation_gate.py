@@ -20,6 +20,17 @@ def load_module():
     return module
 
 
+def load_shaper_builder():
+    script = ROOT / "tools" / "solidworks_codex" / "scripts" / "sw_create_complete_shaper_fixture.py"
+    spec = importlib.util.spec_from_file_location("sw_create_complete_shaper_fixture_for_live_gate_test", script)
+    if spec is None or spec.loader is None:
+        raise AssertionError("could not load shaper builder module spec")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
 def with_readbacks(context):
     for part in context.values():
         for op in part["operations"].values():
@@ -79,71 +90,20 @@ def capability_assembly_inspect():
 
 
 def shaper_mates():
-    return [
-        {
-            "name": "Bed_Column_Distance_Mate",
-            "kind": "distance",
-            "semantic_pair": ["cast_bed_with_t_slots", "column_frame_with_window"],
-            "components": ["cast_bed_with_t_slots-1", "column_frame_with_window-1"],
+    mates = []
+    for name, expected in load_shaper_builder().expected_shaper_mate_contract().items():
+        pair = list(expected["semantic_pair"])
+        components = [f"{pair[0]}-1", f"{pair[1]}-1"]
+        mates.append({
+            "name": name,
+            "kind": expected["type"],
+            "semantic_pair": pair,
+            "components": components,
             "selected_entities": 2,
-            "selection_guard": {"cleared_selection_count": 0, "selection_count_before_mate": 2, "component_pair": ["cast_bed_with_t_slots-1", "column_frame_with_window-1"]},
+            "selection_guard": {"cleared_selection_count": 0, "selection_count_before_mate": 2, "component_pair": components},
             "ok": True,
-        },
-        {
-            "name": "Ram_LeftWay_Guidance_Distance_Mate",
-            "kind": "distance",
-            "semantic_pair": ["ram_with_dovetail_and_tool_mount", "left_dovetail_way"],
-            "components": ["ram_with_dovetail_and_tool_mount-1", "left_dovetail_way-1"],
-            "selected_entities": 2,
-            "selection_guard": {"cleared_selection_count": 0, "selection_count_before_mate": 2, "component_pair": ["ram_with_dovetail_and_tool_mount-1", "left_dovetail_way-1"]},
-            "ok": True,
-        },
-        {
-            "name": "ToolHead_Ram_Distance_Mate",
-            "kind": "distance",
-            "semantic_pair": ["clapper_tool_head", "ram_with_dovetail_and_tool_mount"],
-            "components": ["clapper_tool_head-1", "ram_with_dovetail_and_tool_mount-1"],
-            "selected_entities": 2,
-            "selection_guard": {"cleared_selection_count": 0, "selection_count_before_mate": 2, "component_pair": ["clapper_tool_head-1", "ram_with_dovetail_and_tool_mount-1"]},
-            "ok": True,
-        },
-        {
-            "name": "Table_CrossSlide_Distance_Mate",
-            "kind": "distance",
-            "semantic_pair": ["work_table_with_t_slots", "table_cross_slide"],
-            "components": ["work_table_with_t_slots-1", "table_cross_slide-1"],
-            "selected_entities": 2,
-            "selection_guard": {"cleared_selection_count": 0, "selection_count_before_mate": 2, "component_pair": ["work_table_with_t_slots-1", "table_cross_slide-1"]},
-            "ok": True,
-        },
-        {
-            "name": "BullGear_CrankShaft_Concentric_Mate",
-            "kind": "concentric",
-            "semantic_pair": ["bull_gear_crank_disk", "crank_center_shaft"],
-            "components": ["bull_gear_crank_disk-1", "crank_center_shaft-1"],
-            "selected_entities": 2,
-            "selection_guard": {"cleared_selection_count": 0, "selection_count_before_mate": 2, "component_pair": ["bull_gear_crank_disk-1", "crank_center_shaft-1"]},
-            "ok": True,
-        },
-        {
-            "name": "Crank_Link_Concentric_Mate",
-            "kind": "concentric",
-            "semantic_pair": ["eccentric_crank_pin", "ram_drive_link"],
-            "components": ["eccentric_crank_pin-1", "ram_drive_link-1"],
-            "selected_entities": 2,
-            "selection_guard": {"cleared_selection_count": 0, "selection_count_before_mate": 2, "component_pair": ["eccentric_crank_pin-1", "ram_drive_link-1"]},
-            "ok": True,
-        },
-        {
-            "name": "Rocker_Pivot_Concentric_Mate",
-            "kind": "concentric",
-            "semantic_pair": ["slotted_rocker_arm", "rocker_pivot_shaft"],
-            "components": ["slotted_rocker_arm-1", "rocker_pivot_shaft-1"],
-            "selected_entities": 2,
-            "selection_guard": {"cleared_selection_count": 0, "selection_count_before_mate": 2, "component_pair": ["slotted_rocker_arm-1", "rocker_pivot_shaft-1"]},
-            "ok": True,
-        },
-    ]
+        })
+    return mates
 
 
 def shaper_primary_components():
@@ -154,15 +114,25 @@ def shaper_primary_components():
 
 
 def shaper_inspect_evidence():
+    builder = load_shaper_builder()
     return {"active_document": {"type": "assembly", "component_count_sampled": 58, "components": shaper_primary_components(), "mate_like_features": [
-        {"name": "Bed_Column_Distance_Mate", "type": "MateDistanceDim", "components": ["cast_bed_with_t_slots-1", "column_frame_with_window-1"], "suppressed": False},
-        {"name": "Ram_LeftWay_Guidance_Distance_Mate", "type": "MateDistanceDim", "components": ["ram_with_dovetail_and_tool_mount-1", "left_dovetail_way-1"], "suppressed": False},
-        {"name": "ToolHead_Ram_Distance_Mate", "type": "MateDistanceDim", "components": ["clapper_tool_head-1", "ram_with_dovetail_and_tool_mount-1"], "suppressed": False},
-        {"name": "Table_CrossSlide_Distance_Mate", "type": "MateDistanceDim", "components": ["work_table_with_t_slots-1", "table_cross_slide-1"], "suppressed": False},
-        {"name": "BullGear_CrankShaft_Concentric_Mate", "type": "MateConcentric", "components": ["bull_gear_crank_disk-1", "crank_center_shaft-1"], "suppressed": False},
-        {"name": "Crank_Link_Concentric_Mate", "type": "MateConcentric", "components": ["eccentric_crank_pin-1", "ram_drive_link-1"], "suppressed": False},
-        {"name": "Rocker_Pivot_Concentric_Mate", "type": "MateConcentric", "components": ["slotted_rocker_arm-1", "rocker_pivot_shaft-1"], "suppressed": False}
+        {"name": name, "type": builder.expected_inspect_mate_type(expected["type"]), "components": [f"{expected['semantic_pair'][0]}-1", f"{expected['semantic_pair'][1]}-1"], "suppressed": False}
+        for name, expected in builder.expected_shaper_mate_contract().items()
     ]}}
+
+
+def shaper_understanding_evidence():
+    return {"baseline": {"inventory": {"component_count": 58}}, "cad_evidence_graph": {"spatial_evidence": {"near_or_overlap_pairs": [
+        {"a": f"{left}-1", "b": f"{right}-1", "relation": "near", "gap_m": 0.002}
+        for left, right in load_shaper_builder().expected_shaper_functional_connection_contract()
+    ]}}}
+
+
+def shaper_part_feature_evidence():
+    return {
+        part_name: {"ok": True, "features": [{"name": name, "type": "Feature"} for name in feature_names]}
+        for part_name, feature_names in load_shaper_builder().expected_live_feature_names().items()
+    }
 
 
 class LiveValidationGateSpecTests(unittest.TestCase):
@@ -317,6 +287,7 @@ class LiveValidationGateSpecTests(unittest.TestCase):
         self.assertIn("part_count", expectations["complete_shaper_v5"].strict_checks)
         self.assertIn("component_count", expectations["complete_shaper_v5"].strict_checks)
         self.assertIn("mate_semantics", expectations["complete_shaper_v5"].strict_checks)
+        self.assertIn("part_feature_evidence", expectations["complete_shaper_v5"].strict_checks)
 
     def test_validate_gate_accepts_strict_live_evidence_and_native_artifacts(self):
         with TemporaryDirectory() as tmp:
@@ -363,8 +334,9 @@ class LiveValidationGateSpecTests(unittest.TestCase):
                 "component_count": 58,
                 "mates": shaper_mates(),
                 "callbacks": {"interference": {"available": True, "count": 0}, "mass": {"available": True, "mass_kg": 15.125546510666322}},
+                "part_feature_evidence": shaper_part_feature_evidence(),
                 "inspect": shaper_inspect_evidence(),
-                "model_understanding": {"baseline": {"inventory": {"component_count": 58}}, "cad_evidence_graph": {"spatial_evidence": {"near_or_overlap_pairs": [{"a": "cast_bed_with_t_slots-1", "b": "column_frame_with_window-1"}]}}},
+                "model_understanding": shaper_understanding_evidence(),
                 "post_cleanup": {"locked_files": [], "lock_files": []},
                 "validation": {"ok": True, "failed": []},
             }), encoding="utf-8")
@@ -439,7 +411,7 @@ class LiveValidationGateSpecTests(unittest.TestCase):
                 {"name": "Crank_Link_Concentric_Mate"},
                 {"name": "Rocker_Pivot_Concentric_Mate"},
             ]}},
-            "model_understanding": {"baseline": {"inventory": {"component_count": 58}}, "cad_evidence_graph": {"spatial_evidence": {"near_or_overlap_pairs": [{"a": "cast_bed_with_t_slots-1", "b": "column_frame_with_window-1"}]}}},
+            "model_understanding": shaper_understanding_evidence(),
             "post_cleanup": {"locked_files": [], "lock_files": []},
             "validation": {"ok": True, "failed": []},
         }
@@ -453,7 +425,7 @@ class LiveValidationGateSpecTests(unittest.TestCase):
             "mates": shaper_mates(),
             "callbacks": {"interference": {"available": True, "count": 0}, "mass": {"available": True, "mass_kg": 15.0}},
             "inspect": shaper_inspect_evidence(),
-            "model_understanding": {"baseline": {"inventory": {"component_count": 58}}, "cad_evidence_graph": {"spatial_evidence": {"near_or_overlap_pairs": [{"a": "cast_bed_with_t_slots-1", "b": "column_frame_with_window-1"}]}}},
+            "model_understanding": shaper_understanding_evidence(),
             "post_cleanup": {"locked_files": [], "lock_files": []},
             "validation": {"ok": True, "failed": []},
         }

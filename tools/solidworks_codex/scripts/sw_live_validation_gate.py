@@ -142,21 +142,31 @@ def shaper_v5_strict_checks() -> tuple[str, ...]:
         "mass_callback",
         "interference_clearance",
         "mate_semantics",
+        "part_feature_evidence",
         "inspect_model_understand",
         "post_cleanup_single_session",
     )
 
 
 def _expected_inspect_mates() -> dict[str, tuple[str, list[str]]]:
+    shaper = _load_shaper_builder_module()
     return {
-        "Bed_Column_Distance_Mate": ("MateDistanceDim", ["cast_bed_with_t_slots", "column_frame_with_window"]),
-        "Ram_LeftWay_Guidance_Distance_Mate": ("MateDistanceDim", ["ram_with_dovetail_and_tool_mount", "left_dovetail_way"]),
-        "ToolHead_Ram_Distance_Mate": ("MateDistanceDim", ["clapper_tool_head", "ram_with_dovetail_and_tool_mount"]),
-        "Table_CrossSlide_Distance_Mate": ("MateDistanceDim", ["work_table_with_t_slots", "table_cross_slide"]),
-        "BullGear_CrankShaft_Concentric_Mate": ("MateConcentric", ["bull_gear_crank_disk", "crank_center_shaft"]),
-        "Crank_Link_Concentric_Mate": ("MateConcentric", ["eccentric_crank_pin", "ram_drive_link"]),
-        "Rocker_Pivot_Concentric_Mate": ("MateConcentric", ["slotted_rocker_arm", "rocker_pivot_shaft"]),
+        name: (shaper.expected_inspect_mate_type(expected["type"]), list(expected["semantic_pair"]))
+        for name, expected in shaper.expected_shaper_mate_contract().items()
     }
+
+
+def _expected_runtime_mates() -> dict[str, tuple[str, list[str]]]:
+    shaper = _load_shaper_builder_module()
+    return {
+        name: (expected["type"], list(expected["semantic_pair"]))
+        for name, expected in shaper.expected_shaper_mate_contract().items()
+    }
+
+
+def _functional_connection_pairs() -> list[tuple[str, str]]:
+    shaper = _load_shaper_builder_module()
+    return [tuple(pair) for pair in shaper.expected_shaper_functional_connection_contract()]
 
 
 def _load_shaper_builder_module() -> Any:
@@ -397,15 +407,7 @@ def _strict_check_failed(data: dict[str, Any], check: str) -> bool:
         return int(data.get("component_count", 0) or 0) != 58
     if check == "mate_semantics":
         mates = data.get("mates", [])
-        required = {
-            "Bed_Column_Distance_Mate": ("distance", ["cast_bed_with_t_slots", "column_frame_with_window"]),
-            "Ram_LeftWay_Guidance_Distance_Mate": ("distance", ["ram_with_dovetail_and_tool_mount", "left_dovetail_way"]),
-            "ToolHead_Ram_Distance_Mate": ("distance", ["clapper_tool_head", "ram_with_dovetail_and_tool_mount"]),
-            "Table_CrossSlide_Distance_Mate": ("distance", ["work_table_with_t_slots", "table_cross_slide"]),
-            "BullGear_CrankShaft_Concentric_Mate": ("concentric", ["bull_gear_crank_disk", "crank_center_shaft"]),
-            "Crank_Link_Concentric_Mate": ("concentric", ["eccentric_crank_pin", "ram_drive_link"]),
-            "Rocker_Pivot_Concentric_Mate": ("concentric", ["slotted_rocker_arm", "rocker_pivot_shaft"]),
-        }
+        required = _expected_runtime_mates()
         by_name = {m.get("name"): m for m in mates if isinstance(m, dict)}
         for name, (kind, pair) in required.items():
             mate = by_name.get(name)
@@ -418,6 +420,10 @@ def _strict_check_failed(data: dict[str, Any], check: str) -> bool:
             if not _component_pair_matches(mate.get("components"), pair):
                 return True
         return False
+    if check == "part_feature_evidence":
+        shaper = _load_shaper_builder_module()
+        evidence = data.get("part_feature_evidence")
+        return bool(shaper.validate_part_feature_evidence(evidence))
     if check == "inspect_model_understand":
         inspect = data.get("inspect", {})
         doc = inspect.get("active_document", {}) if isinstance(inspect, dict) else {}
@@ -443,7 +449,11 @@ def _strict_check_failed(data: dict[str, Any], check: str) -> bool:
         if int(inv.get("component_count", 0) or 0) < 58:
             return True
         relations = spatial.get("near_or_overlap_pairs") or []
-        return not relations
+        relation_texts = [f"{r.get('a')} {r.get('b')}" for r in relations if isinstance(r, dict)]
+        for left, right in _functional_connection_pairs():
+            if not any(left in text and right in text for text in relation_texts):
+                return True
+        return False
     return True
 
 def _read_path(data: dict[str, Any], dotted: str) -> Any:

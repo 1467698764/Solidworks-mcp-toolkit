@@ -39,6 +39,13 @@ def sample_shaper_mates(module):
     return mates
 
 
+def sample_part_feature_evidence(module):
+    return {
+        part_name: {"ok": True, "features": [{"name": name, "type": "Feature"} for name in feature_names]}
+        for part_name, feature_names in module.expected_live_feature_names().items()
+    }
+
+
 class CompleteShaperSpecTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -99,7 +106,7 @@ class CompleteShaperSpecTests(unittest.TestCase):
     def test_validation_manifest_rejects_plain_block_stack(self):
         model = self.module.build_complete_shaper_spec()
         manifest = self.module.spec_to_manifest(model)
-        self.assertEqual(manifest["quality_target"], "display_grade_mechanical_model")
+        self.assertEqual(manifest["quality_target"], "mechanism_assembly_validation")
         self.assertGreaterEqual(manifest["feature_counts"]["cut"], 18)
         self.assertGreaterEqual(manifest["feature_counts"]["hole"], 20)
         self.assertGreaterEqual(manifest["feature_counts"]["slot"], 6)
@@ -107,6 +114,7 @@ class CompleteShaperSpecTests(unittest.TestCase):
         self.assertIn("no_plain_block_stack", manifest["acceptance_rules"])
         self.assertIn("visible_holes_slots_and_fasteners", manifest["acceptance_rules"])
         self.assertIn("recognizable_bullhead_shaper_silhouette", manifest["acceptance_rules"])
+        self.assertIn("mechanism_profile_blocking_checks", manifest["acceptance_rules"])
 
     def test_live_builder_fails_fast_for_missing_cut_features(self):
         source = SCRIPT.read_text(encoding="utf-8")
@@ -143,6 +151,32 @@ class CompleteShaperSpecTests(unittest.TestCase):
         self.assertIn("Hex_Socket_Drive", expected["fastener_set_m6"])
         self.assertIn("Angled_Dovetail_Underside_Cut", expected["ram_with_dovetail_and_tool_mount"])
         self.assertIn("Left_Angled_Dovetail_Flank", expected["left_dovetail_way"])
+
+    def test_validate_live_result_requires_part_shape_feature_readback(self):
+        base = {
+            "ok": True,
+            "part_count": 24,
+            "component_count": self.module.expected_assembly_component_minimum(),
+            "layout": {"ok": True},
+            "mates": sample_shaper_mates(self.module),
+            "callbacks": {"mass": {"available": True, "mass_kg": 14.81}, "interference": {"available": True, "count": 0}},
+            "post_cleanup": {"locked_files": [], "lock_files": []},
+            "inspect": self.module.sample_expected_shaper_inspect_evidence(),
+            "model_understanding": self.module.sample_expected_shaper_understanding_evidence(),
+        }
+        validation = self.module.validate_live_result(base)
+        self.assertFalse(validation["ok"])
+        self.assertIn("part_feature_evidence", validation["failed"])
+
+        base["part_feature_evidence"] = sample_part_feature_evidence(self.module)
+        self.assertTrue(self.module.validate_live_result(base)["ok"])
+
+        bad = dict(base)
+        bad_features = sample_part_feature_evidence(self.module)
+        bad_features["bull_gear_crank_disk"] = {"ok": True, "features": [{"name": "Plain_Disk_Body_Only"}]}
+        bad["part_feature_evidence"] = bad_features
+        failed = self.module.validate_live_result(bad)["failed"]
+        self.assertIn("part_feature_evidence:bull_gear_crank_disk", failed)
 
     def test_live_outputs_are_separate_from_old_failed_fixture(self):
         model = self.module.build_complete_shaper_spec()
@@ -214,7 +248,7 @@ class CompleteShaperSpecTests(unittest.TestCase):
 
     def test_complete_shaper_requires_semantic_mate_network_not_single_distance_mate(self):
         expected = self.module.expected_shaper_mate_contract()
-        self.assertGreaterEqual(len(expected), 4)
+        self.assertGreaterEqual(len(expected), 18)
         self.assertIn("Bed_Column_Distance_Mate", expected)
         self.assertIn("Ram_LeftWay_Guidance_Distance_Mate", expected)
         self.assertIn("ToolHead_Ram_Distance_Mate", expected)
@@ -222,7 +256,24 @@ class CompleteShaperSpecTests(unittest.TestCase):
         self.assertIn("BullGear_CrankShaft_Concentric_Mate", expected)
         self.assertIn("Crank_Link_Concentric_Mate", expected)
         self.assertIn("Rocker_Pivot_Concentric_Mate", expected)
-        self.assertGreaterEqual(len(expected), 7)
+        for required_mate in (
+            "Column_LeftWay_Distance_Mate",
+            "Column_RightWay_Distance_Mate",
+            "Ram_RightWay_Guidance_Distance_Mate",
+            "Ram_FrontGib_Distance_Mate",
+            "Ram_RearGib_Distance_Mate",
+            "ToolBit_ToolHead_Distance_Mate",
+            "CrossSlide_Bed_Distance_Mate",
+            "FixedJaw_Table_Distance_Mate",
+            "MovableJaw_Table_Distance_Mate",
+            "CrankDisk_EccentricPin_Concentric_Mate",
+            "SlidingDie_RockerSlot_Distance_Mate",
+            "SlidingDie_CrankPin_Concentric_Mate",
+            "Link_SlidingDie_Concentric_Mate",
+            "RockerShaft_Bracket_Concentric_Mate",
+            "RockerBracket_Column_Distance_Mate",
+        ):
+            self.assertIn(required_mate, expected)
 
         spatial = self.module.expected_shaper_spatial_contract()
         self.assertIn("structural_stack", spatial)
@@ -264,6 +315,7 @@ class CompleteShaperSpecTests(unittest.TestCase):
             "post_cleanup": {"locked_files": [], "lock_files": []},
             "inspect": self.module.sample_expected_shaper_inspect_evidence(),
             "model_understanding": self.module.sample_expected_shaper_understanding_evidence(),
+            "part_feature_evidence": sample_part_feature_evidence(self.module),
         }
         self.assertTrue(self.module.validate_live_result(base)["ok"])
 
@@ -336,6 +388,7 @@ class CompleteShaperSpecTests(unittest.TestCase):
         inspected = dict(base)
         inspected["inspect"] = self.module.sample_expected_shaper_inspect_evidence()
         inspected["model_understanding"] = self.module.sample_expected_shaper_understanding_evidence()
+        inspected["part_feature_evidence"] = sample_part_feature_evidence(self.module)
         self.assertTrue(self.module.validate_live_result(inspected)["ok"])
 
         bad = dict(inspected)
@@ -344,7 +397,7 @@ class CompleteShaperSpecTests(unittest.TestCase):
         self.assertFalse(validation["ok"])
         self.assertIn("model_understanding:spatial_contract", validation["failed"])
 
-    def test_model_understanding_accepts_contract_member_inventory_when_near_pairs_are_sparse(self):
+    def test_model_understanding_rejects_contract_member_inventory_when_near_pairs_are_sparse(self):
         components_index = []
         for group_members in self.module.expected_shaper_spatial_contract().values():
             for name in group_members:
@@ -358,7 +411,22 @@ class CompleteShaperSpecTests(unittest.TestCase):
             },
             "spatial_model": {"components": components_index, "pairwise_relations": [], "missing_spatial_evidence": []},
         }
+        failed = self.module.validate_model_understanding_evidence(understanding)
+        self.assertIn("model_understanding:spatial_contract", failed)
+
+    def test_model_understanding_requires_functional_adjacency_pairs(self):
+        required_pairs = self.module.expected_shaper_functional_connection_contract()
+        self.assertGreaterEqual(len(required_pairs), 18)
+        understanding = self.module.sample_expected_shaper_understanding_evidence()
         self.assertEqual([], self.module.validate_model_understanding_evidence(understanding))
+
+        sparse = dict(understanding)
+        sparse["cad_evidence_graph"] = {"spatial_evidence": {"near_or_overlap_pairs": [
+            {"a": "cast_bed_with_t_slots-1", "b": "column_frame_with_window-1", "relation": "near", "gap_m": 0.002}
+        ], "missing_spatial_evidence": []}}
+        sparse["spatial_model"] = {"pairwise_relations": []}
+        failed = self.module.validate_model_understanding_evidence(sparse)
+        self.assertIn("model_understanding:functional_connections", failed)
 
     def test_inspect_evidence_rejects_same_named_mates_without_type_and_component_pair(self):
         evidence = self.module.sample_expected_shaper_inspect_evidence()
@@ -447,6 +515,7 @@ class CompleteShaperSpecTests(unittest.TestCase):
             "post_cleanup": {"locked_files": [], "lock_files": []},
             "inspect": self.module.sample_expected_shaper_inspect_evidence(),
             "model_understanding": self.module.sample_expected_shaper_understanding_evidence(),
+            "part_feature_evidence": sample_part_feature_evidence(self.module),
         }
         self.assertTrue(self.module.validate_live_result(base)["ok"])
 

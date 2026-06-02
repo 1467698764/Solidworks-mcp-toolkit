@@ -83,12 +83,12 @@ def build_complete_shaper_spec() -> CompleteShaperSpec:
     )
     return CompleteShaperSpec(
         name="bullhead_shaper_complete",
-        quality_target="display_grade_mechanical_model",
+        quality_target="mechanism_assembly_validation",
         output_dir=out,
         reports_dir="tools/solidworks_codex/reports/shaper_machine_v5",
         assembly_file=f"{out}/bullhead_shaper_complete.SLDASM",
         parts=parts,
-        acceptance_rules=("no_plain_block_stack", "visible_holes_slots_and_fasteners", "recognizable_bullhead_shaper_silhouette"),
+        acceptance_rules=("no_plain_block_stack", "visible_holes_slots_and_fasteners", "recognizable_bullhead_shaper_silhouette", "mechanism_profile_blocking_checks"),
     )
 
 
@@ -135,13 +135,38 @@ def expected_shaper_mate_contract() -> dict[str, dict[str, Any]]:
     """
     return {
         "Bed_Column_Distance_Mate": {"type": "distance", "semantic_pair": ["cast_bed_with_t_slots", "column_frame_with_window"], "functional_group": "structural_stack"},
+        "Column_LeftWay_Distance_Mate": {"type": "distance", "semantic_pair": ["column_frame_with_window", "left_dovetail_way"], "functional_group": "ram_guidance"},
+        "Column_RightWay_Distance_Mate": {"type": "distance", "semantic_pair": ["column_frame_with_window", "right_dovetail_way"], "functional_group": "ram_guidance"},
         "Ram_LeftWay_Guidance_Distance_Mate": {"type": "distance", "semantic_pair": ["ram_with_dovetail_and_tool_mount", "left_dovetail_way"], "functional_group": "ram_guidance"},
+        "Ram_RightWay_Guidance_Distance_Mate": {"type": "distance", "semantic_pair": ["ram_with_dovetail_and_tool_mount", "right_dovetail_way"], "functional_group": "ram_guidance"},
+        "Ram_FrontGib_Distance_Mate": {"type": "distance", "semantic_pair": ["ram_with_dovetail_and_tool_mount", "front_gib_plate"], "functional_group": "ram_guidance"},
+        "Ram_RearGib_Distance_Mate": {"type": "distance", "semantic_pair": ["ram_with_dovetail_and_tool_mount", "rear_gib_plate"], "functional_group": "ram_guidance"},
         "ToolHead_Ram_Distance_Mate": {"type": "distance", "semantic_pair": ["clapper_tool_head", "ram_with_dovetail_and_tool_mount"], "functional_group": "tool_head"},
+        "ToolBit_ToolHead_Distance_Mate": {"type": "distance", "semantic_pair": ["single_point_cutting_tool", "clapper_tool_head"], "functional_group": "tool_head"},
+        "CrossSlide_Bed_Distance_Mate": {"type": "distance", "semantic_pair": ["table_cross_slide", "cast_bed_with_t_slots"], "functional_group": "workholding_stack"},
         "Table_CrossSlide_Distance_Mate": {"type": "distance", "semantic_pair": ["work_table_with_t_slots", "table_cross_slide"], "functional_group": "workholding_stack"},
+        "FixedJaw_Table_Distance_Mate": {"type": "distance", "semantic_pair": ["vise_jaw_fixed", "work_table_with_t_slots"], "functional_group": "workholding_stack"},
+        "MovableJaw_Table_Distance_Mate": {"type": "distance", "semantic_pair": ["vise_jaw_movable", "work_table_with_t_slots"], "functional_group": "workholding_stack"},
         "BullGear_CrankShaft_Concentric_Mate": {"type": "concentric", "semantic_pair": ["bull_gear_crank_disk", "crank_center_shaft"], "functional_group": "quick_return_drive"},
+        "CrankDisk_EccentricPin_Concentric_Mate": {"type": "concentric", "semantic_pair": ["bull_gear_crank_disk", "eccentric_crank_pin"], "functional_group": "quick_return_drive"},
         "Crank_Link_Concentric_Mate": {"type": "concentric", "semantic_pair": ["eccentric_crank_pin", "ram_drive_link"], "functional_group": "quick_return_drive"},
+        "SlidingDie_CrankPin_Concentric_Mate": {"type": "concentric", "semantic_pair": ["bronze_sliding_die_block", "eccentric_crank_pin"], "functional_group": "quick_return_drive"},
+        "Link_SlidingDie_Concentric_Mate": {"type": "concentric", "semantic_pair": ["ram_drive_link", "bronze_sliding_die_block"], "functional_group": "quick_return_drive"},
+        "SlidingDie_RockerSlot_Distance_Mate": {"type": "distance", "semantic_pair": ["bronze_sliding_die_block", "slotted_rocker_arm"], "functional_group": "quick_return_drive"},
         "Rocker_Pivot_Concentric_Mate": {"type": "concentric", "semantic_pair": ["slotted_rocker_arm", "rocker_pivot_shaft"], "functional_group": "quick_return_drive"},
+        "RockerShaft_Bracket_Concentric_Mate": {"type": "concentric", "semantic_pair": ["rocker_pivot_shaft", "rocker_pivot_bracket"], "functional_group": "quick_return_drive"},
+        "RockerBracket_Column_Distance_Mate": {"type": "distance", "semantic_pair": ["rocker_pivot_bracket", "column_frame_with_window"], "functional_group": "quick_return_drive"},
     }
+
+
+def expected_shaper_functional_connection_contract() -> list[tuple[str, str]]:
+    """Required physical adjacency/proximity pairs for the complete shaper.
+
+    Mates prove constraint intent; this contract separately proves the visible
+    assembly is not a cloud of parts. Every pair must be present in spatial
+    near/overlap evidence from model-understand, independent of group inventory.
+    """
+    return [tuple(v["semantic_pair"]) for v in expected_shaper_mate_contract().values()]
 
 
 def expected_inspect_mate_type(kind: str) -> str:
@@ -262,6 +287,35 @@ def expected_shaper_spatial_contract() -> dict[str, list[str]]:
 
 def expected_shaper_mate_minimum() -> int:
     return len(expected_shaper_mate_contract())
+
+
+def component_pair_text_matches_pair(text: str, pair: tuple[str, str]) -> bool:
+    return pair[0] in text and pair[1] in text
+
+
+def spatial_relation_texts(understanding: dict[str, Any]) -> list[str]:
+    relation_sources: list[Any] = []
+    spatial = ((understanding.get("cad_evidence_graph") or {}).get("spatial_evidence") or {})
+    relation_sources.extend(spatial.get("near_or_overlap_pairs") or [])
+    spatial_model = understanding.get("spatial_model") or {}
+    relation_sources.extend(spatial_model.get("pairwise_relations") or [])
+    texts: list[str] = []
+    for relation in relation_sources:
+        if not isinstance(relation, dict):
+            continue
+        if str(relation.get("relation", "near")) not in {"near", "overlap", "touching", "contact", "coincident"}:
+            continue
+        texts.append(f"{relation.get('a')} {relation.get('b')}")
+    return texts
+
+
+def validate_functional_connection_evidence(understanding: dict[str, Any]) -> list[str]:
+    texts = spatial_relation_texts(understanding)
+    missing = []
+    for pair in expected_shaper_functional_connection_contract():
+        if not any(component_pair_text_matches_pair(text, pair) for text in texts):
+            missing.append(pair)
+    return ["model_understanding:functional_connections"] if missing else []
 
 
 def expected_assembly_component_minimum() -> int:
@@ -676,6 +730,15 @@ def feature_names_by_type(model: Any, type_name: str) -> set[str]:
     return names
 
 
+def feature_tree_evidence(model: Any, limit: int = 300) -> list[dict[str, Any]]:
+    features: list[dict[str, Any]] = []
+    feat = read_member(model, "FirstFeature")
+    while feat is not None and len(features) < limit:
+        features.append({"name": str(read_member(feat, "Name")), "type": str(read_member(feat, "GetTypeName2"))})
+        feat = read_member(feat, "GetNextFeature")
+    return features
+
+
 def find_new_feature_by_type(model: Any, type_name: str, before: set[str]) -> Any:
     types = SKETCH_FEATURE_TYPES if type_name == "ProfileFeature" else {type_name}
     feat = read_member(model, "FirstFeature")
@@ -777,6 +840,10 @@ def circular_pattern(count: int, pcd: float, radius: float, offset_angle: float 
 
 
 def create_part(sw: Any, out_dir: Path, part: PartSpec) -> Path:
+    return create_part_with_feature_evidence(sw, out_dir, part)[0]
+
+
+def create_part_with_feature_evidence(sw: Any, out_dir: Path, part: PartSpec) -> tuple[Path, dict[str, Any]]:
     path = out_dir / f"{part.name}.SLDPRT"
     model = new_part(sw)
     try:
@@ -842,8 +909,9 @@ def create_part(sw: Any, out_dir: Path, part: PartSpec) -> Path:
         elif name == "oil_cups":
             cut_circles(model, [(0, 0, max(w, h)*.18)], depth, "Oil_Cup_Bore")
         model.ForceRebuild3(False)
+        evidence = {"ok": True, "part": part.name, "features": feature_tree_evidence(model)}
         save_as(model, path)
-        return path
+        return path, evidence
     finally:
         close_doc(sw, model)
 
@@ -1161,7 +1229,7 @@ def inspect_live_assembly_model(asm: Any, sw: Any, reports_dir: Path) -> dict[st
 
 def understand_saved_assembly(inspect_report: dict[str, Any], reports_dir: Path) -> dict[str, Any]:
     understand_mod = load_sibling_module("sw_model_understand")
-    task = "鐗涘ご鍒ㄥ簥 bullhead shaper 瑁呴厤 绌洪棿鍏崇郴 閰嶅悎 绾︽潫 骞叉秹 ram guidance quick return drive tool head"
+    task = "閻楁稑銇旈崚銊ョ哎 bullhead shaper 鐟佸懘鍘?缁屾椽妫块崗宕囬兇 闁板秴鎮?缁撅附娼?楠炲弶绉?ram guidance quick return drive tool head"
     report = understand_mod.understand(inspect_report, task, 160, 80, "spatial-assembly")
     report["ok"] = True
     json_out = reports_dir / "complete_shaper_model_understanding.json"
@@ -1304,9 +1372,12 @@ def sample_expected_shaper_inspect_evidence() -> dict[str, Any]:
 
 def sample_expected_shaper_understanding_evidence() -> dict[str, Any]:
     pairs = []
-    for members in expected_shaper_spatial_contract().values():
-        for left, right in zip(members, members[1:]):
+    seen: set[tuple[str, str]] = set()
+    for left, right in expected_shaper_functional_connection_contract():
+        key = tuple(sorted((left, right)))
+        if key not in seen:
             pairs.append({"a": f"{left}-1", "b": f"{right}-1", "relation": "near", "gap_m": 0.002})
+            seen.add(key)
     return {
         "ok": True,
         "baseline": {"inventory": {"component_count": expected_assembly_component_minimum(), "floating_components": []}},
@@ -1456,6 +1527,25 @@ def validate_inspect_evidence(inspect: Any) -> list[str]:
     return failed
 
 
+def validate_part_feature_evidence(evidence: Any) -> list[str]:
+    if not isinstance(evidence, dict):
+        return ["part_feature_evidence"]
+    failed: list[str] = []
+    for part_name, required_names in expected_live_feature_names().items():
+        part_evidence = evidence.get(part_name)
+        if not isinstance(part_evidence, dict) or part_evidence.get("ok") is not True:
+            failed.append(f"part_feature_evidence:{part_name}")
+            continue
+        feature_names = {
+            str(item.get("name", ""))
+            for item in part_evidence.get("features", [])
+            if isinstance(item, dict)
+        }
+        if not all(any(required in actual for actual in feature_names) for required in required_names):
+            failed.append(f"part_feature_evidence:{part_name}")
+    return failed or []
+
+
 def validate_model_understanding_evidence(understanding: Any) -> list[str]:
     failed: list[str] = []
     if not isinstance(understanding, dict):
@@ -1463,6 +1553,7 @@ def validate_model_understanding_evidence(understanding: Any) -> list[str]:
     inv = ((understanding.get("baseline") or {}).get("inventory") or {})
     if int(inv.get("component_count", 0) or 0) < expected_assembly_component_minimum():
         failed.append("model_understanding:component_count")
+    failed.extend(validate_functional_connection_evidence(understanding))
     spatial = ((understanding.get("cad_evidence_graph") or {}).get("spatial_evidence") or {})
     relations = spatial.get("near_or_overlap_pairs") or []
     text = "\n".join(f"{r.get('a')} {r.get('b')}" for r in relations if isinstance(r, dict))
@@ -1477,8 +1568,7 @@ def validate_model_understanding_evidence(understanding: Any) -> list[str]:
     )
     for group, members in expected_shaper_spatial_contract().items():
         hits = sum(1 for member in members if member in text)
-        inventory_hits = sum(1 for member in members if member in component_text)
-        if hits < min(2, len(members)) and inventory_hits < len(members):
+        if hits < min(2, len(members)):
             failed.append(f"model_understanding:spatial_contract:{group}")
     if failed and not any(x == "model_understanding:spatial_contract" for x in failed):
         # Preserve a stable coarse failure code for callers/tests while still
@@ -1510,6 +1600,7 @@ def validate_live_result(result: dict[str, Any]) -> dict[str, Any]:
     if interference.get("count") != 0:
         failed.append("interference_clearance")
     failed.extend(validate_inspect_evidence(result.get("inspect")))
+    failed.extend(validate_part_feature_evidence(result.get("part_feature_evidence")))
     failed.extend(validate_model_understanding_evidence(result.get("model_understanding")))
     post_cleanup = result.get("post_cleanup", {})
     if post_cleanup.get("locked_files") or post_cleanup.get("lock_files"):
@@ -1595,11 +1686,14 @@ def construct_live_fixture(spec: CompleteShaperSpec, out_dir: Path, reports_dir:
         out_dir.mkdir(parents=True, exist_ok=True)
         reports_dir.mkdir(parents=True, exist_ok=True)
         part_paths: dict[str, Path] = {}
+        part_feature_evidence: dict[str, Any] = {}
         for part in spec.parts:
             stage = f"create_part:{part.name}"
             assert_solidworks_runtime_healthy(stage)
             print(f"[complete-shaper] creating {part.name}", flush=True)
-            part_paths[part.name] = create_part(sw, out_dir, part)
+            part_path, feature_evidence = create_part_with_feature_evidence(sw, out_dir, part)
+            part_paths[part.name] = part_path
+            part_feature_evidence[part.name] = feature_evidence
         stage = "new_assembly"
         asm = new_assembly(sw)
         components = []
@@ -1644,6 +1738,7 @@ def construct_live_fixture(spec: CompleteShaperSpec, out_dir: Path, reports_dir:
             "components": components,
             "mates": mates,
             "callbacks": callbacks,
+            "part_feature_evidence": part_feature_evidence,
             "inspect": inspect_report,
             "model_understanding": model_understanding,
             "layout": layout,
