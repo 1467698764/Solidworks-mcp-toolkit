@@ -268,6 +268,57 @@ class LiveCapabilitySuiteSpecTests(unittest.TestCase):
         self.assertEqual(readback["source"], "reopened_feature_tree")
         self.assertEqual(readback["geometry"], {"lines": 2, "circles": 1, "centerlines": 1})
 
+
+    def test_inspect_features_falls_back_to_active_doc_when_opendoc_proxy_lacks_feature_tree(self):
+        class FakeVariantFactory:
+            VT_BYREF = 0
+            VT_I4 = 0
+            def VARIANT(self, _flags, value):
+                return type("Variant", (), {"value": value})()
+
+        class BadOpenDocProxy:
+            pass
+
+        class Feature:
+            Name = "Distance_Mate"
+            def GetTypeName2(self):
+                return "MateDistanceDim"
+            def GetFirstSubFeature(self):
+                return None
+            def GetNextFeature(self):
+                return None
+
+        class ActiveModel:
+            def FirstFeature(self):
+                return Feature()
+            def GetTitle(self):
+                return "capability_suite.SLDASM"
+
+        class FakeSw:
+            def __init__(self):
+                self.active = ActiveModel()
+                self.activated = []
+                self.closed = []
+            def OpenDoc6(self, *args):
+                return BadOpenDocProxy()
+            def ActivateDoc3(self, title, *_args):
+                self.activated.append(title)
+                return self.active
+            @property
+            def ActiveDoc(self):
+                return self.active
+            def CloseDoc(self, title):
+                self.closed.append(title)
+
+        original = self.module.require_pywin32
+        try:
+            self.module.require_pywin32 = lambda: (FakeVariantFactory(), FakeVariantFactory())
+            features = self.module.inspect_features(FakeSw(), ROOT / "capability_suite.SLDASM", 2)
+        finally:
+            self.module.require_pywin32 = original
+
+        self.assertEqual([{"name": "Distance_Mate", "type": "MateDistanceDim", "depth": "0"}], features)
+
     def test_cleanup_policy_is_explicit_and_keeps_generated_outputs_separate(self):
         matrix = self.module.build_capability_matrix()
         self.assertIn("live_capability_suite", matrix.output_dir)
@@ -276,6 +327,32 @@ class LiveCapabilitySuiteSpecTests(unittest.TestCase):
         self.assertTrue(policy["close_documents_before_cleanup"])
         self.assertTrue(policy["delete_unlocked_generated_files"])
         self.assertTrue(policy["never_touch_unrelated_user_files"])
+
+
+    def test_validate_live_result_rejects_nonzero_interference_count(self):
+        result = {
+            "features": {
+                "extrude": [{"name": "Body_Plate"}, {"name": "Round_Through_Hole"}, {"name": "Rectangular_Window_Cut"}],
+                "revolve": [{"name": "Revolve_Boss_Profile"}],
+                "revolve_cut": [{"name": "Revolve_Boss_Profile"}, {"name": "Revolve_Cut_Bore"}],
+                "editable": [{"name": "Body_Editable_Plate"}, {"name": "Edited_Sketch_Dimension"}],
+            },
+            "dimension_edit": {"dimension": "D1@Edited_Sketch_Dimension", "before_m": 0.02, "after_m": 0.024},
+            "reopen_modify": {"dimension": "D1@Edited_Sketch_Dimension", "before_m": 0.024, "target_m": 0.028, "after_reopen_m": 0.028, "persisted": True, "save": {"ok": True, "errors": 0, "warnings": 0}},
+            "assembly_result": {"component_count": 4, "mates": sample_mates()},
+            "assembly_features": [{"name": "Concentric_Mate"}, {"name": "Distance_Mate"}],
+            "assembly_inspect": sample_assembly_inspect(),
+            "callbacks": {"mass": {"available": True, "mass_kg": 1.0}, "interference": {"available": True, "count": 1}},
+            "native_artifacts": {"assembly_exists": True, "part_count": 4, "part_files": ["a.SLDPRT", "b.SLDPRT", "c.SLDPRT", "d.SLDPRT"]},
+            "cleanup": {"locked_files": []},
+            "post_cleanup": {"locked_files": []},
+            "operation_context": sample_operation_context(self.module),
+        }
+
+        validation = self.module.validate_live_result(result)
+
+        self.assertFalse(validation["ok"])
+        self.assertIn("interference_callback", validation["failed_capabilities"])
 
     def test_validate_live_result_rejects_failed_mates_callbacks_and_cleanup(self):
         bad = {
@@ -436,6 +513,47 @@ class LiveCapabilitySuiteSpecTests(unittest.TestCase):
         validation = self.module.validate_live_result(result)
         self.assertFalse(validation["ok"])
         self.assertIn("mate_selection:Distance_Mate", validation["failed_capabilities"])
+
+
+    def test_validate_live_result_rejects_mates_that_do_not_match_declared_contract_pairs(self):
+        result = {
+            "features": {
+                "extrude": [{"name": "Body_Plate"}, {"name": "Round_Through_Hole"}, {"name": "Rectangular_Window_Cut"}],
+                "revolve": [{"name": "Revolve_Boss_Profile"}],
+                "revolve_cut": [{"name": "Revolve_Boss_Profile"}, {"name": "Revolve_Cut_Bore"}],
+                "editable": [{"name": "Body_Editable_Plate"}, {"name": "Edited_Sketch_Dimension"}],
+            },
+            "dimension_edit": {"dimension": "D1@Edited_Sketch_Dimension", "before_m": 0.02, "after_m": 0.024},
+            "reopen_modify": {"dimension": "D1@Edited_Sketch_Dimension", "before_m": 0.024, "target_m": 0.028, "after_reopen_m": 0.028, "persisted": True, "save": {"ok": True, "errors": 0, "warnings": 0}},
+            "assembly_result": {
+                "component_count": 4,
+                "mates": [
+                    {"name": "Concentric_Mate", "ok": True, "components": ["extrude_cut_plate-1", "revolve_cut_part-1"], "selected_entities": 2, "selection_guard": {"cleared_selection_count": 0, "selection_count_before_mate": 2, "component_pair": ["extrude_cut_plate-1", "revolve_cut_part-1"]}},
+                    {"name": "Distance_Mate", "ok": True, "components": ["extrude_cut_plate-1", "revolve_boss_part-1"], "selected_entities": 2, "selection_guard": {"cleared_selection_count": 0, "selection_count_before_mate": 2, "component_pair": ["extrude_cut_plate-1", "revolve_boss_part-1"]}},
+                ],
+            },
+            "assembly_features": [{"name": "Concentric_Mate"}, {"name": "Distance_Mate"}],
+            "assembly_inspect": {
+                "active_document": {
+                    "type": "assembly",
+                    "component_count_sampled": 4,
+                    "mate_like_features": [
+                        {"name": "Concentric_Mate", "type": "MateConcentric", "components": ["extrude_cut_plate-1", "revolve_cut_part-1"], "suppressed": False},
+                        {"name": "Distance_Mate", "type": "MateDistanceDim", "components": ["extrude_cut_plate-1", "revolve_boss_part-1"], "suppressed": False},
+                    ],
+                }
+            },
+            "callbacks": {"mass": {"available": True, "mass_kg": 1.0}, "interference": {"available": True, "count": 0}},
+            "native_artifacts": {"assembly_exists": True, "part_count": 4, "part_files": ["a.SLDPRT", "b.SLDPRT", "c.SLDPRT", "d.SLDPRT"]},
+            "cleanup": {"locked_files": []},
+            "post_cleanup": {"locked_files": []},
+            "operation_context": sample_operation_context(self.module),
+        }
+
+        validation = self.module.validate_live_result(result)
+
+        self.assertFalse(validation["ok"])
+        self.assertIn("assembly_inspect_mates", validation["failed_capabilities"])
 
     def test_validate_live_result_requires_assembly_inspect_mate_component_readback(self):
         result = {

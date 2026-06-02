@@ -254,24 +254,22 @@ def validate_assembly_inspect_mates(result: dict[str, Any]) -> dict[str, Any]:
     if doc.get("type") != "assembly":
         return {"ok": False, "failed": ["assembly_inspect:type"], "details": {"assembly_inspect": inspect}}
     mate_features = {str(item.get("name", "")): item for item in doc.get("mate_like_features", []) if isinstance(item, dict)}
-    expected_types = {"Concentric_Mate": "MateConcentric", "Distance_Mate": "MateDistanceDim"}
-    mates = {str(item.get("name", "")): item for item in result.get("assembly_result", {}).get("mates", []) if isinstance(item, dict)}
-    for name, expected_type in expected_types.items():
+    expected_mates = expected_live_contract()["assembly_inspect"]["mates"]
+    for name, expected in expected_mates.items():
         mate_feature = mate_features.get(name)
-        mate_result = mates.get(name, {})
         if not mate_feature:
             failed.append(f"{name}:missing")
             continue
-        if mate_feature.get("type") != expected_type:
+        if mate_feature.get("type") != expected["type"]:
             failed.append(f"{name}:type")
             details[name] = mate_feature
-        if mate_feature.get("suppressed") is True:
+        if mate_feature.get("suppressed") is not expected.get("suppressed", False):
             failed.append(f"{name}:suppressed")
             details[name] = mate_feature
-        components = mate_result.get("components", [])
-        if not component_pair_matches(mate_feature.get("components"), [str(item).split("-")[0] for item in components]):
+        expected_components = [str(item) for item in expected["components"]]
+        if not component_pair_matches(mate_feature.get("components"), expected_components):
             failed.append(f"{name}:components")
-            details[name] = {"inspect": mate_feature, "mate_result": mate_result}
+            details[name] = {"inspect": mate_feature, "expected_components": expected_components}
     return {"ok": not failed, "failed": failed, "details": details}
 
 
@@ -344,7 +342,7 @@ def validate_live_result(result: dict[str, Any]) -> dict[str, Any]:
         failed.append("mass_callback")
         details["mass_callback"] = mass
     interference = callbacks.get("interference", {})
-    if not interference.get("available") or interference.get("count") is None:
+    if not interference.get("available") or interference.get("count") != 0:
         failed.append("interference_callback")
         details["interference_callback"] = interference
     native = result.get("native_artifacts", {})
@@ -652,14 +650,14 @@ def extrude_cut_rect(model: Any, x: float, y: float, width: float, height: float
     return operation_report(model, name, sketch_name, "rectangle", "FeatureCut3", {"lines": 4, "circles": 0, "centerlines": 0}, selection_guard=guard)
 
 
-def revolve_boss(model: Any, name: str) -> dict[str, Any]:
+def revolve_boss(model: Any, name: str, outer_radius: float = 0.008, shoulder_radius: float = 0.006) -> dict[str, Any]:
     before = feature_names(model)
     select_first_ref_plane(model)
     model.SketchManager.InsertSketch(True)
     axis = model.SketchManager.CreateCenterLine(0, -0.035, 0, 0, 0.035, 0)
     if axis is None:
         raise RuntimeError("CreateCenterLine returned None for revolve axis")
-    pts = [(0.0, -0.025), (0.018, -0.025), (0.026, 0.0), (0.018, 0.025), (0.0, 0.025)]
+    pts = [(0.0, -0.025), (outer_radius, -0.025), (outer_radius, 0.025), (shoulder_radius, 0.025), (0.0, 0.025)]
     for (x1, y1), (x2, y2) in zip(pts, pts[1:] + pts[:1]):
         line = model.SketchManager.CreateLine(x1, y1, 0, x2, y2, 0)
         if line is None:
@@ -680,7 +678,7 @@ def revolve_cut(model: Any, name: str) -> dict[str, Any]:
     axis = model.SketchManager.CreateCenterLine(0, -0.04, 0, 0, 0.04, 0)
     if axis is None:
         raise RuntimeError("CreateCenterLine returned None for revolve cut axis")
-    pts = [(0.010, -0.010), (0.030, -0.010), (0.030, 0.010), (0.010, 0.010)]
+    pts = [(0.0, -0.010), (0.018, -0.010), (0.018, 0.010), (0.0, 0.010)]
     for (x1, y1), (x2, y2) in zip(pts, pts[1:] + pts[:1]):
         line = model.SketchManager.CreateLine(x1, y1, 0, x2, y2, 0)
         if line is None:
@@ -727,7 +725,7 @@ def create_revolve_boss_part(sw: Any, out_dir: Path) -> tuple[Path, dict[str, An
 def create_revolve_cut_part(sw: Any, out_dir: Path) -> tuple[Path, dict[str, Any]]:
     model = new_part(sw)
     operations = {
-        "Revolve_Boss_Profile": revolve_boss(model, "Revolve_Boss_Profile"),
+        "Revolve_Boss_Profile": revolve_boss(model, "Revolve_Boss_Profile", outer_radius=0.026, shoulder_radius=0.018),
         "Revolve_Cut_Bore": revolve_cut(model, "Revolve_Cut_Bore"),
     }
     model.ForceRebuild3(False)
@@ -1039,13 +1037,14 @@ def create_assembly(sw: Any, out_dir: Path, part_paths: dict[str, Path]) -> tupl
     component_objs = [
         add_component(sw, asm, part_paths["extrude"], (0.00, 0.00, 0.00)),
         add_component(sw, asm, part_paths["revolve"], (0.12, 0.00, 0.00)),
-        add_component(sw, asm, part_paths["revolve_cut"], (0.20, 0.00, 0.00)),
+        add_component(sw, asm, part_paths["revolve_cut"], (0.20, 0.075, 0.00)),
         add_component(sw, asm, part_paths["editable"], (0.00, 0.10, 0.00)),
     ]
     components = [comp.Name2 for comp in component_objs]
+    extrude_comp, revolve_comp, revolve_cut_comp, editable_comp = component_objs
     mate_results = [
-        add_concentric_mate_between_cylinders(asm, component_objs),
-        add_distance_mate_between_planar_faces(asm, component_objs, 0.030),
+        add_concentric_mate_between_cylinders(asm, [revolve_comp, revolve_cut_comp]),
+        add_distance_mate_between_planar_faces(asm, [extrude_comp, editable_comp], 0.030),
     ]
     asm.ForceRebuild3(False)
     path = out_dir / "capability_suite.SLDASM"
@@ -1060,6 +1059,22 @@ def inspect_features(sw: Any, path: Path, doc_type: int) -> list[dict[str, str]]
     model = sw.OpenDoc6(str(path.resolve()), doc_type, 1, "", errors, warnings)
     if model is None:
         raise RuntimeError(f"OpenDoc6 failed for inspect {path}")
+    try:
+        read_member(model, "FirstFeature")
+    except Exception:
+        try:
+            activated = sw.ActivateDoc3(path.name, False, 0, errors)
+        except Exception:
+            activated = None
+        if activated is not None:
+            model = activated
+        else:
+            try:
+                active = read_member(sw, "ActiveDoc")
+            except Exception:
+                active = None
+            if active is not None:
+                model = active
     features: list[dict[str, str]] = []
 
     visited: set[str] = set()

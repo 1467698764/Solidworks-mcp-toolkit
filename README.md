@@ -179,7 +179,7 @@ node tools\solidworks_codex\mcp\smoke-test.cjs
 该 gate 会隐藏 SolidWorks 窗口并串行执行三个层级的 live 验证，避免多开窗口和并行 COM 会话：
 
 - `live_session_smoke`：最小实机链路，生成两个小零件和一个装配，创建距离配合，直接 inspect 当前 ModelDoc2，不启动第二个 SolidWorks 会话；要求 mate 回读到参与组件、干涉为 0、退出后无锁文件。
-- `live_capability_suite`：验证拉伸、拉伸切除、旋转拉伸、旋转切除、草图尺寸读取/修改/rebuild/save、装配插入、同心配合、距离配合、干涉回调、质量回调、关闭文档和文件锁探测。每个会生成特征的操作还会记录选择隔离证据：创建特征前已清空选择、只选中目标草图、当前活动文档标题、重开后特征实际消耗的草图名和几何计数。每个 live mate 还必须记录清空选择后的计数、创建配合前 2 个选中实体、组件对、保存后 mate feature，以及 inspect 回读到的 mate 参与组件。
+- `live_capability_suite`：验证拉伸、拉伸切除、旋转拉伸、旋转切除、草图尺寸读取/修改/rebuild/save、装配插入、同心配合、距离配合、干涉回调、质量回调、关闭文档和文件锁探测。每个会生成特征的操作还会记录选择隔离证据：创建特征前已清空选择、只选中目标草图、当前活动文档标题、重开后特征实际消耗的草图名和几何计数。每个 live mate 还必须记录清空选择后的计数、创建配合前 2 个选中实体、组件对、保存后 mate feature，以及 inspect 回读到的 mate 类型、参与组件和未 suppressed 状态；inspect 回读组件必须匹配声明的语义合约组件对，而不能只匹配创建时碰巧选中的组件。干涉回调必须可用且 count 为 0，非零干涉会让 gate 失败。
 - `complete_shaper_v5`：牛头刨床只是复杂机械试刀石；它生成原生装配体 `tools/solidworks_codex/live_fixture/shaper_machine_v5/bullhead_shaper_complete.SLDASM`，并校验 24 个零件、58 个组件实例、主要功能组件的 Transform2/origin 位置回读、7 个覆盖结构、导轨、刀头、工作台和快回传动的语义配合网络及其参与组件、配合创建时的 2 实体选择证据、质量、干涉为 0、inspect/model-understanding 证据、post-cleanup 无锁文件。
 
 验收主产物始终是原生 `.SLDASM/.SLDPRT`；STEP 只作为 optional smoke，不作为交付判定。`-CleanupStale` 只会删除已知旧失败生成目录 `shaper_machine`/`shaper_machine_v2`/`shaper_machine_v3`/`shaper_machine_v4`，不会触碰 `shaper_machine_v5`、`live_capability_suite` 或仓库其它目录。gate 运行前和每个 live check 之间都会检查 `tools/solidworks_codex/live_fixture/**/~$*`；如果重型 check 超时，会记录 timeout cleanup 结果并只清理无响应或超过内存阈值的 `SLDWORKS.exe`。
