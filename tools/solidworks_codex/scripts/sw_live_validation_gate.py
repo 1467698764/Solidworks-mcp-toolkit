@@ -162,6 +162,68 @@ def _component_pair_matches(component_names: Any, semantic_pair: list[str]) -> b
     return all(name in text for name in semantic_pair)
 
 
+def _expected_shaper_component_origins() -> dict[str, tuple[float, float, float]]:
+    return {
+        "cast_bed_with_t_slots": (0.00, 0.00, 0.000),
+        "column_frame_with_window": (-0.22, 0.095, 0.056),
+        "left_dovetail_way": (0.03, 0.245, 0.105),
+        "right_dovetail_way": (0.03, 0.245, 0.145),
+        "ram_with_dovetail_and_tool_mount": (0.10, 0.285, 0.198),
+        "front_gib_plate": (0.10, 0.222, 0.232),
+        "rear_gib_plate": (0.10, 0.222, 0.252),
+        "clapper_tool_head": (0.315, 0.255, 0.274),
+        "single_point_cutting_tool": (0.350, 0.160, 0.316),
+        "bull_gear_crank_disk": (-0.245, 0.115, 0.102),
+        "crank_center_shaft": (-0.245, 0.115, 0.125),
+        "eccentric_crank_pin": (-0.198, 0.115, 0.196),
+        "bronze_sliding_die_block": (-0.055, 0.205, 0.292),
+        "slotted_rocker_arm": (-0.145, 0.205, 0.245),
+        "rocker_pivot_bracket": (-0.205, 0.105, 0.318),
+        "rocker_pivot_shaft": (-0.205, 0.105, 0.377),
+        "ram_drive_link": (0.055, 0.245, 0.363),
+        "table_cross_slide": (0.08, 0.085, 0.142),
+        "work_table_with_t_slots": (0.10, 0.125, 0.207),
+        "vise_jaw_fixed": (0.045, 0.170, 0.383),
+        "vise_jaw_movable": (0.165, 0.170, 0.406),
+    }
+
+
+def _component_origin(component: dict[str, Any]) -> list[float] | None:
+    transform = component.get("transform")
+    if isinstance(transform, dict):
+        origin = transform.get("origin_m")
+        if isinstance(origin, list) and len(origin) == 3:
+            try:
+                return [float(value) for value in origin]
+            except (TypeError, ValueError):
+                return None
+    raw = component.get("transform_array") or component.get("transform_m")
+    if isinstance(raw, list) and len(raw) >= 12:
+        try:
+            return [float(raw[9]), float(raw[10]), float(raw[11])]
+        except (TypeError, ValueError):
+            return None
+    return None
+
+
+def _shaper_component_placements_ok(doc: dict[str, Any], tolerance_m: float = 0.003) -> bool:
+    components = doc.get("components", [])
+    if not isinstance(components, list):
+        return False
+    by_name = {str(component.get("name2", "")): component for component in components if isinstance(component, dict)}
+    for part_name, expected in _expected_shaper_component_origins().items():
+        component = by_name.get(f"{part_name}-1")
+        if not component:
+            return False
+        origin = _component_origin(component)
+        if origin is None:
+            return False
+        for index, value in enumerate(expected):
+            if abs(origin[index] - value) > tolerance_m:
+                return False
+    return True
+
+
 def _strict_check_failed(data: dict[str, Any], check: str) -> bool:
     def int_equals(value: Any, expected: int) -> bool:
         try:
@@ -342,6 +404,8 @@ def _strict_check_failed(data: dict[str, Any], check: str) -> bool:
         inspect = data.get("inspect", {})
         doc = inspect.get("active_document", {}) if isinstance(inspect, dict) else {}
         if doc.get("type") != "assembly" or int(doc.get("component_count_sampled", 0) or 0) < 58:
+            return True
+        if not _shaper_component_placements_ok(doc):
             return True
         mate_by_name = {str(m.get("name", "")): m for m in doc.get("mate_like_features", []) if isinstance(m, dict)}
         expected_mates = _expected_inspect_mates()

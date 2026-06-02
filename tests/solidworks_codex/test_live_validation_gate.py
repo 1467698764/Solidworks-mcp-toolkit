@@ -118,6 +118,45 @@ def shaper_mates():
     ]
 
 
+def shaper_primary_components():
+    placements = {
+        "cast_bed_with_t_slots": (0.00, 0.00, 0.000),
+        "column_frame_with_window": (-0.22, 0.095, 0.056),
+        "left_dovetail_way": (0.03, 0.245, 0.105),
+        "right_dovetail_way": (0.03, 0.245, 0.145),
+        "ram_with_dovetail_and_tool_mount": (0.10, 0.285, 0.198),
+        "front_gib_plate": (0.10, 0.222, 0.232),
+        "rear_gib_plate": (0.10, 0.222, 0.252),
+        "clapper_tool_head": (0.315, 0.255, 0.274),
+        "single_point_cutting_tool": (0.350, 0.160, 0.316),
+        "bull_gear_crank_disk": (-0.245, 0.115, 0.102),
+        "crank_center_shaft": (-0.245, 0.115, 0.125),
+        "eccentric_crank_pin": (-0.198, 0.115, 0.196),
+        "bronze_sliding_die_block": (-0.055, 0.205, 0.292),
+        "slotted_rocker_arm": (-0.145, 0.205, 0.245),
+        "rocker_pivot_bracket": (-0.205, 0.105, 0.318),
+        "rocker_pivot_shaft": (-0.205, 0.105, 0.377),
+        "ram_drive_link": (0.055, 0.245, 0.363),
+        "table_cross_slide": (0.08, 0.085, 0.142),
+        "work_table_with_t_slots": (0.10, 0.125, 0.207),
+        "vise_jaw_fixed": (0.045, 0.170, 0.383),
+        "vise_jaw_movable": (0.165, 0.170, 0.406),
+    }
+    return [
+        {"name2": f"{name}-1", "transform": {"origin_m": list(origin)}, "suppressed": False}
+        for name, origin in placements.items()
+    ]
+
+
+def shaper_inspect_evidence():
+    return {"active_document": {"type": "assembly", "component_count_sampled": 58, "components": shaper_primary_components(), "mate_like_features": [
+        {"name": "Bed_Column_Distance_Mate", "type": "MateDistanceDim", "components": ["cast_bed_with_t_slots-1", "column_frame_with_window-1"], "suppressed": False},
+        {"name": "BullGear_CrankShaft_Concentric_Mate", "type": "MateConcentric", "components": ["bull_gear_crank_disk-1", "crank_center_shaft-1"], "suppressed": False},
+        {"name": "Crank_Link_Concentric_Mate", "type": "MateConcentric", "components": ["eccentric_crank_pin-1", "ram_drive_link-1"], "suppressed": False},
+        {"name": "Rocker_Pivot_Concentric_Mate", "type": "MateConcentric", "components": ["slotted_rocker_arm-1", "rocker_pivot_shaft-1"], "suppressed": False}
+    ]}}
+
+
 class LiveValidationGateSpecTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -142,6 +181,19 @@ class LiveValidationGateSpecTests(unittest.TestCase):
         for check in contract.checks:
             self.assertIn("--force", check.command)
             self.assertTrue(check.report_json.endswith(".json"))
+
+    def test_shaper_gate_component_origin_contract_matches_builder_placements(self):
+        builder_script = ROOT / "tools" / "solidworks_codex" / "scripts" / "sw_create_complete_shaper_fixture.py"
+        spec = importlib.util.spec_from_file_location("sw_create_complete_shaper_fixture_for_gate_test", builder_script)
+        builder = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = builder
+        spec.loader.exec_module(builder)
+        builder_contract = builder.expected_shaper_placement_contract()
+        gate_contract = self.module._expected_shaper_component_origins()
+
+        self.assertEqual(set(builder_contract), set(gate_contract))
+        for name, gate_origin in gate_contract.items():
+            self.assertEqual(builder_contract[name]["expected_origin_m"], gate_origin)
 
     def test_validate_gate_rejects_missing_or_failed_reports(self):
         with TemporaryDirectory() as tmp:
@@ -285,12 +337,7 @@ class LiveValidationGateSpecTests(unittest.TestCase):
                 "component_count": 58,
                 "mates": shaper_mates(),
                 "callbacks": {"interference": {"available": True, "count": 0}, "mass": {"available": True, "mass_kg": 15.125546510666322}},
-                "inspect": {"active_document": {"type": "assembly", "component_count_sampled": 58, "mate_like_features": [
-                    {"name": "Bed_Column_Distance_Mate", "type": "MateDistanceDim", "components": ["cast_bed_with_t_slots-1", "column_frame_with_window-1"], "suppressed": False},
-                    {"name": "BullGear_CrankShaft_Concentric_Mate", "type": "MateConcentric", "components": ["bull_gear_crank_disk-1", "crank_center_shaft-1"], "suppressed": False},
-                    {"name": "Crank_Link_Concentric_Mate", "type": "MateConcentric", "components": ["eccentric_crank_pin-1", "ram_drive_link-1"], "suppressed": False},
-                    {"name": "Rocker_Pivot_Concentric_Mate", "type": "MateConcentric", "components": ["slotted_rocker_arm-1", "rocker_pivot_shaft-1"], "suppressed": False}
-                ]}},
+                "inspect": shaper_inspect_evidence(),
                 "model_understanding": {"baseline": {"inventory": {"component_count": 58}}, "cad_evidence_graph": {"spatial_evidence": {"near_or_overlap_pairs": [{"a": "cast_bed_with_t_slots-1", "b": "column_frame_with_window-1"}]}}},
                 "post_cleanup": {"locked_files": [], "lock_files": []},
                 "validation": {"ok": True, "failed": []},
@@ -345,7 +392,7 @@ class LiveValidationGateSpecTests(unittest.TestCase):
                 {"name": "Rocker_Pivot_Concentric_Mate", "kind": "concentric", "semantic_pair": ["slotted_rocker_arm", "rocker_pivot_shaft"], "ok": True},
             ],
             "callbacks": {"interference": {"available": True, "count": 0}, "mass": {"available": True, "mass_kg": 15.0}},
-            "inspect": {"active_document": {"type": "assembly", "component_count_sampled": 58, "mate_like_features": [
+            "inspect": {"active_document": {"type": "assembly", "component_count_sampled": 58, "components": shaper_primary_components(), "mate_like_features": [
                 {"name": "Bed_Column_Distance_Mate"},
                 {"name": "BullGear_CrankShaft_Concentric_Mate"},
                 {"name": "Crank_Link_Concentric_Mate"},
@@ -355,6 +402,27 @@ class LiveValidationGateSpecTests(unittest.TestCase):
             "post_cleanup": {"locked_files": [], "lock_files": []},
             "validation": {"ok": True, "failed": []},
         }
+        self.assertTrue(self.module._strict_check_failed(report, "inspect_model_understand"))
+
+    def test_shaper_strict_inspect_rejects_missing_or_far_component_placement_readback(self):
+        report = {
+            "ok": True,
+            "part_count": 24,
+            "component_count": 58,
+            "mates": shaper_mates(),
+            "callbacks": {"interference": {"available": True, "count": 0}, "mass": {"available": True, "mass_kg": 15.0}},
+            "inspect": shaper_inspect_evidence(),
+            "model_understanding": {"baseline": {"inventory": {"component_count": 58}}, "cad_evidence_graph": {"spatial_evidence": {"near_or_overlap_pairs": [{"a": "cast_bed_with_t_slots-1", "b": "column_frame_with_window-1"}]}}},
+            "post_cleanup": {"locked_files": [], "lock_files": []},
+            "validation": {"ok": True, "failed": []},
+        }
+        self.assertFalse(self.module._strict_check_failed(report, "inspect_model_understand"))
+
+        del report["inspect"]["active_document"]["components"][0]["transform"]
+        self.assertTrue(self.module._strict_check_failed(report, "inspect_model_understand"))
+
+        report["inspect"] = shaper_inspect_evidence()
+        report["inspect"]["active_document"]["components"][4]["transform"]["origin_m"] = [4.0, 4.0, 4.0]
         self.assertTrue(self.module._strict_check_failed(report, "inspect_model_understand"))
 
     def test_validate_gate_rejects_reopen_persistence_when_save3_failed(self):

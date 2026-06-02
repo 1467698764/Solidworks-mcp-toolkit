@@ -1113,9 +1113,21 @@ def run_assembly_callbacks(asm: Any, reports_dir: Path) -> dict[str, Any]:
 
 def sample_expected_shaper_inspect_evidence() -> dict[str, Any]:
     comps = []
+    placements = placements_for(build_complete_shaper_spec())
     for part in build_complete_shaper_spec().parts:
         name = part.name
-        comps.append({"name2": f"{name}-1", "fixed": name == "cast_bed_with_t_slots", "suppressed": False, "bbox_m": [0, 0, 0, 0.01, 0.01, 0.01]})
+        origin = placements.get(name, (0.0, 0.0, 0.0))
+        comps.append({
+            "name2": f"{name}-1",
+            "fixed": name == "cast_bed_with_t_slots",
+            "suppressed": False,
+            "bbox_m": [0, 0, 0, 0.01, 0.01, 0.01],
+            "transform": {
+                "origin_m": list(origin),
+                "local_axes": {"x": [1, 0, 0], "y": [0, 1, 0], "z": [0, 0, 1]},
+                "scale": 1,
+            },
+        })
     return {
         "ok": True,
         "active_document": {
@@ -1158,6 +1170,72 @@ def component_prefixes_from_inspect(inspect: dict[str, Any]) -> set[str]:
     return prefixes
 
 
+def expected_shaper_placement_contract(tolerance_m: float = 0.003) -> dict[str, dict[str, Any]]:
+    """Expected primary component origins for the live shaper assembly.
+
+    Component count and mate names do not prove that the machine is assembled
+    instead of scattered. This contract ties inspect Transform2 readback to the
+    nominal layout used by the builder for the primary functional components.
+    Detail-strip fasteners/washers/oil-cups remain countable visual evidence but
+    are excluded from the hard spatial placement check.
+    """
+    spec = build_complete_shaper_spec()
+    display_only = {"fastener_set_m6", "washer_set", "oil_cups"}
+    return {
+        part_name: {
+            "component": f"{part_name}-1",
+            "expected_origin_m": origin,
+            "tolerance_m": tolerance_m,
+        }
+        for part_name, origin in placements_for(spec).items()
+        if part_name not in display_only
+    }
+
+
+def component_origin_from_inspect_item(component: dict[str, Any]) -> list[float] | None:
+    transform = component.get("transform")
+    if isinstance(transform, dict):
+        origin = transform.get("origin_m")
+        if isinstance(origin, list) and len(origin) == 3:
+            try:
+                return [float(value) for value in origin]
+            except (TypeError, ValueError):
+                return None
+    raw = component.get("transform_array") or component.get("transform_m")
+    if isinstance(raw, list) and len(raw) >= 12:
+        try:
+            return [float(raw[9]), float(raw[10]), float(raw[11])]
+        except (TypeError, ValueError):
+            return None
+    return None
+
+
+def origin_within_tolerance(origin: list[float], expected: tuple[float, float, float], tolerance_m: float) -> bool:
+    return all(abs(float(origin[index]) - float(expected[index])) <= tolerance_m for index in range(3))
+
+
+def validate_component_placement_evidence(inspect: dict[str, Any]) -> list[str]:
+    doc = inspect.get("active_document") if isinstance(inspect, dict) else {}
+    comps = doc.get("components", []) if isinstance(doc, dict) else []
+    if not isinstance(comps, list):
+        return ["inspect_report:component_placements"]
+    by_name = {str(comp.get("name2", "")): comp for comp in comps if isinstance(comp, dict)}
+    failed: list[str] = []
+    for part_name, contract in expected_shaper_placement_contract().items():
+        component_name = contract["component"]
+        comp = by_name.get(component_name)
+        if not comp:
+            failed.append(part_name)
+            continue
+        origin = component_origin_from_inspect_item(comp)
+        if origin is None:
+            failed.append(part_name)
+            continue
+        if not origin_within_tolerance(origin, contract["expected_origin_m"], contract["tolerance_m"]):
+            failed.append(part_name)
+    return ["inspect_report:component_placements"] if failed else []
+
+
 def validate_inspect_evidence(inspect: Any) -> list[str]:
     failed: list[str] = []
     if not isinstance(inspect, dict):
@@ -1171,6 +1249,7 @@ def validate_inspect_evidence(inspect: Any) -> list[str]:
     missing_parts = sorted({p.name for p in build_complete_shaper_spec().parts} - prefixes)
     if missing_parts:
         failed.append("inspect_report:components")
+    failed.extend(validate_component_placement_evidence(inspect))
     mate_features = [m for m in doc.get("mate_like_features", []) if isinstance(m, dict)]
     mate_by_name = {str(m.get("name", "")): m for m in mate_features}
     if not set(expected_shaper_mate_contract()).issubset(set(mate_by_name)):

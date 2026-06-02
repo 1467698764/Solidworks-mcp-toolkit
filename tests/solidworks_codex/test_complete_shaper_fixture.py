@@ -285,6 +285,38 @@ class CompleteShaperSpecTests(unittest.TestCase):
         failed = self.module.validate_inspect_evidence(evidence)
         self.assertIn("inspect_report:mate_details", failed)
 
+    def test_inspect_evidence_requires_primary_component_transform_placement_readback(self):
+        evidence = self.module.sample_expected_shaper_inspect_evidence()
+        self.assertEqual([], self.module.validate_inspect_evidence(evidence))
+
+        doc = evidence["active_document"]
+        by_name = {item["name2"]: item for item in doc["components"]}
+        del by_name["ram_with_dovetail_and_tool_mount-1"]["transform"]
+        failed = self.module.validate_inspect_evidence(evidence)
+        self.assertIn("inspect_report:component_placements", failed)
+
+        evidence = self.module.sample_expected_shaper_inspect_evidence()
+        doc = evidence["active_document"]
+        by_name = {item["name2"]: item for item in doc["components"]}
+        by_name["bull_gear_crank_disk-1"]["transform"]["origin_m"] = [9.0, 9.0, 9.0]
+        failed = self.module.validate_inspect_evidence(evidence)
+        self.assertIn("inspect_report:component_placements", failed)
+
+    def test_placement_contract_covers_functional_shaper_subassemblies(self):
+        contract = self.module.expected_shaper_placement_contract()
+        for name in (
+            "cast_bed_with_t_slots",
+            "column_frame_with_window",
+            "ram_with_dovetail_and_tool_mount",
+            "bull_gear_crank_disk",
+            "slotted_rocker_arm",
+            "work_table_with_t_slots",
+            "single_point_cutting_tool",
+        ):
+            self.assertIn(name, contract)
+            self.assertEqual(contract[name]["expected_origin_m"], self.module.placements_for(self.module.build_complete_shaper_spec())[name])
+            self.assertLessEqual(contract[name]["tolerance_m"], 0.003)
+
 
     def test_builder_runs_hidden_and_has_mate_and_interference_callbacks(self):
         source = SCRIPT.read_text(encoding="utf-8")
