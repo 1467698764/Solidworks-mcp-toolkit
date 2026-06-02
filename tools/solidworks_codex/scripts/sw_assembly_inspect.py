@@ -183,6 +183,82 @@ def classify_mate_like_features(features: list[dict[str, Any]]) -> list[dict[str
     return result
 
 
+
+
+
+
+def read_method_or_member(obj: Any, name: str, *args: Any) -> Any:
+    """Call plain Python methods while preserving COM property wrappers.
+
+    read_member intentionally avoids calling callable COM property wrappers. Unit
+    fakes use normal methods for APIs such as FirstFeature/GetComponents, so this
+    helper gives inspect_model_object a deterministic non-COM path without
+    weakening COM property safety elsewhere.
+    """
+    try:
+        member = getattr(obj, name)
+        if hasattr(member, "_oleobj_"):
+            return read_member(obj, name, *args)
+        if callable(member):
+            return member(*args)
+        return member
+    except Exception:
+        return read_member(obj, name, *args)
+
+
+def feature_item_from(feat: Any, reader: Any) -> dict[str, Any]:
+    return {
+        "name": reader(feat, "Name"),
+        "type": reader(feat, "GetTypeName2"),
+        "suppressed": reader(feat, "IsSuppressed"),
+    }
+
+
+def append_subfeatures_from(feat: Any, features: list[dict[str, Any]], limit: int, reader: Any) -> None:
+    sub = reader(feat, "GetFirstSubFeature")
+    while sub is not None and not isinstance(sub, dict) and len(features) < limit:
+        features.append(feature_item_from(sub, reader))
+        append_subfeatures_from(sub, features, limit, reader)
+        sub = reader(sub, "GetNextSubFeature")
+
+
+def iter_features_from(model: Any, limit: int, reader: Any) -> list[dict[str, Any]]:
+    features: list[dict[str, Any]] = []
+    feat = reader(model, "FirstFeature")
+    while feat is not None and not isinstance(feat, dict) and len(features) < limit:
+        features.append(feature_item_from(feat, reader))
+        append_subfeatures_from(feat, features, limit, reader)
+        feat = reader(feat, "GetNextFeature")
+    return features
+
+
+def inspect_components_from(model: Any, limit: int, reader: Any) -> list[dict[str, Any]]:
+    comps = reader(model, "GetComponents", False)
+    if isinstance(comps, dict) or not comps:
+        comps = reader(model, "GetComponents", True)
+    items: list[dict[str, Any]] = []
+    if isinstance(comps, dict) or not comps:
+        return items
+    for comp in list(comps)[:limit]:
+        item = {
+            "name2": reader(comp, "Name2"),
+            "path": reader(comp, "GetPathName"),
+            "referenced_configuration": reader(comp, "ReferencedConfiguration"),
+            "suppressed": reader(comp, "IsSuppressed"),
+            "hidden": reader(comp, "IsHidden", True),
+            "fixed": reader(comp, "IsFixed"),
+            "lightweight": reader(comp, "IsLightWeight"),
+            "transform": component_transform(comp),
+            "bbox_m": component_bbox(comp),
+        }
+        items.append(item)
+    return items
+
+def normalize_doc_type(value: Any) -> tuple[int | None, str]:
+    if isinstance(value, int):
+        return value, SW_DOC_TYPES.get(value, f"unknown:{value}")
+    return None, "unknown"
+
 def open_model_if_requested(sw: Any, path: str | None, pythoncom: Any, win32_client: Any) -> Any:
     if not path:
         return read_member(sw, "ActiveDoc")
@@ -198,6 +274,51 @@ def open_model_if_requested(sw: Any, path: str | None, pythoncom: Any, win32_cli
         raise RuntimeError(f"OpenDoc6 failed: errors={errors.value}, warnings={warnings.value}, path={model_path}")
     return model
 
+
+
+
+def inspect_model_object(model: Any, started_by_probe: bool = False, revision_number: Any = None, visible: Any = None) -> dict[str, Any]:
+    """Inspect an already-open ModelDoc2 object without attaching/starting SW.
+
+    This is important for long live builders: opening a second SolidWorks COM
+    application to inspect a just-created assembly is both memory-heavy and can
+    observe the wrong document state.
+    """
+    report: dict[str, Any] = {
+        "timestamp": datetime.now().isoformat(timespec="seconds"),
+        "connected": True,
+        "started_by_probe": started_by_probe,
+        "revision_number": revision_number,
+        "visible": visible,
+    }
+    if isinstance(model, dict) or model is None:
+        report["active_document"] = None
+        report["note"] = "No active SolidWorks document detected."
+        return report
+    raw_doc_type = read_method_or_member(model, "GetType")
+    doc_type, doc_type_label = normalize_doc_type(raw_doc_type)
+    active: dict[str, Any] = {
+        "title": read_method_or_member(model, "GetTitle"),
+        "path": read_method_or_member(model, "GetPathName"),
+        "type_code": doc_type,
+        "type_raw": raw_doc_type,
+        "type": doc_type_label,
+        "configuration": None,
+        "features": iter_features_from(model, 800, read_method_or_member),
+        "dimensions": iter_display_dimensions(model, 800),
+    }
+    cfg_mgr = read_method_or_member(model, "ConfigurationManager")
+    if not isinstance(cfg_mgr, dict) and cfg_mgr is not None:
+        active_cfg = read_method_or_member(cfg_mgr, "ActiveConfiguration")
+        if not isinstance(active_cfg, dict) and active_cfg is not None:
+            active["configuration"] = read_method_or_member(active_cfg, "Name")
+    if doc_type == 2:
+        components = inspect_components_from(model, 1000, read_method_or_member)
+        active["components"] = components
+        active["component_count_sampled"] = len(components)
+        active["mate_like_features"] = classify_mate_like_features(active["features"])
+    report["active_document"] = active
+    return report
 
 def inspect(allow_start: bool, feature_limit: int, component_limit: int, dimension_limit: int, model_path: str | None = None) -> dict[str, Any]:
     pythoncom, win32_client = load_pywin32()
@@ -217,14 +338,16 @@ def inspect(allow_start: bool, feature_limit: int, component_limit: int, dimensi
         report["note"] = "No active SolidWorks document detected."
         return report
 
-    doc_type = read_member(model, "GetType")
+    raw_doc_type = read_member(model, "GetType")
+    doc_type, doc_type_label = normalize_doc_type(raw_doc_type)
     active: dict[str, Any] = {
         "title": read_member(model, "GetTitle"),
         "path": read_member(model, "GetPathName"),
         "type_code": doc_type,
-        "type": SW_DOC_TYPES.get(doc_type, f"unknown:{doc_type}"),
+        "type_raw": raw_doc_type,
+        "type": doc_type_label,
         "configuration": None,
-        "features": iter_features(model, feature_limit),
+        "features": iter_features_from(model, feature_limit, read_member),
         "dimensions": iter_display_dimensions(model, dimension_limit),
     }
 
@@ -235,7 +358,7 @@ def inspect(allow_start: bool, feature_limit: int, component_limit: int, dimensi
             active["configuration"] = read_member(active_cfg, "Name")
 
     if doc_type == 2:
-        components = inspect_components(model, component_limit)
+        components = inspect_components_from(model, component_limit, read_member)
         active["components"] = components
         active["component_count_sampled"] = len(components)
         active["mate_like_features"] = classify_mate_like_features(active["features"])

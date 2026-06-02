@@ -31,6 +31,13 @@ class ComPropertyReadingTests(unittest.TestCase):
         prop = FakeObject.ActiveDoc
         self.assertIs(inspect_mod.read_member(FakeObject(), "ActiveDoc"), prop)
 
+
+    def test_inspect_normalizes_doc_type_errors_without_unhashable_dict(self):
+        self.assertEqual(inspect_mod.normalize_doc_type(2), (2, "assembly"))
+        code, label = inspect_mod.normalize_doc_type({"error": "COM failed"})
+        self.assertIsNone(code)
+        self.assertEqual(label, "unknown")
+
     def test_probe_read_member_returns_com_property_without_calling(self):
         class FakeObject:
             ActiveDoc = FakeComProperty("doc")

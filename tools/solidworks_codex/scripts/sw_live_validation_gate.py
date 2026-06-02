@@ -14,6 +14,7 @@ import json
 import shutil
 import subprocess
 import sys
+import time
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
@@ -45,6 +46,8 @@ class ReportExpectation:
     path: Path
     required_truthy_paths: tuple[str, ...]
     strict_checks: tuple[str, ...] = ()
+    source_paths: tuple[Path, ...] = ()
+    generated_after: float | None = None
 
 
 def _script(name: str) -> str:
@@ -59,6 +62,20 @@ def build_gate_contract() -> GateContract:
         name="solidworks_live_validation_gate",
         output_json="tools/solidworks_codex/reports/live_validation_gate.json",
         checks=(
+            LiveCheck(
+                name="live_session_smoke",
+                command=(
+                    py,
+                    _script("sw_live_session_smoke.py"),
+                    "--force",
+                    "--out-dir",
+                    "tools/solidworks_codex/live_fixture/live_session_smoke",
+                    "--reports-dir",
+                    "tools/solidworks_codex/reports/live_session_smoke",
+                ),
+                report_json="tools/solidworks_codex/reports/live_session_smoke/live_session_smoke.json",
+                purpose="prove one hidden single SolidWorks session can create, inspect current model without a second session, close, exit, and release locks",
+            ),
             LiveCheck(
                 name="live_capability_suite",
                 command=(
@@ -99,6 +116,12 @@ def build_gate_contract() -> GateContract:
 
 
 
+
+
+def live_session_smoke_strict_checks() -> tuple[str, ...]:
+    return ("single_session_smoke",)
+
+
 def capability_suite_strict_checks() -> tuple[str, ...]:
     return (
         "native_solidworks_artifacts",
@@ -118,11 +141,30 @@ def shaper_v5_strict_checks() -> tuple[str, ...]:
         "mass_callback",
         "interference_clearance",
         "mate_semantics",
+        "inspect_model_understand",
         "post_cleanup_single_session",
     )
 
 
 def _strict_check_failed(data: dict[str, Any], check: str) -> bool:
+    if check == "single_session_smoke":
+        part_doc = (data.get("part_inspect") or data.get("inspect") or {}).get("active_document", {}) if isinstance(data.get("part_inspect") or data.get("inspect"), dict) else {}
+        asm_doc = (data.get("assembly_inspect") or {}).get("active_document", {}) if isinstance(data.get("assembly_inspect"), dict) else {}
+        inter = (data.get("callbacks") or {}).get("interference", {}) if isinstance(data.get("callbacks"), dict) else {}
+        post = data.get("post_cleanup", {})
+        return (
+            data.get("ok") is not True
+            or data.get("started_second_session") is not False
+            or part_doc.get("type") != "part"
+            or asm_doc.get("type") != "assembly"
+            or int(asm_doc.get("component_count_sampled", 0) or 0) < 2
+            or not asm_doc.get("mate_like_features")
+            or inter.get("available") is not True
+            or inter.get("count") != 0
+            or "post_cleanup" not in data
+            or bool(post.get("locked_files"))
+            or bool(post.get("lock_files"))
+        )
     if check == "native_solidworks_artifacts":
         native = data.get("native_artifacts", {})
         return not native.get("assembly_exists") or int(native.get("part_count", 0) or 0) < 4 or not native.get("primary")
@@ -193,12 +235,33 @@ def _strict_check_failed(data: dict[str, Any], check: str) -> bool:
         return int(data.get("component_count", 0) or 0) != 58
     if check == "mate_semantics":
         mates = data.get("mates", [])
-        if not mates:
+        required = {
+            "Bed_Column_Distance_Mate": ("distance", ["cast_bed_with_t_slots", "column_frame_with_window"]),
+            "BullGear_CrankShaft_Concentric_Mate": ("concentric", ["bull_gear_crank_disk", "crank_center_shaft"]),
+            "Crank_Link_Concentric_Mate": ("concentric", ["eccentric_crank_pin", "ram_drive_link"]),
+            "Rocker_Pivot_Concentric_Mate": ("concentric", ["slotted_rocker_arm", "rocker_pivot_shaft"]),
+        }
+        by_name = {m.get("name"): m for m in mates if isinstance(m, dict)}
+        for name, (kind, pair) in required.items():
+            mate = by_name.get(name)
+            if not mate or not mate.get("ok") or mate.get("kind") != kind or mate.get("semantic_pair") != pair:
+                return True
+        return False
+    if check == "inspect_model_understand":
+        inspect = data.get("inspect", {})
+        doc = inspect.get("active_document", {}) if isinstance(inspect, dict) else {}
+        if doc.get("type") != "assembly" or int(doc.get("component_count_sampled", 0) or 0) < 58:
             return True
-        for mate in mates:
-            if mate.get("name") == "Shaper_Distance_Mate" and mate.get("semantic_pair") == ["cast_bed_with_t_slots", "column_frame_with_window"] and mate.get("ok"):
-                return False
-        return True
+        mate_names = {str(m.get("name", "")) for m in doc.get("mate_like_features", []) if isinstance(m, dict)}
+        if not {"Bed_Column_Distance_Mate", "BullGear_CrankShaft_Concentric_Mate", "Crank_Link_Concentric_Mate", "Rocker_Pivot_Concentric_Mate"}.issubset(mate_names):
+            return True
+        understanding = data.get("model_understanding", {})
+        inv = ((understanding.get("baseline") or {}).get("inventory") or {}) if isinstance(understanding, dict) else {}
+        spatial = (((understanding.get("cad_evidence_graph") or {}).get("spatial_evidence") or {}) if isinstance(understanding, dict) else {})
+        if int(inv.get("component_count", 0) or 0) < 58:
+            return True
+        relations = spatial.get("near_or_overlap_pairs") or []
+        return not relations
     return True
 
 def _read_path(data: dict[str, Any], dotted: str) -> Any:
@@ -237,6 +300,20 @@ def validate_gate_reports(expectations: Iterable[ReportExpectation]) -> dict[str
             failed.append(f"invalid_json:{expectation.name}")
             reports[expectation.name] = {"path": str(path), "error": str(exc)}
             continue
+        if expectation.source_paths:
+            try:
+                report_mtime = path.stat().st_mtime
+                newest_source = max(source.stat().st_mtime for source in expectation.source_paths if source.exists())
+                if report_mtime < newest_source:
+                    failed.append(f"stale_report:{expectation.name}")
+            except ValueError:
+                failed.append(f"missing_source_for_freshness:{expectation.name}")
+        if expectation.generated_after is not None:
+            try:
+                if path.stat().st_mtime < expectation.generated_after:
+                    failed.append(f"stale_run_report:{expectation.name}")
+            except OSError:
+                failed.append(f"missing_report_stat:{expectation.name}")
         reports[expectation.name] = data
         if data.get("ok") is not True:
             failed.append(f"report_not_ok:{expectation.name}")
@@ -252,20 +329,47 @@ def validate_gate_reports(expectations: Iterable[ReportExpectation]) -> dict[str
     return {"ok": not failed, "failed": failed, "reports": reports}
 
 
-def report_expectations(contract: GateContract) -> tuple[ReportExpectation, ...]:
+
+def validation_for_gate_state(lockfile_preflight: dict[str, Any], validate_only: bool, expectations: Iterable[ReportExpectation]) -> dict[str, Any]:
+    if not validate_only and lockfile_preflight.get("ok") is not True:
+        return {"ok": False, "failed": ["skipped_due_to_generated_lock_files"], "reports": {}}
+    return validate_gate_reports(expectations)
+
+def report_expectations(contract: GateContract, executions: Iterable[dict[str, Any]] = ()) -> tuple[ReportExpectation, ...]:
     by_name = {check.name: check for check in contract.checks}
+    generated_after = {str(item.get("name")): item.get("started_at_epoch") for item in executions if item.get("started_at_epoch") is not None}
     return (
+        ReportExpectation(
+            "live_session_smoke",
+            ROOT / by_name["live_session_smoke"].report_json,
+            ("ok",),
+            live_session_smoke_strict_checks(),
+            (
+                Path(by_name["live_session_smoke"].command[1]),
+                ROOT / "tools" / "solidworks_codex" / "scripts" / "sw_assembly_inspect.py",
+                ROOT / "tools" / "solidworks_codex" / "scripts" / "sw_create_complete_shaper_fixture.py",
+            ),
+            generated_after.get("live_session_smoke"),
+        ),
         ReportExpectation(
             "live_capability_suite",
             ROOT / by_name["live_capability_suite"].report_json,
             ("ok", "native_artifacts.primary"),
             capability_suite_strict_checks(),
+            (Path(by_name["live_capability_suite"].command[1]), ROOT / "tools" / "solidworks_codex" / "scripts" / "sw_assembly_inspect.py"),
+            generated_after.get("live_capability_suite"),
         ),
         ReportExpectation(
             "complete_shaper_v5",
             ROOT / by_name["complete_shaper_v5"].report_json,
             ("ok",),
             shaper_v5_strict_checks(),
+            (
+                Path(by_name["complete_shaper_v5"].command[1]),
+                ROOT / "tools" / "solidworks_codex" / "scripts" / "sw_assembly_inspect.py",
+                ROOT / "tools" / "solidworks_codex" / "scripts" / "sw_model_understand.py",
+            ),
+            generated_after.get("complete_shaper_v5"),
         ),
     )
 
@@ -322,6 +426,46 @@ def cleanup_stale_fixtures(remove: bool) -> dict[str, Any]:
     return {"remove_requested": remove, "entries": entries}
 
 
+
+def generated_lockfile_preflight(root: Path = ROOT) -> dict[str, Any]:
+    """Detect stale SolidWorks lock files anywhere under generated live fixtures.
+
+    A live gate run must not start another SolidWorks session if a previous crash
+    left ~$ files behind. Those files are direct evidence that cleanup/lifecycle is
+    unhealthy and continuing would make the next failure ambiguous.
+    """
+    live_fixture = root / "tools" / "solidworks_codex" / "live_fixture"
+    lock_files: list[str] = []
+    if live_fixture.exists():
+        lock_files = [str(path) for path in sorted(live_fixture.rglob("~$*")) if path.is_file()]
+    failed = ["solidworks_generated_lock_files"] if lock_files else []
+    return {"ok": not lock_files, "failed": failed, "lock_files": lock_files, "scope": str(live_fixture)}
+
+
+def execute_checks_with_lock_preflight(
+    checks: Iterable[LiveCheck],
+    root: Path = ROOT,
+    runner: Any = run_check,
+    lock_probe: Any = generated_lockfile_preflight,
+    clock: Any = time.time,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    executions: list[dict[str, Any]] = []
+    preflights: list[dict[str, Any]] = []
+    for check in checks:
+        before = lock_probe(root)
+        preflights.append(before)
+        if before.get("ok") is not True:
+            break
+        started_at_epoch = float(clock())
+        result = runner(check)
+        result.setdefault("started_at_epoch", started_at_epoch)
+        executions.append(result)
+        after = lock_probe(root)
+        preflights.append(after)
+        if result.get("returncode") != 0 or after.get("ok") is not True:
+            break
+    return executions, preflights
+
 def write_gate_report(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -347,16 +491,18 @@ def main() -> int:
         return 0
 
     executions: list[dict[str, Any]] = []
-    if not args.validate_only:
-        for check in contract.checks:
-            result = run_check(check)
-            executions.append(result)
-            if result["returncode"] != 0:
-                break
+    lockfile_preflight = generated_lockfile_preflight(ROOT)
+    inter_check_lockfile_preflights: list[dict[str, Any]] = []
+    if not args.validate_only and lockfile_preflight["ok"]:
+        executions, inter_check_lockfile_preflights = execute_checks_with_lock_preflight(contract.checks, ROOT)
+        if inter_check_lockfile_preflights:
+            lockfile_preflight = inter_check_lockfile_preflights[-1]
 
-    validation = validate_gate_reports(report_expectations(contract))
+    validation = validation_for_gate_state(lockfile_preflight, args.validate_only, report_expectations(contract, executions))
     cleanup = cleanup_stale_fixtures(args.cleanup_stale)
     failed = list(validation["failed"])
+    if not args.validate_only and not lockfile_preflight["ok"]:
+        failed.extend(str(item) for item in lockfile_preflight.get("failed", []))
     failed.extend(f"process:{item['name']}:{item['returncode']}" for item in executions if item.get("returncode") != 0)
     payload = {
         "ok": not failed,
@@ -364,6 +510,8 @@ def main() -> int:
         "contract": asdict(contract),
         "executions": executions,
         "validation": validation,
+        "generated_lockfile_preflight": lockfile_preflight,
+        "inter_check_lockfile_preflights": inter_check_lockfile_preflights,
         "stale_fixture_cleanup": cleanup,
         "failed": failed,
     }

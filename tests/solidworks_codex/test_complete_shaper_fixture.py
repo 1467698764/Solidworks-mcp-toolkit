@@ -2,6 +2,8 @@
 import sys
 import unittest
 from pathlib import Path
+from tempfile import TemporaryDirectory
+import json
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "tools" / "solidworks_codex" / "scripts" / "sw_create_complete_shaper_fixture.py"
@@ -15,6 +17,19 @@ def load_module():
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
+
+
+def sample_shaper_mates(module):
+    mates = []
+    for name, expected in module.expected_shaper_mate_contract().items():
+        mates.append({
+            "name": name,
+            "ok": True,
+            "kind": expected["type"],
+            "mate_error": 1,
+            "semantic_pair": list(expected["semantic_pair"]),
+        })
+    return mates
 
 
 class CompleteShaperSpecTests(unittest.TestCase):
@@ -144,6 +159,95 @@ class CompleteShaperSpecTests(unittest.TestCase):
         self.assertEqual([], validation["intersections"])
         self.assertGreaterEqual(validation["component_count"], self.module.expected_assembly_component_minimum())
 
+
+    def test_complete_shaper_requires_semantic_mate_network_not_single_distance_mate(self):
+        expected = self.module.expected_shaper_mate_contract()
+        self.assertGreaterEqual(len(expected), 4)
+        self.assertIn("Bed_Column_Distance_Mate", expected)
+        self.assertIn("BullGear_CrankShaft_Concentric_Mate", expected)
+        self.assertIn("Crank_Link_Concentric_Mate", expected)
+        self.assertIn("Rocker_Pivot_Concentric_Mate", expected)
+
+        spatial = self.module.expected_shaper_spatial_contract()
+        self.assertIn("structural_stack", spatial)
+        self.assertIn("ram_guidance", spatial)
+        self.assertIn("tool_head", spatial)
+        self.assertIn("quick_return_drive", spatial)
+        self.assertIn("ram_with_dovetail_and_tool_mount", spatial["ram_guidance"])
+        self.assertIn("single_point_cutting_tool", spatial["tool_head"])
+
+        only_one = {
+            "ok": True,
+            "part_count": 24,
+            "component_count": self.module.expected_assembly_component_minimum(),
+            "layout": {"ok": True},
+            "mates": [{"name": "Shaper_Distance_Mate", "ok": True, "mate_error": 1, "semantic_pair": ["cast_bed_with_t_slots", "column_frame_with_window"]}],
+            "callbacks": {"mass": {"available": True, "mass_kg": 14.81}, "interference": {"available": True, "count": 0}},
+            "post_cleanup": {"locked_files": [], "lock_files": []},
+        }
+        validation = self.module.validate_live_result(only_one)
+        self.assertFalse(validation["ok"])
+        self.assertIn("mate_network", validation["failed"])
+
+
+
+
+    def test_live_inspect_reuses_current_assembly_and_cleanup_after_exit(self):
+        source = SCRIPT.read_text(encoding="utf-8")
+        self.assertIn("inspect_live_assembly_model(asm", source)
+        self.assertNotIn("inspect_saved_assembly(asm_path", source)
+        self.assertIn("already_closed", source)
+        self.assertIn("wait_for_generated_files_unlocked", source)
+        self.assertLess(source.index("close_or_exit_solidworks(sw, spec, out_dir, started_by_fixture)"), source.rindex('result["post_cleanup"] = wait_for_generated_files_unlocked(out_dir)'))
+
+    def test_live_build_failure_report_includes_stage_and_traceback(self):
+        source = SCRIPT.read_text(encoding="utf-8")
+        self.assertIn("traceback.format_exc()", source)
+        self.assertIn('"stage"', source)
+
+
+    def test_runtime_preflight_refuses_stale_lock_files_before_live(self):
+        result = self.module.preflight_solidworks_runtime(process_snapshots=[], lock_files=["~$part.SLDPRT"])
+        self.assertFalse(result["ok"])
+        self.assertIn("solidworks_stale_lock_files", result["failed"])
+
+    def test_runtime_preflight_refuses_high_memory_or_com_dead_session(self):
+        high = [{"name": "SLDWORKS", "id": 123, "private_memory_bytes": 2_500_000_000, "responding": True}]
+        result = self.module.preflight_solidworks_runtime(process_snapshots=high, max_private_memory_bytes=1_500_000_000)
+        self.assertFalse(result["ok"])
+        self.assertIn("solidworks_memory_high", result["failed"])
+
+        low = [{"name": "SLDWORKS", "id": 124, "private_memory_bytes": 500_000_000, "responding": True}]
+        result = self.module.preflight_solidworks_runtime(process_snapshots=low, com_attach_probe=lambda: (_ for _ in ()).throw(RuntimeError("COM unavailable")))
+        self.assertFalse(result["ok"])
+        self.assertIn("solidworks_com_unreachable", result["failed"])
+
+    def test_inspect_and_model_understanding_are_hard_shaper_gates(self):
+        base = {
+            "ok": True,
+            "part_count": 24,
+            "component_count": self.module.expected_assembly_component_minimum(),
+            "layout": {"ok": True},
+            "mates": sample_shaper_mates(self.module),
+            "callbacks": {"mass": {"available": True, "mass_kg": 14.81}, "interference": {"available": True, "count": 0}},
+            "post_cleanup": {"locked_files": [], "lock_files": []},
+        }
+        no_inspect = self.module.validate_live_result(dict(base))
+        self.assertFalse(no_inspect["ok"])
+        self.assertIn("inspect_report", no_inspect["failed"])
+        self.assertIn("model_understanding", no_inspect["failed"])
+
+        inspected = dict(base)
+        inspected["inspect"] = self.module.sample_expected_shaper_inspect_evidence()
+        inspected["model_understanding"] = self.module.sample_expected_shaper_understanding_evidence()
+        self.assertTrue(self.module.validate_live_result(inspected)["ok"])
+
+        bad = dict(inspected)
+        bad["model_understanding"] = {"ok": True, "baseline": {"inventory": {"component_count": 58, "floating_components": []}}, "cad_evidence_graph": {"spatial_evidence": {"near_or_overlap_pairs": []}}}
+        validation = self.module.validate_live_result(bad)
+        self.assertFalse(validation["ok"])
+        self.assertIn("model_understanding:spatial_contract", validation["failed"])
+
     def test_builder_runs_hidden_and_has_mate_and_interference_callbacks(self):
         source = SCRIPT.read_text(encoding="utf-8")
         self.assertIn("sw.Visible = False", source)
@@ -159,26 +263,25 @@ class CompleteShaperSpecTests(unittest.TestCase):
             "part_count": 24,
             "component_count": self.module.expected_assembly_component_minimum(),
             "layout": {"ok": True},
-            "mates": [
-                {
-                    "name": "Shaper_Distance_Mate",
-                    "ok": True,
-                    "mate_error": 1,
-                    "semantic_pair": ["cast_bed_with_t_slots", "column_frame_with_window"],
-                }
-            ],
-            "callbacks": {"mass": {"available": True, "mass_kg": self.module.expected_shaper_mass_kg()}, "interference": {"available": True, "count": 0}},
+            "mates": sample_shaper_mates(self.module),
+            "callbacks": {"mass": {"available": True, "mass_kg": 14.81}, "interference": {"available": True, "count": 0}},
             "post_cleanup": {"locked_files": [], "lock_files": []},
+            "inspect": self.module.sample_expected_shaper_inspect_evidence(),
+            "model_understanding": self.module.sample_expected_shaper_understanding_evidence(),
         }
         self.assertTrue(self.module.validate_live_result(base)["ok"])
 
         bad_mate = dict(base)
-        bad_mate["mates"] = [{"name": "Shaper_Distance_Mate", "ok": True, "semantic_pair": ["ram", "tool"]}]
-        self.assertIn("mate_semantics:Shaper_Distance_Mate", self.module.validate_live_result(bad_mate)["failed"])
+        bad_mates = sample_shaper_mates(self.module)
+        bad_mates[0] = dict(bad_mates[0], semantic_pair=["ram", "tool"])
+        bad_mate["mates"] = bad_mates
+        self.assertIn(f"mate_semantics:{bad_mates[0]['name']}", self.module.validate_live_result(bad_mate)["failed"])
 
         bad_mate_error = dict(base)
-        bad_mate_error["mates"] = [{"name": "Shaper_Distance_Mate", "ok": True, "mate_error": 4, "semantic_pair": ["cast_bed_with_t_slots", "column_frame_with_window"]}]
-        self.assertIn("mate_error:Shaper_Distance_Mate", self.module.validate_live_result(bad_mate_error)["failed"])
+        bad_error_mates = sample_shaper_mates(self.module)
+        bad_error_mates[0] = dict(bad_error_mates[0], mate_error=4)
+        bad_mate_error["mates"] = bad_error_mates
+        self.assertIn(f"mate_error:{bad_error_mates[0]['name']}", self.module.validate_live_result(bad_mate_error)["failed"])
 
         bad_interference = dict(base)
         bad_interference["callbacks"] = {"mass": {"available": True, "mass_kg": 1.0}, "interference": {"available": True, "count": 1}}
@@ -191,6 +294,67 @@ class CompleteShaperSpecTests(unittest.TestCase):
         bad_lock = dict(base)
         bad_lock["post_cleanup"] = {"locked_files": [], "lock_files": ["~$bullhead_shaper_complete.SLDASM"]}
         self.assertIn("post_cleanup_single_session", self.module.validate_live_result(bad_lock)["failed"])
+
+
+    def test_live_builder_preflight_checks_requested_output_dir_locks(self):
+        calls = []
+        original = self.module.preflight_solidworks_runtime
+        try:
+            self.module.preflight_solidworks_runtime = lambda **kwargs: (calls.append(kwargs) or {"ok": False, "failed": ["solidworks_stale_lock_files"]})
+            result = self.module.construct_live_fixture(
+                self.module.build_complete_shaper_spec(),
+                Path("tools/solidworks_codex/live_fixture/custom_shaper"),
+                Path("tools/solidworks_codex/reports/custom_shaper"),
+                force=False,
+            )
+        finally:
+            self.module.preflight_solidworks_runtime = original
+        self.assertFalse(result["ok"])
+        self.assertEqual(Path("tools/solidworks_codex/live_fixture/custom_shaper"), calls[0]["out_dir"])
+
+
+    def test_live_builder_records_attach_failure_report_and_cleanup_state(self):
+        spec = self.module.build_complete_shaper_spec()
+        with TemporaryDirectory() as tmp:
+            out_dir = Path(tmp) / "fixture"
+            reports_dir = Path(tmp) / "reports"
+            original_preflight = self.module.preflight_solidworks_runtime
+            original_attach = self.module.attach_solidworks
+            try:
+                self.module.preflight_solidworks_runtime = lambda **kwargs: {"ok": True, "failed": []}
+                self.module.attach_solidworks = lambda: (_ for _ in ()).throw(RuntimeError("COM dispatch failed"))
+                result = self.module.construct_live_fixture(spec, out_dir, reports_dir, force=True)
+            finally:
+                self.module.preflight_solidworks_runtime = original_preflight
+                self.module.attach_solidworks = original_attach
+            saved = json.loads((reports_dir / "complete_shaper_build.json").read_text(encoding="utf-8"))
+        self.assertFalse(result["ok"])
+        self.assertEqual("attach_solidworks", result["stage"])
+        self.assertIn("RuntimeError: COM dispatch failed", result["error"])
+        self.assertIn("traceback", result)
+        self.assertIn("post_cleanup", result)
+        self.assertEqual(result["stage"], saved["stage"])
+
+
+    def test_post_cleanup_waits_for_solidworks_to_release_generated_files(self):
+        calls = []
+        snapshots = iter([{"locked_files": ["part.SLDPRT"], "lock_files": [], "checked_files": ["part.SLDPRT"]}, {"locked_files": [], "lock_files": [], "checked_files": ["part.SLDPRT"]}])
+        result = self.module.wait_for_generated_files_unlocked(
+            Path("tools/solidworks_codex/live_fixture/shaper_machine_v5"),
+            probe=lambda path: (calls.append(path) or next(snapshots)),
+            sleep=lambda seconds: None,
+            attempts=2,
+        )
+        self.assertEqual([], result["locked_files"])
+        self.assertEqual(2, result["attempts"])
+        self.assertEqual(2, len(calls))
+
+
+    def test_live_inspect_resolves_and_rebuilds_assembly_before_sampling(self):
+        source = SCRIPT.read_text(encoding="utf-8")
+        self.assertIn("prepare_assembly_for_inspect(asm)", source)
+        self.assertIn("ResolveAllLightWeightComponents", source)
+        self.assertLess(source.index("prepare_assembly_for_inspect(asm)"), source.index("inspect_mod.inspect_model_object("))
 
 
 if __name__ == "__main__":

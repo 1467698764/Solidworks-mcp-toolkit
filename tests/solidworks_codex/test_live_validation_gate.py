@@ -36,12 +36,22 @@ class LiveValidationGateSpecTests(unittest.TestCase):
     def setUpClass(cls):
         cls.module = load_module()
 
+
+    def test_gate_contract_runs_minimal_session_smoke_before_heavy_builds(self):
+        contract = self.module.build_gate_contract()
+        names = [check.name for check in contract.checks]
+        self.assertLess(names.index("live_session_smoke"), names.index("live_capability_suite"))
+        smoke = next(check for check in contract.checks if check.name == "live_session_smoke")
+        self.assertIn("sw_live_session_smoke.py", " ".join(smoke.command))
+        self.assertIn("single SolidWorks session", smoke.purpose)
+
     def test_gate_contract_requires_capability_suite_and_complete_shaper(self):
         contract = self.module.build_gate_contract()
         names = [check.name for check in contract.checks]
-        self.assertEqual(names, ["live_capability_suite", "complete_shaper_v5"])
-        self.assertIn("sw_live_capability_suite.py", contract.checks[0].command[1])
-        self.assertIn("sw_create_complete_shaper_fixture.py", contract.checks[1].command[1])
+        self.assertEqual(names, ["live_session_smoke", "live_capability_suite", "complete_shaper_v5"])
+        by_name = {check.name: check for check in contract.checks}
+        self.assertIn("sw_live_capability_suite.py", by_name["live_capability_suite"].command[1])
+        self.assertIn("sw_create_complete_shaper_fixture.py", by_name["complete_shaper_v5"].command[1])
         for check in contract.checks:
             self.assertIn("--force", check.command)
             self.assertTrue(check.report_json.endswith(".json"))
@@ -95,6 +105,17 @@ class LiveValidationGateSpecTests(unittest.TestCase):
         self.assertIn("strict:live_capability_suite:operation_context_guards", result["failed"])
 
 
+
+    def test_session_smoke_strict_check_rejects_second_session_or_lock_leak(self):
+        good = {"ok": True, "started_second_session": False, "part_inspect": {"active_document": {"type": "part"}}, "assembly_inspect": {"active_document": {"type": "assembly", "component_count_sampled": 2, "mate_like_features": [{"name": "Smoke_Distance_Mate"}]}}, "callbacks": {"interference": {"available": True, "count": 0}}, "post_cleanup": {"locked_files": [], "lock_files": []}, "validation": {"ok": True, "failed": []}}
+        self.assertFalse(self.module._strict_check_failed(good, "single_session_smoke"))
+        bad = dict(good, started_second_session=True)
+        self.assertTrue(self.module._strict_check_failed(bad, "single_session_smoke"))
+        bad_asm = dict(good, assembly_inspect={"active_document": {"type": "assembly", "component_count_sampled": 0, "mate_like_features": []}})
+        self.assertTrue(self.module._strict_check_failed(bad_asm, "single_session_smoke"))
+        bad_lock = dict(good, post_cleanup={"locked_files": ["session_smoke.SLDPRT"], "lock_files": []})
+        self.assertTrue(self.module._strict_check_failed(bad_lock, "single_session_smoke"))
+
     def test_default_report_expectations_use_strict_live_checks(self):
         contract = self.module.build_gate_contract()
         expectations = {item.name: item for item in self.module.report_expectations(contract)}
@@ -147,8 +168,17 @@ class LiveValidationGateSpecTests(unittest.TestCase):
                 "ok": True,
                 "part_count": 24,
                 "component_count": 58,
-                "mates": [{"name": "Shaper_Distance_Mate", "semantic_pair": ["cast_bed_with_t_slots", "column_frame_with_window"], "ok": True}],
+                "mates": [
+                    {"name": "Bed_Column_Distance_Mate", "kind": "distance", "semantic_pair": ["cast_bed_with_t_slots", "column_frame_with_window"], "ok": True},
+                    {"name": "BullGear_CrankShaft_Concentric_Mate", "kind": "concentric", "semantic_pair": ["bull_gear_crank_disk", "crank_center_shaft"], "ok": True},
+                    {"name": "Crank_Link_Concentric_Mate", "kind": "concentric", "semantic_pair": ["eccentric_crank_pin", "ram_drive_link"], "ok": True},
+                    {"name": "Rocker_Pivot_Concentric_Mate", "kind": "concentric", "semantic_pair": ["slotted_rocker_arm", "rocker_pivot_shaft"], "ok": True},
+                ],
                 "callbacks": {"interference": {"available": True, "count": 0}, "mass": {"available": True, "mass_kg": 15.125546510666322}},
+                "inspect": {"active_document": {"type": "assembly", "component_count_sampled": 58, "mate_like_features": [
+                    {"name": "Bed_Column_Distance_Mate"}, {"name": "BullGear_CrankShaft_Concentric_Mate"}, {"name": "Crank_Link_Concentric_Mate"}, {"name": "Rocker_Pivot_Concentric_Mate"}
+                ]}},
+                "model_understanding": {"baseline": {"inventory": {"component_count": 58}}, "cad_evidence_graph": {"spatial_evidence": {"near_or_overlap_pairs": [{"a": "cast_bed_with_t_slots-1", "b": "column_frame_with_window-1"}]}}},
                 "post_cleanup": {"locked_files": [], "lock_files": []},
                 "validation": {"ok": True, "failed": []},
             }), encoding="utf-8")
@@ -230,6 +260,114 @@ class LiveValidationGateSpecTests(unittest.TestCase):
         self.assertTrue(self.module.is_safe_stale_fixture_dir(allowed))
         self.assertFalse(self.module.is_safe_stale_fixture_dir(current))
         self.assertFalse(self.module.is_safe_stale_fixture_dir(unrelated))
+
+
+    def test_gate_preflight_blocks_any_generated_lock_files_before_running_checks(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            generated = root / "tools" / "solidworks_codex" / "live_fixture"
+            generated.mkdir(parents=True)
+            lock = generated / "~$codex_validation_assembly.SLDASM"
+            lock.write_text("stale", encoding="utf-8")
+            result = self.module.generated_lockfile_preflight(root)
+        self.assertFalse(result["ok"])
+        self.assertIn("solidworks_generated_lock_files", result["failed"])
+        self.assertEqual([str(lock)], result["lock_files"])
+
+
+    def test_gate_preflight_failure_skips_stale_report_validation(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            generated = root / "tools" / "solidworks_codex" / "live_fixture"
+            generated.mkdir(parents=True)
+            (generated / "~$stale.SLDPRT").write_text("stale", encoding="utf-8")
+            preflight = self.module.generated_lockfile_preflight(root)
+            validation = self.module.validation_for_gate_state(
+                preflight,
+                validate_only=False,
+                expectations=[self.module.ReportExpectation("missing", root / "missing.json", ("ok",))],
+            )
+        self.assertFalse(validation["ok"])
+        self.assertEqual(["skipped_due_to_generated_lock_files"], validation["failed"])
+        self.assertEqual({}, validation["reports"])
+
+
+    def test_gate_stops_between_checks_if_a_check_leaks_generated_lock_files(self):
+        root = Path("C:/fake-root")
+        checks = (
+            self.module.LiveCheck("smoke", ("python", "smoke.py"), "smoke.json", "first"),
+            self.module.LiveCheck("heavy", ("python", "heavy.py"), "heavy.json", "second"),
+        )
+        calls = []
+        lock_states = iter([
+            {"ok": True, "failed": [], "lock_files": []},
+            {"ok": False, "failed": ["solidworks_generated_lock_files"], "lock_files": ["~$leak.SLDPRT"]},
+        ])
+        executions, preflights = self.module.execute_checks_with_lock_preflight(
+            checks,
+            root,
+            runner=lambda check: (calls.append(check.name) or {"name": check.name, "returncode": 0}),
+            lock_probe=lambda probe_root: next(lock_states),
+        )
+        self.assertEqual(["smoke"], calls)
+        self.assertEqual(["smoke"], [item["name"] for item in executions])
+        self.assertFalse(preflights[-1]["ok"])
+
+
+    def test_validate_gate_rejects_reports_older_than_their_live_script(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            report = root / "report.json"
+            script = root / "script.py"
+            report.write_text(json.dumps({"ok": True, "validation": {"ok": True, "failed": []}}), encoding="utf-8")
+            script.write_text("# newer", encoding="utf-8")
+            import os
+            os.utime(report, (100, 100))
+            os.utime(script, (200, 200))
+            result = self.module.validate_gate_reports([
+                self.module.ReportExpectation("live_check", report, ("ok",), source_paths=(script,)),
+            ])
+        self.assertFalse(result["ok"])
+        self.assertIn("stale_report:live_check", result["failed"])
+
+
+    def test_validate_gate_rejects_report_not_written_by_current_live_check(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            report = root / "report.json"
+            report.write_text(json.dumps({"ok": True, "validation": {"ok": True, "failed": []}}), encoding="utf-8")
+            import os
+            os.utime(report, (100, 100))
+            result = self.module.validate_gate_reports([
+                self.module.ReportExpectation("live_check", report, ("ok",), generated_after=150),
+            ])
+        self.assertFalse(result["ok"])
+        self.assertIn("stale_run_report:live_check", result["failed"])
+
+
+    def test_execution_freshness_is_bound_to_each_check_start_time(self):
+        checks = (self.module.LiveCheck("smoke", ("python", "smoke.py"), "smoke.json", "first"),)
+        def fake_runner(check):
+            return {"name": check.name, "returncode": 0}
+        executions, _preflights = self.module.execute_checks_with_lock_preflight(
+            checks,
+            Path("C:/fake-root"),
+            runner=fake_runner,
+            lock_probe=lambda root: {"ok": True, "failed": [], "lock_files": []},
+            clock=lambda: 123.5,
+        )
+        self.assertEqual(123.5, executions[0]["started_at_epoch"])
+
+
+    def test_default_report_freshness_tracks_shared_inspect_code_for_live_checks(self):
+        contract = self.module.build_gate_contract()
+        expectations = {item.name: item for item in self.module.report_expectations(contract)}
+        inspect_script = ROOT / "tools" / "solidworks_codex" / "scripts" / "sw_assembly_inspect.py"
+        self.assertIn(inspect_script, expectations["live_session_smoke"].source_paths)
+        self.assertIn(inspect_script, expectations["live_capability_suite"].source_paths)
+        self.assertIn(inspect_script, expectations["complete_shaper_v5"].source_paths)
+        shaper_script = ROOT / "tools" / "solidworks_codex" / "scripts" / "sw_create_complete_shaper_fixture.py"
+        self.assertIn(shaper_script, expectations["live_session_smoke"].source_paths)
 
 
 if __name__ == "__main__":
