@@ -426,6 +426,7 @@ class CompleteShaperSpecTests(unittest.TestCase):
         source = SCRIPT.read_text(encoding="utf-8")
         self.assertIn('"pairs"', source)
         self.assertIn("GetComponents", source)
+        self.assertIn("Components", source)
 
     def test_validate_live_result_rejects_bad_callbacks_mates_and_interference(self):
         base = {

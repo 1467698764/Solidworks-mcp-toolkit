@@ -1088,12 +1088,19 @@ def add_semantic_concentric_mate(asm: Any, components: list[Any], name: str, sem
     return result
 
 
+def shaper_distance_mate_clearance(name: str) -> float:
+    # Keep the ram visually guided by the left way while avoiding hard body
+    # overlap in SolidWorks interference detection. Other distance mates keep the
+    # original 10 mm display clearance that already validates cleanly.
+    return {"Ram_LeftWay_Guidance_Distance_Mate": 0.040}.get(name, 0.010)
+
+
 def add_shaper_mate_network(asm: Any, components: list[Any]) -> list[dict[str, Any]]:
     mates: list[dict[str, Any]] = []
     contract = expected_shaper_mate_contract()
     for name, expected in contract.items():
         if expected["type"] == "distance":
-            mates.append(add_semantic_distance_mate(asm, components, name, list(expected["semantic_pair"]), 0.010))
+            mates.append(add_semantic_distance_mate(asm, components, name, list(expected["semantic_pair"]), shaper_distance_mate_clearance(name)))
         elif expected["type"] == "concentric":
             mates.append(add_semantic_concentric_mate(asm, components, name, list(expected["semantic_pair"])))
         else:
@@ -1178,10 +1185,14 @@ def interference_component_pairs(interferences: Any) -> list[list[str]]:
         return pairs
     for item in interferences:
         comps: list[str] = []
-        try:
-            raw_components = read_member(item, "GetComponents")
-        except Exception:
-            raw_components = None
+        raw_components = None
+        for attr_name in ("GetComponents", "Components"):
+            try:
+                raw_components = read_member(item, attr_name)
+            except Exception:
+                raw_components = None
+            if raw_components:
+                break
         if raw_components:
             for comp in raw_components:
                 try:
@@ -1514,9 +1525,9 @@ def placements_for(spec: CompleteShaperSpec) -> dict[str, tuple[float, float, fl
         "crank_center_shaft": (-0.245, 0.115, 0.125),
         "eccentric_crank_pin": (-0.198, 0.115, 0.196),
         "bronze_sliding_die_block": (-0.055, 0.205, 0.292),
-        "slotted_rocker_arm": (-0.145, 0.205, 0.245),
-        "rocker_pivot_bracket": (-0.205, 0.105, 0.318),
-        "rocker_pivot_shaft": (-0.205, 0.105, 0.377),
+        "slotted_rocker_arm": (-0.145, 0.205, 0.285),
+        "rocker_pivot_bracket": (-0.205, 0.105, 0.398),
+        "rocker_pivot_shaft": (-0.205, 0.105, 0.497),
         "ram_drive_link": (0.055, 0.245, 0.363),
         "table_cross_slide": (0.08, 0.085, 0.142),
         "work_table_with_t_slots": (0.10, 0.125, 0.207),
