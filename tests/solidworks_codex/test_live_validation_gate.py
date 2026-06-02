@@ -1,4 +1,5 @@
 import importlib.util
+import inspect
 import sys
 import unittest
 from pathlib import Path
@@ -188,6 +189,24 @@ class LiveValidationGateSpecTests(unittest.TestCase):
         for check in contract.checks:
             self.assertIn("--force", check.command)
             self.assertTrue(check.report_json.endswith(".json"))
+
+    def test_shaper_gate_reuses_builder_origin_contract_without_coordinate_copy(self):
+        source = inspect.getsource(self.module._expected_shaper_component_origins)
+        self.assertIn("expected_shaper_placement_contract", source)
+        self.assertNotIn('"cast_bed_with_t_slots": (0.0, 0.0, -0.0275)', source)
+
+    def test_shaper_gate_loads_builder_contract_without_repo_root_on_syspath(self):
+        original = list(sys.path)
+        try:
+            sys.path[:] = [
+                entry for entry in sys.path
+                if entry and Path(entry).resolve() != ROOT
+            ]
+            origins = self.module._expected_shaper_component_origins()
+        finally:
+            sys.path[:] = original
+
+        self.assertIn("cast_bed_with_t_slots", origins)
 
     def test_shaper_gate_component_origin_contract_matches_builder_placements(self):
         builder_script = ROOT / "tools" / "solidworks_codex" / "scripts" / "sw_create_complete_shaper_fixture.py"

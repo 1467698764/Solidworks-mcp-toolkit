@@ -10,6 +10,7 @@ only process exit codes.
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import shutil
 import subprocess
@@ -158,6 +159,27 @@ def _expected_inspect_mates() -> dict[str, tuple[str, list[str]]]:
     }
 
 
+def _load_shaper_builder_module() -> Any:
+    """Load the shaper builder by file path, independent of the caller's cwd.
+
+    swctl launches this gate by script path, so package-style imports that rely
+    on the repository root being present in sys.path are too fragile for the live
+    validation path.
+    """
+    module_name = "_solidworks_codex_complete_shaper_fixture_contract"
+    existing = sys.modules.get(module_name)
+    if existing is not None:
+        return existing
+    script = ROOT / "tools" / "solidworks_codex" / "scripts" / "sw_create_complete_shaper_fixture.py"
+    spec = importlib.util.spec_from_file_location(module_name, script)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"could not load shaper fixture module spec from {script}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
 def _component_pair_matches(component_names: Any, semantic_pair: list[str]) -> bool:
     if not isinstance(component_names, list) or len(component_names) < 2:
         return False
@@ -174,28 +196,10 @@ def _expected_shaper_component_origins() -> dict[str, tuple[float, float, float]
     points. Values are in meters and are intentionally limited to primary
     functional components; display-strip fasteners/washers/oil cups are excluded.
     """
+    shaper = _load_shaper_builder_module()
     return {
-        "cast_bed_with_t_slots": (0.0, 0.0, -0.0275),
-        "column_frame_with_window": (-0.22, 0.1642, 0.035),
-        "left_dovetail_way": (0.03, 0.245, 0.235),
-        "right_dovetail_way": (0.03, 0.245, 0.129),
-        "ram_with_dovetail_and_tool_mount": (0.10, 0.285, 0.169),
-        "front_gib_plate": (0.10, 0.222, 0.223),
-        "rear_gib_plate": (0.10, 0.222, 0.243),
-        "clapper_tool_head": (0.315, 0.255, 0.179),
-        "single_point_cutting_tool": (0.350, 0.160, 0.310),
-        "bull_gear_crank_disk": (-0.245, 0.115, 0.091),
-        "crank_center_shaft": (-0.245, 0.115, 0.0675),
-        "eccentric_crank_pin": (-0.198, 0.115, 0.161),
-        "bronze_sliding_die_block": (-0.055, 0.205, 0.275),
-        "slotted_rocker_arm": (-0.145, 0.205, 0.274),
-        "rocker_pivot_bracket": (-0.205, 0.105, 0.378),
-        "rocker_pivot_shaft": (-0.145, 0.319, 0.4525),
-        "ram_drive_link": (-0.198, 0.12412, 0.353),
-        "table_cross_slide": (0.08, 0.085, 0.067),
-        "work_table_with_t_slots": (0.10, 0.125, 0.032),
-        "vise_jaw_fixed": (0.045, 0.170, 0.372),
-        "vise_jaw_movable": (0.165, 0.170, 0.395),
+        name: tuple(contract["expected_origin_m"])
+        for name, contract in shaper.expected_shaper_placement_contract().items()
     }
 
 
