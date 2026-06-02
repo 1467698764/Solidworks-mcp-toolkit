@@ -54,6 +54,7 @@ def build_capability_matrix() -> CapabilityMatrix:
         C("assembly_insert_component", "capability_suite.SLDASM", ("component_count>=3",), "insert generated components into assembly"),
         C("assembly_mate_concentric", "capability_suite.SLDASM", ("Concentric_Mate",), "add at least one concentric mate or record mate API error"),
         C("assembly_mate_distance", "capability_suite.SLDASM", ("Distance_Mate",), "add at least one distance mate or record mate API error"),
+        C("assembly_mate_inspect_readback", "capability_suite.SLDASM", ("mate_like_features", "components", "not_suppressed"), "reopen/inspect native assembly and verify mate type plus participating components"),
         C("interference_callback", "interference.json", ("available", "count"), "run interference callback after assembly build"),
         C("mass_callback", "mass.json", ("mass_kg",), "mass callback evidence from native SolidWorks assembly"),
         C("native_solidworks_artifacts", "capability_suite.SLDASM + generated SLDPRT files", ("sldasm_exists", "sldprt_count>=4"), "primary deliverables are native SolidWorks assembly and part files"),
@@ -75,6 +76,22 @@ def expected_live_contract() -> dict[str, Any]:
         "mates": ("Concentric_Mate", "Distance_Mate"),
         "minimum_component_count": 3,
         "open_existing_modify_reopen": {"dimension": "D1@Edited_Sketch_Dimension", "expected_after_reopen_m": 0.028},
+        "assembly_inspect": {
+            "document": "capability_suite.SLDASM",
+            "active_document_type": "assembly",
+            "mates": {
+                "Concentric_Mate": {
+                    "type": "MateConcentric",
+                    "components": ("revolve_boss_part", "revolve_cut_part"),
+                    "suppressed": False,
+                },
+                "Distance_Mate": {
+                    "type": "MateDistanceDim",
+                    "components": ("extrude_cut_plate", "editable_dimension_plate"),
+                    "suppressed": False,
+                },
+            },
+        },
         "operation_context": expected_operation_context(),
     }
 

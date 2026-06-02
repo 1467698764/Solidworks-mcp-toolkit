@@ -140,6 +140,7 @@ class LiveCapabilitySuiteSpecTests(unittest.TestCase):
             "assembly_insert_component",
             "assembly_mate_concentric",
             "assembly_mate_distance",
+            "assembly_mate_inspect_readback",
             "interference_callback",
             "mass_callback",
             "native_solidworks_artifacts",
@@ -165,6 +166,30 @@ class LiveCapabilitySuiteSpecTests(unittest.TestCase):
         self.assertIn("Concentric_Mate", contract["mates"])
         self.assertIn("Distance_Mate", contract["mates"])
         self.assertGreaterEqual(contract["minimum_component_count"], 3)
+
+    def test_expected_contract_requires_assembly_mate_inspect_readback(self):
+        contract = self.module.expected_live_contract()
+
+        inspect = contract["assembly_inspect"]
+        self.assertEqual(inspect["document"], "capability_suite.SLDASM")
+        self.assertEqual(inspect["active_document_type"], "assembly")
+
+        concentric = inspect["mates"]["Concentric_Mate"]
+        self.assertEqual(concentric["type"], "MateConcentric")
+        self.assertEqual(concentric["components"], ("revolve_boss_part", "revolve_cut_part"))
+        self.assertFalse(concentric["suppressed"])
+
+        distance = inspect["mates"]["Distance_Mate"]
+        self.assertEqual(distance["type"], "MateDistanceDim")
+        self.assertEqual(distance["components"], ("extrude_cut_plate", "editable_dimension_plate"))
+        self.assertFalse(distance["suppressed"])
+
+        matrix = self.module.build_capability_matrix()
+        capability = next(c for c in matrix.capabilities if c.name == "assembly_mate_inspect_readback")
+        self.assertEqual(capability.live_artifact, "capability_suite.SLDASM")
+        self.assertIn("mate_like_features", capability.acceptance_checks)
+        self.assertIn("components", capability.acceptance_checks)
+        self.assertIn("not_suppressed", capability.acceptance_checks)
 
 
     def test_expected_contract_includes_reopen_persistence_check(self):
