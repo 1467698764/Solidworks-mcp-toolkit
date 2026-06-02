@@ -77,6 +77,47 @@ D1@Sketch1@plate.SLDPRT
 .\tools\solidworks_codex\swctl.ps1 export -Target tools\solidworks_codex\exports\sample_machine.step -Out tools\solidworks_codex\reports\export_step.json
 ```
 
+
+## 装配合约验证
+
+`assembly-contract` 是离线、只读的装配验收工具：输入一份 `inspect` JSON 和一份合约 JSON，验证当前装配是否满足可复用的机械证据条件，而不是只相信文件已生成。它重点检查：
+
+- 文档类型和最小组件数；
+- 必要组件前缀是否存在；
+- 关键组件 Transform/origin 是否在容差内；
+- 语义 mate 是否存在、类型是否正确、是否未 suppressed；
+- mate inspect 回读的参与组件是否匹配预期语义组件对。
+
+示例合约：
+
+```json
+{
+  "document_type": "assembly",
+  "minimum_component_count": 4,
+  "components": {
+    "base_plate": {"required": true, "origin_m": [0.0, 0.0, 0.0], "tolerance_m": 0.002},
+    "cover_plate": {"required": true, "origin_m": [0.0, 0.0, 0.05], "tolerance_m": 0.002},
+    "drive_shaft": {"required": true},
+    "bearing_block": {"required": true}
+  },
+  "mates": {
+    "Base_Cover_Distance": {"type": "MateDistanceDim", "semantic_pair": ["base_plate", "cover_plate"]},
+    "Shaft_Bearing_Concentric": {"type": "MateConcentric", "semantic_pair": ["drive_shaft", "bearing_block"]}
+  }
+}
+```
+
+运行：
+
+```powershell
+.\tools\solidworks_codex\swctl.ps1 assembly-contract `
+  -Report tools\solidworks_codex\reports\assembly_before.json `
+  -Manifest tools\solidworks_codex\reports\assembly_contract_manifest.json `
+  -Out tools\solidworks_codex\reports\assembly_contract.json
+```
+
+这个工具会继续用于牛头刨床 live fixture 的通用化验收，但它不是绕开实机建模的替代品：复杂装配仍必须通过 SolidWorks 原生 `.SLDASM/.SLDPRT`、真实 mate 回读、干涉和质量检查。
+
 ## 交接和多轮工作
 
 ```powershell

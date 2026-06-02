@@ -51,8 +51,9 @@ cd <repo>
 3. 用 `report-search` 查找不确定的尺寸、特征、mate 或组件。
 4. 需要修改时，先用 `change-plan` 生成修改计划。
 5. 用 `safe-set-dimension` 或其他受控写入工具完成一次窄范围修改。
-6. 执行 `rebuild`、`inspect`、`compare`、`change-verify`，必要时再跑 `interference` / `export`。
-7. 暂停或切换 AI 会话前，用 `worklog` 和 `handoff-bundle` 记录交接证据。
+6. 执行 `rebuild`、`inspect`、`compare`、`change-verify`，必要时再跑 `interference` / `assembly-contract` / `export`。
+7. 对装配类目标，把“哪些组件必须存在、关键组件应在什么空间位置、哪些语义 mate 必须存在且连接哪些组件”写成合约，用 `assembly-contract` 防止只看文件生成成功而忽略零件散落、mate 缺失或位置错误。
+8. 暂停或切换 AI 会话前，用 `worklog` 和 `handoff-bundle` 记录交接证据。
 
 ## MCP 工具分组
 
@@ -85,6 +86,7 @@ cd <repo>
 
 - `solidworks_compare_reports`
 - `solidworks_change_verify`
+- `assembly-contract`（CLI）：离线校验 inspect 报告是否满足装配合约，包括组件前缀、Transform2/origin 位置、语义 mate 类型、mate 参与组件和 suppressed 状态；用于把牛头刨床这类复杂试刀石的验收条件抽成可复用机制。
 - `solidworks_interference_check`
 - `solidworks_mass_properties`
 - `solidworks_export`

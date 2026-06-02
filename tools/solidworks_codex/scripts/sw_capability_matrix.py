@@ -35,6 +35,7 @@ WORKFLOW_BY_CLI = {
     "export": "verify_export",
     "compare": "verify_export",
     "change-verify": "verify_export",
+    "assembly-contract": "verify_export",
     "interference": "verify_export",
     "start-interference": "verify_export",
     "preflight": "release_gate",
@@ -78,7 +79,7 @@ SOLIDWORKS_NOT_REQUIRED = {
     "summary", "compare", "issue-report", "design-review", "change-plan", "report-search", "report-context", "model-understand",
     "worklog", "handoff-bundle", "tool-catalog", "offline-demo", "preflight", "audit", "finalize",
     "github-readiness", "repo-health", "release-tree", "public-copy-guard", "template-macro", "mate-macro",
-    "mcp-tools", "session-snapshot", "capability-matrix", "backup", "backup-status", "restore-backup", "change-verify",
+    "mcp-tools", "session-snapshot", "capability-matrix", "backup", "backup-status", "restore-backup", "change-verify", "assembly-contract",
 }
 
 MCP_TO_CLI = {

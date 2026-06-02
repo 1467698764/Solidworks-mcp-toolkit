@@ -1,7 +1,17 @@
 {
-  "timestamp": "2026-06-02T14:02:43",
-  "count": 47,
+  "timestamp": "2026-06-02T20:10:34",
+  "count": 48,
   "capabilities": [
+    {
+      "cli": "assembly-contract",
+      "mcp": null,
+      "workflow": "verify_export",
+      "safety": "verification_or_export",
+      "solidworks_required": false,
+      "required": [],
+      "properties": [],
+      "description": "CLI-only support command."
+    },
     {
       "cli": "audit",
       "mcp": "solidworks_audit",
@@ -679,7 +689,7 @@
     }
   ],
   "coverage": {
-    "cli_commands": 47,
+    "cli_commands": 48,
     "mcp_tools": 35,
     "mapped_mcp_tools": 35,
     "has_cli_for_every_local_mcp": true,
