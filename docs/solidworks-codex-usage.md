@@ -165,7 +165,7 @@ D1@Sketch1@plate.SLDPRT
 .\tools\solidworks_codex\swctl.ps1 live-gate -CleanupStale -Out tools\solidworks_codex\reports\live_validation_gate.json
 ```
 
-live gate 是 opt-in，不默认放进普通 CI；它需要本机 SolidWorks、可导入 `pythoncom/win32com.client` 的 Python，并会尽量设置 `sw.Visible = False` 以减少窗口和内存干扰。它串行运行，不并行启动多个 SolidWorks 会话。它验证的交付物是原生 `.SLDASM/.SLDPRT`：
+live gate 是 opt-in，不默认放进普通 CI；它需要本机 SolidWorks、可导入 `pythoncom/win32com.client` 的 Python，并会尽量设置 `sw.Visible = False` 以减少窗口和内存干扰。它串行运行，不并行启动多个 SolidWorks 会话。控制台默认只打印 compact summary，完整 JSON 始终写入 `-Out`；如确实需要把完整报告树打印到终端，可加 `-FullConsoleJson`。它验证的交付物是原生 `.SLDASM/.SLDPRT`：
 
 - 会话 smoke：两个小零件 + 一个装配 + 距离配合；inspect 必须读到 mate 参与组件，干涉为 0，退出后无锁。
 - 功能套件：拉伸/切除/旋转拉伸/旋转切除/草图尺寸修改/读取修改重建/装配插入/配合/干涉/质量/cleanup。每个特征操作必须带选择隔离证据：当前活动文档、清空选择后的选择数、创建特征前唯一选中的草图、以及重开文件后特征实际消耗的草图名和几何计数。每个配合也必须带选择隔离证据：清空选择后为 0、创建配合前恰好 2 个选中实体、组件对与 mate 结果一致，并通过装配 inspect 回读 mate 类型、参与组件和未 suppressed 状态；回读组件必须匹配声明的语义合约组件对。干涉回调必须可用且 count 为 0，非零干涉会让 gate 失败。

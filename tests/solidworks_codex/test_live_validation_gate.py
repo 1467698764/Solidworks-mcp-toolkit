@@ -697,6 +697,70 @@ class LiveValidationGateSpecTests(unittest.TestCase):
         shaper_script = ROOT / "tools" / "solidworks_codex" / "scripts" / "sw_create_complete_shaper_fixture.py"
         self.assertIn(shaper_script, expectations["live_session_smoke"].source_paths)
 
+    def test_gate_console_summary_omits_full_report_tree_but_keeps_key_status(self):
+        payload = {
+            "ok": True,
+            "failed": [],
+            "executions": [{"name": "live_session_smoke", "returncode": 0, "stdout_tail": "x" * 8000}],
+            "validation": {
+                "ok": True,
+                "failed": [],
+                "reports": {
+                    "complete_shaper_v5": {
+                        "ok": True,
+                        "inspect": {"active_document": {"features": ["huge"] * 1000}},
+                    }
+                },
+            },
+            "generated_lockfile_preflight": {"ok": True, "failed": [], "lock_files": []},
+            "stale_fixture_cleanup": {"remove_requested": False, "entries": []},
+        }
+
+        text = self.module.console_summary_json(payload)
+        summary = json.loads(text)
+
+        self.assertTrue(summary["ok"])
+        self.assertEqual([], summary["failed"])
+        self.assertEqual([{"name": "live_session_smoke", "returncode": 0}], summary["executions"])
+        self.assertNotIn("reports", summary["validation"])
+        self.assertLess(len(text), 1200)
+
+    def test_gate_console_summary_includes_report_hint_contract_and_failed_tail(self):
+        payload = {
+            "ok": False,
+            "failed": ["process:live_capability_suite:2"],
+            "contract": {"output_json": "tools/solidworks_codex/reports/live_validation_gate.json", "checks": [{"name": "live_capability_suite"}]},
+            "executions": [{"name": "live_capability_suite", "returncode": 2, "stderr_tail": "diagnostic" * 200}],
+            "validation": {"ok": False, "failed": ["strict:live_capability_suite:mass_callback"], "reports": {}},
+            "generated_lockfile_preflight": {"ok": True, "failed": [], "lock_files": []},
+            "stale_fixture_cleanup": {"remove_requested": False, "entries": []},
+        }
+
+        summary = json.loads(self.module.console_summary_json(payload, full_report="custom.json"))
+
+        self.assertEqual("custom.json", summary["full_report"])
+        self.assertIn("Use --full-console-json", summary["hint"])
+        self.assertEqual(["live_capability_suite"], summary["contract"]["check_names"])
+        failed_execution = summary["executions"][0]
+        self.assertIn("stderr_tail", failed_execution)
+        self.assertLessEqual(len(failed_execution["stderr_tail"]), 240)
+
+    def test_gate_main_prints_summary_by_default_and_full_json_on_request(self):
+        payload = {"ok": True, "contract": {"checks": [{"name": "live_session_smoke"}], "output_json": "x.json"}, "stale_fixture_cleanup": {"entries": []}}
+        summary = json.loads(self.module.console_output_json(payload, full_console_json=False, full_report="out.json"))
+        full = json.loads(self.module.console_output_json(payload, full_console_json=True, full_report="out.json"))
+
+        self.assertIn("full_report", summary)
+        self.assertNotEqual(payload, summary)
+        self.assertEqual(payload, full)
+
+    def test_live_gate_supports_explicit_full_console_json_escape_hatch(self):
+        args = self.module.parse_args(["--full-console-json"])
+        self.assertTrue(args.full_console_json)
+        swctl = (ROOT / "tools" / "solidworks_codex" / "swctl.ps1").read_text(encoding="utf-8-sig")
+        self.assertIn("FullConsoleJson", swctl)
+        self.assertIn("--full-console-json", swctl)
+
     def test_console_json_is_safe_for_gbk_stdout(self):
         text = self.module.console_json({"relationship": "ram↔way", "ok": False})
         text.encode("gbk")

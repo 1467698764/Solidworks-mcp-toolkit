@@ -741,13 +741,79 @@ def console_json(payload: dict[str, Any]) -> str:
     return json.dumps(payload, indent=2, ensure_ascii=True)
 
 
-def parse_args() -> argparse.Namespace:
+def _short_tail(value: Any, limit: int = 240) -> str:
+    text = str(value or "")
+    if len(text) <= limit:
+        return text
+    return text[-limit:]
+
+
+def summarize_gate_payload(payload: dict[str, Any], full_report: str | None = None) -> dict[str, Any]:
+    validation = payload.get("validation", {})
+    reports = validation.get("reports", {}) if isinstance(validation, dict) else {}
+    lockfile_preflight = payload.get("generated_lockfile_preflight", {})
+    cleanup = payload.get("stale_fixture_cleanup", {})
+    cleanup_entries = cleanup.get("entries", []) if isinstance(cleanup, dict) else []
+    contract = payload.get("contract", {})
+    checks = contract.get("checks", []) if isinstance(contract, dict) else []
+    summary_executions = []
+    for item in payload.get("executions", []):
+        if not isinstance(item, dict):
+            continue
+        entry = {"name": item.get("name"), "returncode": item.get("returncode")}
+        if item.get("returncode") not in (0, None):
+            if item.get("stderr_tail"):
+                entry["stderr_tail"] = _short_tail(item.get("stderr_tail"))
+            if item.get("stdout_tail"):
+                entry["stdout_tail"] = _short_tail(item.get("stdout_tail"))
+            if item.get("timeout_seconds") is not None:
+                entry["timeout_seconds"] = item.get("timeout_seconds")
+        summary_executions.append(entry)
+    return {
+        "ok": payload.get("ok"),
+        "timestamp": payload.get("timestamp"),
+        "full_report": full_report or contract.get("output_json") if isinstance(contract, dict) else full_report,
+        "hint": "Full JSON is written to full_report/--out. Use --full-console-json or swctl -FullConsoleJson for the complete stdout tree.",
+        "failed": payload.get("failed", []),
+        "contract": {
+            "output_json": contract.get("output_json") if isinstance(contract, dict) else None,
+            "check_names": [item.get("name") for item in checks if isinstance(item, dict)],
+        },
+        "executions": summary_executions,
+        "validation": {
+            "ok": validation.get("ok") if isinstance(validation, dict) else None,
+            "failed": validation.get("failed", []) if isinstance(validation, dict) else [],
+            "report_names": sorted(reports) if isinstance(reports, dict) else [],
+        },
+        "generated_lockfile_preflight": {
+            "ok": lockfile_preflight.get("ok") if isinstance(lockfile_preflight, dict) else None,
+            "failed": lockfile_preflight.get("failed", []) if isinstance(lockfile_preflight, dict) else [],
+            "lock_file_count": len(lockfile_preflight.get("lock_files", [])) if isinstance(lockfile_preflight, dict) else 0,
+        },
+        "stale_fixture_cleanup": {
+            "remove_requested": cleanup.get("remove_requested") if isinstance(cleanup, dict) else None,
+            "existing_count": sum(1 for item in cleanup_entries if isinstance(item, dict) and item.get("exists")),
+            "removed_count": sum(1 for item in cleanup_entries if isinstance(item, dict) and item.get("removed")),
+        },
+    }
+
+
+def console_summary_json(payload: dict[str, Any], full_report: str | None = None) -> str:
+    return json.dumps(summarize_gate_payload(payload, full_report), indent=2, ensure_ascii=True)
+
+
+def console_output_json(payload: dict[str, Any], full_console_json: bool, full_report: str | None = None) -> str:
+    return console_json(payload) if full_console_json else console_summary_json(payload, full_report)
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--contract-only", action="store_true")
     parser.add_argument("--validate-only", action="store_true")
     parser.add_argument("--cleanup-stale", action="store_true", help="remove only known stale shaper_machine/v2/v3/v4 generated fixture dirs")
+    parser.add_argument("--full-console-json", action="store_true", help="print the full gate JSON to stdout instead of a compact summary; full JSON is always written to --out")
     parser.add_argument("--out", default="tools/solidworks_codex/reports/live_validation_gate.json")
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def main() -> int:
@@ -757,7 +823,7 @@ def main() -> int:
     if args.contract_only:
         payload = {"ok": True, "contract": asdict(contract), "stale_fixture_cleanup": cleanup_stale_fixtures(False)}
         write_gate_report(out, payload)
-        print(console_json(payload))
+        print(console_output_json(payload, args.full_console_json, str(out)))
         return 0
 
     executions: list[dict[str, Any]] = []
@@ -786,7 +852,7 @@ def main() -> int:
         "failed": failed,
     }
     write_gate_report(out, payload)
-    print(console_json(payload))
+    print(console_output_json(payload, args.full_console_json, str(out)))
     return 0 if payload["ok"] else 2
 
 
