@@ -176,7 +176,10 @@ class LiveValidationGateSpecTests(unittest.TestCase):
                 ],
                 "callbacks": {"interference": {"available": True, "count": 0}, "mass": {"available": True, "mass_kg": 15.125546510666322}},
                 "inspect": {"active_document": {"type": "assembly", "component_count_sampled": 58, "mate_like_features": [
-                    {"name": "Bed_Column_Distance_Mate"}, {"name": "BullGear_CrankShaft_Concentric_Mate"}, {"name": "Crank_Link_Concentric_Mate"}, {"name": "Rocker_Pivot_Concentric_Mate"}
+                    {"name": "Bed_Column_Distance_Mate", "type": "MateDistanceDim", "components": ["cast_bed_with_t_slots-1", "column_frame_with_window-1"], "suppressed": False},
+                    {"name": "BullGear_CrankShaft_Concentric_Mate", "type": "MateConcentric", "components": ["bull_gear_crank_disk-1", "crank_center_shaft-1"], "suppressed": False},
+                    {"name": "Crank_Link_Concentric_Mate", "type": "MateConcentric", "components": ["eccentric_crank_pin-1", "ram_drive_link-1"], "suppressed": False},
+                    {"name": "Rocker_Pivot_Concentric_Mate", "type": "MateConcentric", "components": ["slotted_rocker_arm-1", "rocker_pivot_shaft-1"], "suppressed": False}
                 ]}},
                 "model_understanding": {"baseline": {"inventory": {"component_count": 58}}, "cad_evidence_graph": {"spatial_evidence": {"near_or_overlap_pairs": [{"a": "cast_bed_with_t_slots-1", "b": "column_frame_with_window-1"}]}}},
                 "post_cleanup": {"locked_files": [], "lock_files": []},
@@ -188,6 +191,30 @@ class LiveValidationGateSpecTests(unittest.TestCase):
             ])
         self.assertTrue(result["ok"], result)
         self.assertEqual([], result["failed"])
+
+    def test_shaper_strict_inspect_rejects_same_named_mates_without_details(self):
+        report = {
+            "ok": True,
+            "part_count": 24,
+            "component_count": 58,
+            "mates": [
+                {"name": "Bed_Column_Distance_Mate", "kind": "distance", "semantic_pair": ["cast_bed_with_t_slots", "column_frame_with_window"], "ok": True},
+                {"name": "BullGear_CrankShaft_Concentric_Mate", "kind": "concentric", "semantic_pair": ["bull_gear_crank_disk", "crank_center_shaft"], "ok": True},
+                {"name": "Crank_Link_Concentric_Mate", "kind": "concentric", "semantic_pair": ["eccentric_crank_pin", "ram_drive_link"], "ok": True},
+                {"name": "Rocker_Pivot_Concentric_Mate", "kind": "concentric", "semantic_pair": ["slotted_rocker_arm", "rocker_pivot_shaft"], "ok": True},
+            ],
+            "callbacks": {"interference": {"available": True, "count": 0}, "mass": {"available": True, "mass_kg": 15.0}},
+            "inspect": {"active_document": {"type": "assembly", "component_count_sampled": 58, "mate_like_features": [
+                {"name": "Bed_Column_Distance_Mate"},
+                {"name": "BullGear_CrankShaft_Concentric_Mate"},
+                {"name": "Crank_Link_Concentric_Mate"},
+                {"name": "Rocker_Pivot_Concentric_Mate"},
+            ]}},
+            "model_understanding": {"baseline": {"inventory": {"component_count": 58}}, "cad_evidence_graph": {"spatial_evidence": {"near_or_overlap_pairs": [{"a": "cast_bed_with_t_slots-1", "b": "column_frame_with_window-1"}]}}},
+            "post_cleanup": {"locked_files": [], "lock_files": []},
+            "validation": {"ok": True, "failed": []},
+        }
+        self.assertTrue(self.module._strict_check_failed(report, "inspect_model_understand"))
 
     def test_validate_gate_rejects_reopen_persistence_when_save3_failed(self):
         with TemporaryDirectory() as tmp:

@@ -206,12 +206,45 @@ def read_method_or_member(obj: Any, name: str, *args: Any) -> Any:
         return read_member(obj, name, *args)
 
 
+def mate_reference_components_from(feat: Any, reader: Any) -> list[str]:
+    """Best-effort read of components referenced by a mate feature.
+
+    SolidWorks mate feature details live behind GetSpecificFeature2().GetEntities().
+    This is intentionally read-only and defensive: if COM exposes a different
+    shape, callers still receive the generic feature item rather than failing the
+    whole inspection.
+    """
+    specific = reader(feat, "GetSpecificFeature2")
+    if specific is None or isinstance(specific, dict):
+        return []
+    entities = reader(specific, "GetEntities")
+    if entities is None or isinstance(entities, dict):
+        return []
+    names: list[str] = []
+    for entity in list(entities):
+        comp = reader(entity, "ReferenceComponent")
+        if comp is None or isinstance(comp, dict):
+            comp = reader(entity, "GetComponent")
+        if comp is None or isinstance(comp, dict):
+            continue
+        name = reader(comp, "Name2")
+        if name and not isinstance(name, dict):
+            names.append(str(name))
+    return names
+
+
 def feature_item_from(feat: Any, reader: Any) -> dict[str, Any]:
-    return {
+    item = {
         "name": reader(feat, "Name"),
         "type": reader(feat, "GetTypeName2"),
         "suppressed": reader(feat, "IsSuppressed"),
     }
+    text = f"{item.get('name')} {item.get('type')}"
+    if "Mate" in text or "mate" in text:
+        components = mate_reference_components_from(feat, reader)
+        if components:
+            item["components"] = components
+    return item
 
 
 def append_subfeatures_from(feat: Any, features: list[dict[str, Any]], limit: int, reader: Any) -> None:

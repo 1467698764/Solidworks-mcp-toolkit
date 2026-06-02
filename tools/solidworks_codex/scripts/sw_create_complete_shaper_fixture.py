@@ -134,6 +134,17 @@ def expected_shaper_mate_contract() -> dict[str, dict[str, Any]]:
     }
 
 
+def expected_inspect_mate_type(kind: str) -> str:
+    return {"distance": "MateDistanceDim", "concentric": "MateConcentric"}.get(kind, f"Mate:{kind}")
+
+
+def component_pair_matches_semantic_pair(component_names: Any, semantic_pair: list[str]) -> bool:
+    if not isinstance(component_names, list) or len(component_names) < 2:
+        return False
+    text = "\n".join(str(item) for item in component_names)
+    return all(part_name in text for part_name in semantic_pair)
+
+
 def expected_shaper_spatial_contract() -> dict[str, list[str]]:
     return {
         "structural_stack": ["cast_bed_with_t_slots", "column_frame_with_window", "table_cross_slide", "work_table_with_t_slots"],
@@ -1054,7 +1065,15 @@ def sample_expected_shaper_inspect_evidence() -> dict[str, Any]:
             "type": "assembly",
             "component_count_sampled": expected_assembly_component_minimum(),
             "components": comps,
-            "mate_like_features": [{"name": name, "type": "MateCoincident"} for name in expected_shaper_mate_contract()],
+            "mate_like_features": [
+                {
+                    "name": name,
+                    "type": expected_inspect_mate_type(expected["type"]),
+                    "components": [f"{expected['semantic_pair'][0]}-1", f"{expected['semantic_pair'][1]}-1"],
+                    "suppressed": False,
+                }
+                for name, expected in expected_shaper_mate_contract().items()
+            ],
         },
     }
 
@@ -1095,9 +1114,23 @@ def validate_inspect_evidence(inspect: Any) -> list[str]:
     missing_parts = sorted({p.name for p in build_complete_shaper_spec().parts} - prefixes)
     if missing_parts:
         failed.append("inspect_report:components")
-    mate_names = {str(m.get("name", "")) for m in doc.get("mate_like_features", []) if isinstance(m, dict)}
-    if not set(expected_shaper_mate_contract()).issubset(mate_names):
+    mate_features = [m for m in doc.get("mate_like_features", []) if isinstance(m, dict)]
+    mate_by_name = {str(m.get("name", "")): m for m in mate_features}
+    if not set(expected_shaper_mate_contract()).issubset(set(mate_by_name)):
         failed.append("inspect_report:mate_like_features")
+    for name, expected in expected_shaper_mate_contract().items():
+        mate = mate_by_name.get(name)
+        if not mate:
+            continue
+        if mate.get("type") != expected_inspect_mate_type(expected["type"]):
+            failed.append("inspect_report:mate_details")
+            continue
+        if mate.get("suppressed") is True:
+            failed.append("inspect_report:mate_details")
+            continue
+        if not component_pair_matches_semantic_pair(mate.get("components"), list(expected["semantic_pair"])):
+            failed.append("inspect_report:mate_details")
+            continue
     return failed
 
 

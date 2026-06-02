@@ -248,6 +248,21 @@ class CompleteShaperSpecTests(unittest.TestCase):
         self.assertFalse(validation["ok"])
         self.assertIn("model_understanding:spatial_contract", validation["failed"])
 
+    def test_inspect_evidence_rejects_same_named_mates_without_type_and_component_pair(self):
+        evidence = self.module.sample_expected_shaper_inspect_evidence()
+        doc = evidence["active_document"]
+        doc["mate_like_features"] = [{"name": name} for name in self.module.expected_shaper_mate_contract()]
+        failed = self.module.validate_inspect_evidence(evidence)
+        self.assertIn("inspect_report:mate_details", failed)
+
+    def test_inspect_evidence_rejects_mate_bound_to_wrong_component_pair(self):
+        evidence = self.module.sample_expected_shaper_inspect_evidence()
+        doc = evidence["active_document"]
+        doc["mate_like_features"][0] = dict(doc["mate_like_features"][0], components=["ram_with_dovetail_and_tool_mount-1", "single_point_cutting_tool-1"])
+        failed = self.module.validate_inspect_evidence(evidence)
+        self.assertIn("inspect_report:mate_details", failed)
+
+
     def test_builder_runs_hidden_and_has_mate_and_interference_callbacks(self):
         source = SCRIPT.read_text(encoding="utf-8")
         self.assertIn("sw.Visible = False", source)

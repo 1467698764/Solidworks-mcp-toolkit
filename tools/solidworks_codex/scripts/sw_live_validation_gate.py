@@ -146,6 +146,22 @@ def shaper_v5_strict_checks() -> tuple[str, ...]:
     )
 
 
+def _expected_inspect_mates() -> dict[str, tuple[str, list[str]]]:
+    return {
+        "Bed_Column_Distance_Mate": ("MateDistanceDim", ["cast_bed_with_t_slots", "column_frame_with_window"]),
+        "BullGear_CrankShaft_Concentric_Mate": ("MateConcentric", ["bull_gear_crank_disk", "crank_center_shaft"]),
+        "Crank_Link_Concentric_Mate": ("MateConcentric", ["eccentric_crank_pin", "ram_drive_link"]),
+        "Rocker_Pivot_Concentric_Mate": ("MateConcentric", ["slotted_rocker_arm", "rocker_pivot_shaft"]),
+    }
+
+
+def _component_pair_matches(component_names: Any, semantic_pair: list[str]) -> bool:
+    if not isinstance(component_names, list) or len(component_names) < 2:
+        return False
+    text = "\n".join(str(item) for item in component_names)
+    return all(name in text for name in semantic_pair)
+
+
 def _strict_check_failed(data: dict[str, Any], check: str) -> bool:
     if check == "single_session_smoke":
         part_doc = (data.get("part_inspect") or data.get("inspect") or {}).get("active_document", {}) if isinstance(data.get("part_inspect") or data.get("inspect"), dict) else {}
@@ -252,9 +268,18 @@ def _strict_check_failed(data: dict[str, Any], check: str) -> bool:
         doc = inspect.get("active_document", {}) if isinstance(inspect, dict) else {}
         if doc.get("type") != "assembly" or int(doc.get("component_count_sampled", 0) or 0) < 58:
             return True
-        mate_names = {str(m.get("name", "")) for m in doc.get("mate_like_features", []) if isinstance(m, dict)}
-        if not {"Bed_Column_Distance_Mate", "BullGear_CrankShaft_Concentric_Mate", "Crank_Link_Concentric_Mate", "Rocker_Pivot_Concentric_Mate"}.issubset(mate_names):
+        mate_by_name = {str(m.get("name", "")): m for m in doc.get("mate_like_features", []) if isinstance(m, dict)}
+        expected_mates = _expected_inspect_mates()
+        if not set(expected_mates).issubset(set(mate_by_name)):
             return True
+        for mate_name, (mate_type, pair) in expected_mates.items():
+            mate = mate_by_name.get(mate_name, {})
+            if mate.get("type") != mate_type:
+                return True
+            if mate.get("suppressed") is True:
+                return True
+            if not _component_pair_matches(mate.get("components"), pair):
+                return True
         understanding = data.get("model_understanding", {})
         inv = ((understanding.get("baseline") or {}).get("inventory") or {}) if isinstance(understanding, dict) else {}
         spatial = (((understanding.get("cad_evidence_graph") or {}).get("spatial_evidence") or {}) if isinstance(understanding, dict) else {})

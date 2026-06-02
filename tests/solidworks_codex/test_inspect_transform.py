@@ -66,13 +66,27 @@ class InspectTransformTests(unittest.TestCase):
         self.assertIn("MateGroup", names)
         self.assertIn("Bed_Column_Distance_Mate", names)
 
+    def test_inspect_model_object_reads_mate_reference_components(self):
+        report = mod.inspect_model_object(NestedMateModel(), started_by_probe=False)
+        mates = {item["name"]: item for item in report["active_document"]["mate_like_features"]}
+        self.assertEqual(
+            ["cast_bed_with_t_slots-1", "column_frame_with_window-1"],
+            mates["Bed_Column_Distance_Mate"]["components"],
+        )
+
+
+class FakeMateEntity:
+    def __init__(self, component_name):
+        self.ReferenceComponent = type("RefComponent", (), {"Name2": component_name})()
+
 
 class FakeNestedFeature:
-    def __init__(self, name, typ, next_feature=None, first_sub=None):
+    def __init__(self, name, typ, next_feature=None, first_sub=None, entities=None):
         self.Name = name
         self._type = typ
         self._next = next_feature
         self._first_sub = first_sub
+        self._entities = entities or []
     def GetTypeName2(self):
         return self._type
     def IsSuppressed(self):
@@ -85,6 +99,10 @@ class FakeNestedFeature:
         return self._next
     def GetFirstDisplayDimension(self):
         return None
+    def GetSpecificFeature2(self):
+        return self
+    def GetEntities(self):
+        return self._entities
 
 class FallbackComponentModel(FakeAssemblyModel):
     def __init__(self):
@@ -96,7 +114,14 @@ class FallbackComponentModel(FakeAssemblyModel):
 
 class NestedMateModel(FakeAssemblyModel):
     def __init__(self):
-        mate = FakeNestedFeature("Bed_Column_Distance_Mate", "MateDistanceDim")
+        mate = FakeNestedFeature(
+            "Bed_Column_Distance_Mate",
+            "MateDistanceDim",
+            entities=[
+                FakeMateEntity("cast_bed_with_t_slots-1"),
+                FakeMateEntity("column_frame_with_window-1"),
+            ],
+        )
         self._features = FakeNestedFeature("MateGroup", "MateGroup", first_sub=mate)
 
 if __name__ == "__main__":
