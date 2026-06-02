@@ -17,6 +17,64 @@ def load_module():
     return module
 
 
+def sample_operation_context(module):
+    context = module.expected_operation_context()
+    for part_key, part in context.items():
+        part["active_title"] = f"Temporary title for {part_key}"
+        part["saved_path"] = f"C:/generated/{part['document']}"
+        for op_name, op in part["operations"].items():
+            op["sketch"] = f"Sketch_for_{op_name}"
+            op["readback"] = {
+                "sketch": f"Sketch_for_{op_name}",
+                "geometry": dict(op["geometry"]),
+                "feature_type": op["feature_type"],
+                "source": "reopened_feature_tree",
+            }
+    return context
+
+
+class FakeSegment:
+    def __init__(self, segment_type, construction=False):
+        self._segment_type = segment_type
+        self.ConstructionGeometry = construction
+
+    def GetType(self):
+        return self._segment_type
+
+
+class FakeSketch:
+    def __init__(self, segments):
+        self._segments = tuple(segments)
+
+    def GetSketchSegments(self):
+        return self._segments
+
+
+class FakeSubFeature:
+    def __init__(self, name, feature_type, sketch=None, next_sub=None):
+        self.Name = name
+        self._feature_type = feature_type
+        self._sketch = sketch
+        self._next_sub = next_sub
+
+    def GetTypeName2(self):
+        return self._feature_type
+
+    def GetSpecificFeature2(self):
+        return self._sketch
+
+    def GetNextSubFeature(self):
+        return self._next_sub
+
+
+class FakeFeature:
+    def __init__(self, sub_feature):
+        self._sub_feature = sub_feature
+
+    def GetFirstSubFeature(self):
+        return self._sub_feature
+
+
 class LiveCapabilitySuiteSpecTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -68,6 +126,33 @@ class LiveCapabilitySuiteSpecTests(unittest.TestCase):
         self.assertIn("open_existing_modify_reopen", contract)
         self.assertEqual(contract["open_existing_modify_reopen"]["dimension"], "D1@Edited_Sketch_Dimension")
         self.assertEqual(contract["open_existing_modify_reopen"]["expected_after_reopen_m"], 0.028)
+
+    def test_expected_contract_requires_operation_context_guards(self):
+        contract = self.module.expected_live_contract()
+        guards = contract["operation_context"]
+        self.assertEqual(guards["extrude"]["document"], "extrude_cut_plate.SLDPRT")
+        self.assertEqual(guards["extrude"]["operations"]["Round_Through_Hole"]["profile"], "circle")
+        self.assertEqual(guards["extrude"]["operations"]["Round_Through_Hole"]["geometry"]["circles"], 1)
+        self.assertEqual(guards["extrude"]["operations"]["Rectangular_Window_Cut"]["geometry"]["lines"], 4)
+        self.assertEqual(guards["extrude"]["operations"]["Rectangular_Window_Cut"]["profile"], "rectangle")
+        self.assertEqual(guards["revolve"]["operations"]["Revolve_Boss_Profile"]["geometry"]["centerlines"], 1)
+        self.assertEqual(guards["revolve_cut"]["operations"]["Revolve_Cut_Bore"]["feature_type"], "RevCut")
+        self.assertEqual(guards["editable"]["operations"]["Edited_Sketch_Dimension"]["dimension"], "D1@Edited_Sketch_Dimension")
+
+
+    def test_reopened_feature_readback_reports_actual_consumed_sketch_name_and_geometry(self):
+        actual_sketch = FakeSubFeature(
+            "ActualConsumedSketch",
+            "ProfileFeature",
+            FakeSketch([FakeSegment(0), FakeSegment(0), FakeSegment(1), FakeSegment(0, construction=True)]),
+        )
+        feature = FakeFeature(actual_sketch)
+
+        readback = self.module.sketch_readback_from_feature(feature)
+
+        self.assertEqual(readback["sketch"], "ActualConsumedSketch")
+        self.assertEqual(readback["source"], "reopened_feature_tree")
+        self.assertEqual(readback["geometry"], {"lines": 2, "circles": 1, "centerlines": 1})
 
     def test_cleanup_policy_is_explicit_and_keeps_generated_outputs_separate(self):
         matrix = self.module.build_capability_matrix()
@@ -124,8 +209,42 @@ class LiveCapabilitySuiteSpecTests(unittest.TestCase):
             "post_cleanup": {"locked_files": []},
         }
         validation = self.module.validate_live_result(good)
+        self.assertFalse(validation["ok"])
+        self.assertIn("operation_context_guards", validation["failed_capabilities"])
+
+        good["operation_context"] = sample_operation_context(self.module)
+        del good["operation_context"]["extrude"]["active_title"]
+        validation = self.module.validate_live_result(good)
+        self.assertFalse(validation["ok"])
+        self.assertIn("operation_context_guards", validation["failed_capabilities"])
+
+        good["operation_context"] = sample_operation_context(self.module)
+        validation = self.module.validate_live_result(good)
         self.assertTrue(validation["ok"], validation)
         self.assertEqual([], validation["failed_capabilities"])
+
+        good["operation_context"]["extrude"]["operations"]["Round_Through_Hole"]["profile"] = "rectangle"
+        validation = self.module.validate_live_result(good)
+        self.assertFalse(validation["ok"])
+        self.assertIn("operation_context_guards", validation["failed_capabilities"])
+
+        good["operation_context"] = sample_operation_context(self.module)
+        good["operation_context"]["extrude"]["operations"]["Round_Through_Hole"]["geometry"]["circles"] = 0
+        validation = self.module.validate_live_result(good)
+        self.assertFalse(validation["ok"])
+        self.assertIn("operation_context_guards", validation["failed_capabilities"])
+
+        good["operation_context"] = sample_operation_context(self.module)
+        del good["operation_context"]["extrude"]["operations"]["Round_Through_Hole"]["readback"]
+        validation = self.module.validate_live_result(good)
+        self.assertFalse(validation["ok"])
+        self.assertIn("operation_context_guards", validation["failed_capabilities"])
+
+        good["operation_context"] = sample_operation_context(self.module)
+        good["operation_context"]["extrude"]["operations"]["Round_Through_Hole"]["readback"]["geometry"]["circles"] = 0
+        validation = self.module.validate_live_result(good)
+        self.assertFalse(validation["ok"])
+        self.assertIn("operation_context_guards", validation["failed_capabilities"])
 
     def test_cleanup_rejects_unsafe_force_directory(self):
         unsafe = ROOT / "definitely_not_the_live_suite_root"
@@ -232,6 +351,7 @@ class LiveCapabilitySuiteSpecTests(unittest.TestCase):
         self.assertIn("native_solidworks_artifacts", validation["failed_capabilities"])
 
         result["native_artifacts"]["assembly_exists"] = True
+        result["operation_context"] = sample_operation_context(self.module)
         validation = self.module.validate_live_result(result)
         self.assertTrue(validation["ok"], validation)
 

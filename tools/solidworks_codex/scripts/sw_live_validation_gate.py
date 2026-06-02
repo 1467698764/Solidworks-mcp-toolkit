@@ -104,6 +104,7 @@ def capability_suite_strict_checks() -> tuple[str, ...]:
         "native_solidworks_artifacts",
         "assembly_mates_persisted",
         "open_existing_modify_reopen",
+        "operation_context_guards",
         "interference_callback",
         "mass_callback",
         "post_cleanup_single_session",
@@ -138,6 +139,42 @@ def _strict_check_failed(data: dict[str, Any], check: str) -> bool:
             or save.get("ok") is not True
             or int(save.get("errors", 0) or 0) != 0
         )
+    if check == "operation_context_guards":
+        context = data.get("operation_context", {})
+        expected = {
+            "extrude": {"document": "extrude_cut_plate.SLDPRT", "operations": {"Body_Plate": {"profile": "rectangle", "geometry": {"lines": 4, "circles": 0, "centerlines": 0}, "feature_type": "Extrusion", "api": "FeatureExtrusion2"}, "Round_Through_Hole": {"profile": "circle", "geometry": {"lines": 0, "circles": 1, "centerlines": 0}, "feature_type": "ICE", "api": "FeatureCut3"}, "Rectangular_Window_Cut": {"profile": "rectangle", "geometry": {"lines": 4, "circles": 0, "centerlines": 0}, "feature_type": "ICE", "api": "FeatureCut3"}}},
+            "revolve": {"document": "revolve_boss_part.SLDPRT", "operations": {"Revolve_Boss_Profile": {"profile": "closed_revolve_profile_with_centerline", "geometry": {"lines": 5, "circles": 0, "centerlines": 1}, "feature_type": "Revolution", "api": "FeatureRevolve2"}}},
+            "revolve_cut": {"document": "revolve_cut_part.SLDPRT", "operations": {"Revolve_Boss_Profile": {"profile": "closed_revolve_profile_with_centerline", "geometry": {"lines": 5, "circles": 0, "centerlines": 1}, "feature_type": "Revolution", "api": "FeatureRevolve2"}, "Revolve_Cut_Bore": {"profile": "closed_cut_profile_with_centerline", "geometry": {"lines": 4, "circles": 0, "centerlines": 1}, "feature_type": "RevCut", "api": "FeatureRevolveCut2"}}},
+            "editable": {"document": "editable_dimension_plate.SLDPRT", "operations": {"Body_Editable_Plate": {"profile": "rectangle", "geometry": {"lines": 4, "circles": 0, "centerlines": 0}, "feature_type": "Extrusion", "api": "FeatureExtrusion2"}, "Edited_Sketch_Dimension": {"profile": "circle", "geometry": {"lines": 0, "circles": 1, "centerlines": 0}, "feature_type": "ICE", "api": "FeatureCut3", "dimension": "D1@Edited_Sketch_Dimension"}}},
+        }
+        for part_key, part_expected in expected.items():
+            part_actual = context.get(part_key, {}) if isinstance(context, dict) else {}
+            if part_actual.get("document") != part_expected["document"]:
+                return True
+            if not part_actual.get("active_title"):
+                return True
+            if Path(str(part_actual.get("saved_path", ""))).name != part_expected["document"]:
+                return True
+            operations = part_actual.get("operations", {})
+            for op_name, op_expected in part_expected["operations"].items():
+                op_actual = operations.get(op_name, {})
+                if not op_actual.get("sketch"):
+                    return True
+                for field, expected_value in op_expected.items():
+                    if op_actual.get(field) != expected_value:
+                        return True
+                readback = op_actual.get("readback", {})
+                if not readback:
+                    return True
+                if readback.get("source") != "reopened_feature_tree":
+                    return True
+                if readback.get("sketch") != op_actual.get("sketch"):
+                    return True
+                if readback.get("feature_type") != op_expected.get("feature_type"):
+                    return True
+                if readback.get("geometry") != op_expected.get("geometry"):
+                    return True
+        return False
     if check == "interference_callback":
         inter = data.get("callbacks", {}).get("interference", {})
         return not inter.get("available") or inter.get("count") is None

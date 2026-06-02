@@ -74,7 +74,86 @@ def expected_live_contract() -> dict[str, Any]:
         "mates": ("Concentric_Mate", "Distance_Mate"),
         "minimum_component_count": 3,
         "open_existing_modify_reopen": {"dimension": "D1@Edited_Sketch_Dimension", "expected_after_reopen_m": 0.028},
+        "operation_context": expected_operation_context(),
     }
+
+
+def expected_operation_context() -> dict[str, Any]:
+    return {
+        "extrude": {
+            "document": "extrude_cut_plate.SLDPRT",
+            "operations": {
+                "Body_Plate": {"profile": "rectangle", "geometry": {"lines": 4, "circles": 0, "centerlines": 0}, "feature_type": "Extrusion", "api": "FeatureExtrusion2"},
+                "Round_Through_Hole": {"profile": "circle", "geometry": {"lines": 0, "circles": 1, "centerlines": 0}, "feature_type": "ICE", "api": "FeatureCut3"},
+                "Rectangular_Window_Cut": {"profile": "rectangle", "geometry": {"lines": 4, "circles": 0, "centerlines": 0}, "feature_type": "ICE", "api": "FeatureCut3"},
+            },
+        },
+        "revolve": {
+            "document": "revolve_boss_part.SLDPRT",
+            "operations": {
+                "Revolve_Boss_Profile": {"profile": "closed_revolve_profile_with_centerline", "geometry": {"lines": 5, "circles": 0, "centerlines": 1}, "feature_type": "Revolution", "api": "FeatureRevolve2"},
+            },
+        },
+        "revolve_cut": {
+            "document": "revolve_cut_part.SLDPRT",
+            "operations": {
+                "Revolve_Boss_Profile": {"profile": "closed_revolve_profile_with_centerline", "geometry": {"lines": 5, "circles": 0, "centerlines": 1}, "feature_type": "Revolution", "api": "FeatureRevolve2"},
+                "Revolve_Cut_Bore": {"profile": "closed_cut_profile_with_centerline", "geometry": {"lines": 4, "circles": 0, "centerlines": 1}, "feature_type": "RevCut", "api": "FeatureRevolveCut2"},
+            },
+        },
+        "editable": {
+            "document": "editable_dimension_plate.SLDPRT",
+            "operations": {
+                "Body_Editable_Plate": {"profile": "rectangle", "geometry": {"lines": 4, "circles": 0, "centerlines": 0}, "feature_type": "Extrusion", "api": "FeatureExtrusion2"},
+                "Edited_Sketch_Dimension": {"profile": "circle", "geometry": {"lines": 0, "circles": 1, "centerlines": 0}, "feature_type": "ICE", "api": "FeatureCut3", "dimension": "D1@Edited_Sketch_Dimension"},
+            },
+        },
+    }
+
+
+def validate_operation_context(actual: dict[str, Any]) -> dict[str, Any]:
+    failed: list[str] = []
+    details: dict[str, Any] = {}
+    for part_key, part_expected in expected_operation_context().items():
+        part_actual = actual.get(part_key, {}) if isinstance(actual, dict) else {}
+        if part_actual.get("document") != part_expected["document"]:
+            failed.append(f"{part_key}:document")
+            details[part_key] = part_actual
+            continue
+        if not part_actual.get("active_title"):
+            failed.append(f"{part_key}:active_title")
+            details[part_key] = part_actual
+        if Path(str(part_actual.get("saved_path", ""))).name != part_expected["document"]:
+            failed.append(f"{part_key}:saved_path")
+            details[part_key] = part_actual
+        operations = part_actual.get("operations", {})
+        for op_name, op_expected in part_expected["operations"].items():
+            op_actual = operations.get(op_name, {})
+            if not op_actual.get("sketch"):
+                failed.append(f"{part_key}:{op_name}:sketch")
+                details.setdefault(part_key, {})[op_name] = op_actual
+            for field, expected_value in op_expected.items():
+                if op_actual.get(field) != expected_value:
+                    failed.append(f"{part_key}:{op_name}:{field}")
+                    details.setdefault(part_key, {})[op_name] = op_actual
+            readback = op_actual.get("readback", {}) if isinstance(op_actual, dict) else {}
+            if not readback:
+                failed.append(f"{part_key}:{op_name}:readback")
+                details.setdefault(part_key, {})[op_name] = op_actual
+                continue
+            if readback.get("source") != "reopened_feature_tree":
+                failed.append(f"{part_key}:{op_name}:readback:source")
+                details.setdefault(part_key, {})[op_name] = op_actual
+            if readback.get("sketch") != op_actual.get("sketch"):
+                failed.append(f"{part_key}:{op_name}:readback:sketch")
+                details.setdefault(part_key, {})[op_name] = op_actual
+            if readback.get("feature_type") != op_expected.get("feature_type"):
+                failed.append(f"{part_key}:{op_name}:readback:feature_type")
+                details.setdefault(part_key, {})[op_name] = op_actual
+            if readback.get("geometry") != op_expected.get("geometry"):
+                failed.append(f"{part_key}:{op_name}:readback:geometry")
+                details.setdefault(part_key, {})[op_name] = op_actual
+    return {"ok": not failed, "failed": failed, "details": details}
 
 
 def _feature_name_set(result: dict[str, Any], key: str) -> set[str]:
@@ -154,6 +233,10 @@ def validate_live_result(result: dict[str, Any]) -> dict[str, Any]:
     if "post_cleanup" not in result:
         failed.append("post_cleanup_single_session")
         details["post_cleanup_single_session"] = "missing post-cleanup evidence"
+    context_validation = validate_operation_context(result.get("operation_context", {}))
+    if not context_validation["ok"]:
+        failed.append("operation_context_guards")
+        details["operation_context_guards"] = context_validation
     return {"ok": not failed, "failed_capabilities": failed, "details": details}
 
 
@@ -353,20 +436,36 @@ def new_assembly(sw: Any) -> Any:
     return asm
 
 
-def extrude_boss_box(model: Any, width: float, height: float, depth: float, name: str) -> None:
+def active_title(model: Any) -> str:
+    return str(read_member(model, "GetTitle") or "")
+
+
+def operation_report(model: Any, name: str, sketch: str, profile: str, api: str, geometry: dict[str, int], dimension: str | None = None) -> dict[str, Any]:
+    feat = read_member(model, "FeatureByName", name)
+    feature_type = read_member(feat, "GetTypeName2") if feat is not None else None
+    report = {"sketch": sketch, "profile": profile, "geometry": geometry, "feature": name, "feature_type": feature_type, "api": api}
+    if dimension:
+        report["dimension"] = dimension
+    return report
+
+
+def extrude_boss_box(model: Any, width: float, height: float, depth: float, name: str) -> dict[str, Any]:
+    before = feature_names(model)
     select_first_ref_plane(model)
     model.SketchManager.InsertSketch(True)
     rect = model.SketchManager.CreateCornerRectangle(-width / 2, -height / 2, 0, width / 2, height / 2, 0)
     if rect is None:
         raise RuntimeError(f"CreateCornerRectangle returned None for {name}")
     model.SketchManager.InsertSketch(True)
+    sketch = select_new_sketch(model, before)
     feat = model.FeatureManager.FeatureExtrusion2(True, False, False, 0, 0, depth, 0, False, False, False, False, 0, 0, False, False, False, False, True, True, True, 0, 0, False)
     if feat is None:
         raise RuntimeError(f"FeatureExtrusion2 returned None for {name}")
     feat.Name = name
+    return operation_report(model, name, sketch, "rectangle", "FeatureExtrusion2", {"lines": 4, "circles": 0, "centerlines": 0})
 
 
-def extrude_cut_circles(model: Any, circles: list[tuple[float, float, float]], depth: float, name: str) -> None:
+def extrude_cut_circles(model: Any, circles: list[tuple[float, float, float]], depth: float, name: str) -> dict[str, Any]:
     before = feature_names(model)
     select_first_ref_plane(model)
     model.SketchManager.InsertSketch(True)
@@ -375,14 +474,15 @@ def extrude_cut_circles(model: Any, circles: list[tuple[float, float, float]], d
         if circle is None:
             raise RuntimeError(f"CreateCircleByRadius returned None for {name}")
     model.SketchManager.InsertSketch(True)
-    select_new_sketch(model, before)
+    sketch_name = select_new_sketch(model, before)
     feat = model.FeatureManager.FeatureCut3(True, False, True, 0, 0, depth, depth, False, False, False, False, 0, 0, False, False, False, False, False, True, True, True, True, False, 0, 0, False)
     if feat is None:
         raise RuntimeError(f"FeatureCut3 returned None for {name}")
     feat.Name = name
+    return operation_report(model, name, sketch_name, "circle", "FeatureCut3", {"lines": 0, "circles": len(circles), "centerlines": 0})
 
 
-def extrude_cut_rect(model: Any, x: float, y: float, width: float, height: float, depth: float, name: str) -> None:
+def extrude_cut_rect(model: Any, x: float, y: float, width: float, height: float, depth: float, name: str) -> dict[str, Any]:
     before = feature_names(model)
     select_first_ref_plane(model)
     model.SketchManager.InsertSketch(True)
@@ -390,14 +490,15 @@ def extrude_cut_rect(model: Any, x: float, y: float, width: float, height: float
     if rect is None:
         raise RuntimeError(f"CreateCornerRectangle returned None for {name}")
     model.SketchManager.InsertSketch(True)
-    select_new_sketch(model, before)
+    sketch_name = select_new_sketch(model, before)
     feat = model.FeatureManager.FeatureCut3(True, False, True, 0, 0, depth, depth, False, False, False, False, 0, 0, False, False, False, False, False, True, True, True, True, False, 0, 0, False)
     if feat is None:
         raise RuntimeError(f"FeatureCut3 returned None for {name}")
     feat.Name = name
+    return operation_report(model, name, sketch_name, "rectangle", "FeatureCut3", {"lines": 4, "circles": 0, "centerlines": 0})
 
 
-def revolve_boss(model: Any, name: str) -> None:
+def revolve_boss(model: Any, name: str) -> dict[str, Any]:
     before = feature_names(model)
     select_first_ref_plane(model)
     model.SketchManager.InsertSketch(True)
@@ -410,14 +511,15 @@ def revolve_boss(model: Any, name: str) -> None:
         if line is None:
             raise RuntimeError(f"CreateLine returned None for revolve {name}")
     model.SketchManager.InsertSketch(True)
-    select_new_sketch(model, before)
+    sketch_name = select_new_sketch(model, before)
     feat = model.FeatureManager.FeatureRevolve2(True, True, False, False, False, False, 0, 0, 2 * math.pi, 0, False, False, 0, 0, 0, 0, 0, True, True, True)
     if feat is None:
         raise RuntimeError(f"FeatureRevolve2 returned None for {name}")
     feat.Name = name
+    return operation_report(model, name, sketch_name, "closed_revolve_profile_with_centerline", "FeatureRevolve2", {"lines": 5, "circles": 0, "centerlines": 1})
 
 
-def revolve_cut(model: Any, name: str) -> None:
+def revolve_cut(model: Any, name: str) -> dict[str, Any]:
     before = feature_names(model)
     select_first_ref_plane(model)
     model.SketchManager.InsertSketch(True)
@@ -430,49 +532,61 @@ def revolve_cut(model: Any, name: str) -> None:
         if line is None:
             raise RuntimeError(f"CreateLine returned None for revolve cut {name}")
     model.SketchManager.InsertSketch(True)
-    select_new_sketch(model, before)
+    sketch_name = select_new_sketch(model, before)
     feat = model.FeatureManager.FeatureRevolveCut2(True, True, False, False, False, False, 0, 0, 2 * math.pi, 0)
     if feat is None:
         raise RuntimeError(f"FeatureRevolveCut2 returned None for {name}")
     feat.Name = name
+    return operation_report(model, name, sketch_name, "closed_cut_profile_with_centerline", "FeatureRevolveCut2", {"lines": 4, "circles": 0, "centerlines": 1})
 
 
-def create_extrude_cut_plate(sw: Any, out_dir: Path) -> Path:
+def finalized_part_context(model: Any, path: Path, operations: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    return {"document": path.name, "active_title": active_title(model), "saved_path": str(path.resolve()), "operations": operations}
+
+
+def create_extrude_cut_plate(sw: Any, out_dir: Path) -> tuple[Path, dict[str, Any]]:
     model = new_part(sw)
-    extrude_boss_box(model, 0.100, 0.070, 0.012, "Body_Plate")
-    extrude_cut_circles(model, [(0.0, 0.0, 0.012)], 0.025, "Round_Through_Hole")
-    extrude_cut_rect(model, 0.030, 0, 0.020, 0.030, 0.025, "Rectangular_Window_Cut")
+    operations = {
+        "Body_Plate": extrude_boss_box(model, 0.100, 0.070, 0.012, "Body_Plate"),
+        "Round_Through_Hole": extrude_cut_circles(model, [(0.0, 0.0, 0.012)], 0.025, "Round_Through_Hole"),
+        "Rectangular_Window_Cut": extrude_cut_rect(model, 0.030, 0, 0.020, 0.030, 0.025, "Rectangular_Window_Cut"),
+    }
     model.ForceRebuild3(False)
     path = out_dir / "extrude_cut_plate.SLDPRT"
     save_as(model, path)
+    context = finalized_part_context(model, path, operations)
     close_doc(sw, model)
-    return path
+    return path, context
 
 
-def create_revolve_boss_part(sw: Any, out_dir: Path) -> Path:
+def create_revolve_boss_part(sw: Any, out_dir: Path) -> tuple[Path, dict[str, Any]]:
     model = new_part(sw)
-    revolve_boss(model, "Revolve_Boss_Profile")
+    operations = {"Revolve_Boss_Profile": revolve_boss(model, "Revolve_Boss_Profile")}
     model.ForceRebuild3(False)
     path = out_dir / "revolve_boss_part.SLDPRT"
     save_as(model, path)
+    context = finalized_part_context(model, path, operations)
     close_doc(sw, model)
-    return path
+    return path, context
 
 
-def create_revolve_cut_part(sw: Any, out_dir: Path) -> Path:
+def create_revolve_cut_part(sw: Any, out_dir: Path) -> tuple[Path, dict[str, Any]]:
     model = new_part(sw)
-    revolve_boss(model, "Revolve_Boss_Profile")
-    revolve_cut(model, "Revolve_Cut_Bore")
+    operations = {
+        "Revolve_Boss_Profile": revolve_boss(model, "Revolve_Boss_Profile"),
+        "Revolve_Cut_Bore": revolve_cut(model, "Revolve_Cut_Bore"),
+    }
     model.ForceRebuild3(False)
     path = out_dir / "revolve_cut_part.SLDPRT"
     save_as(model, path)
+    context = finalized_part_context(model, path, operations)
     close_doc(sw, model)
-    return path
+    return path, context
 
 
-def create_editable_dimension_plate(sw: Any, out_dir: Path) -> tuple[Path, dict[str, Any]]:
+def create_editable_dimension_plate(sw: Any, out_dir: Path) -> tuple[Path, dict[str, Any], dict[str, Any]]:
     model = new_part(sw)
-    extrude_boss_box(model, 0.080, 0.050, 0.010, "Body_Editable_Plate")
+    operations = {"Body_Editable_Plate": extrude_boss_box(model, 0.080, 0.050, 0.010, "Body_Editable_Plate")}
     before = feature_names(model)
     select_first_ref_plane(model)
     model.SketchManager.InsertSketch(True)
@@ -480,11 +594,12 @@ def create_editable_dimension_plate(sw: Any, out_dir: Path) -> tuple[Path, dict[
     if circle is None:
         raise RuntimeError("CreateCircleByRadius returned None for editable dimension")
     model.SketchManager.InsertSketch(True)
-    select_new_sketch(model, before)
+    sketch_name = select_new_sketch(model, before)
     feat = model.FeatureManager.FeatureCut3(True, False, True, 0, 0, 0.020, 0.020, False, False, False, False, 0, 0, False, False, False, False, False, True, True, True, True, False, 0, 0, False)
     if feat is None:
         raise RuntimeError("FeatureCut3 returned None for editable dimension plate")
     feat.Name = "Edited_Sketch_Dimension"
+    operations["Edited_Sketch_Dimension"] = operation_report(model, "Edited_Sketch_Dimension", sketch_name, "circle", "FeatureCut3", {"lines": 0, "circles": 1, "centerlines": 0}, "D1@Edited_Sketch_Dimension")
     model.ForceRebuild3(False)
     dim = model.Parameter("D1@Edited_Sketch_Dimension")
     before_m = None
@@ -496,10 +611,62 @@ def create_editable_dimension_plate(sw: Any, out_dir: Path) -> tuple[Path, dict[
     model.ForceRebuild3(False)
     path = out_dir / "editable_dimension_plate.SLDPRT"
     save_as(model, path)
+    context = finalized_part_context(model, path, operations)
     close_doc(sw, model)
-    return path, {"dimension": "D1@Edited_Sketch_Dimension", "before_m": before_m, "after_m": after_m}
+    return path, {"dimension": "D1@Edited_Sketch_Dimension", "before_m": before_m, "after_m": after_m}, context
 
 
+
+
+def sketch_geometry_from_segments(segments: Any) -> dict[str, int]:
+    geometry = {"lines": 0, "circles": 0, "centerlines": 0}
+    for segment in segments or []:
+        seg_type = read_member(segment, "GetType")
+        is_construction = bool(read_member(segment, "ConstructionGeometry"))
+        if is_construction:
+            geometry["centerlines"] += 1
+        elif int(seg_type) == 1:
+            geometry["circles"] += 1
+        elif int(seg_type) == 0:
+            geometry["lines"] += 1
+    return geometry
+
+
+def sketch_readback_from_feature(feature: Any) -> dict[str, Any]:
+    sub = read_member(feature, "GetFirstSubFeature") if feature is not None else None
+    hops = 0
+    while sub is not None and hops < 64:
+        hops += 1
+        if read_member(sub, "GetTypeName2") in {"ProfileFeature", "3DProfileFeature"}:
+            sketch = read_member(sub, "GetSpecificFeature2")
+            segments = read_member(sketch, "GetSketchSegments") if sketch is not None else None
+            return {
+                "source": "reopened_feature_tree",
+                "sketch": read_member(sub, "Name"),
+                "geometry": sketch_geometry_from_segments(segments),
+            }
+        sub = read_member(sub, "GetNextSubFeature")
+    return {"source": "reopened_feature_tree", "sketch": None, "geometry": {"lines": 0, "circles": 0, "centerlines": 0}}
+
+
+def sketch_geometry_from_feature(feature: Any) -> dict[str, int]:
+    return sketch_readback_from_feature(feature)["geometry"]
+
+
+def readback_operation_context(sw: Any, part_paths: dict[str, Path], operation_context: dict[str, Any]) -> None:
+    for part_key, part_context in operation_context.items():
+        path = part_paths.get(part_key)
+        if path is None:
+            continue
+        model = open_for_component(sw, path)
+        try:
+            for op_name, op_context in part_context.get("operations", {}).items():
+                feat = read_member(model, "FeatureByName", op_name)
+                readback = sketch_readback_from_feature(feat)
+                readback["feature_type"] = read_member(feat, "GetTypeName2") if feat is not None else None
+                op_context["readback"] = readback
+        finally:
+            close_doc(sw, model)
 
 def save_model(model: Any) -> dict[str, Any]:
     pythoncom, win32_client = require_pywin32()
@@ -821,11 +988,13 @@ def run_live(out_dir: Path, reports_dir: Path, export_dir: Path, force: bool, st
     reports_dir.mkdir(parents=True, exist_ok=True)
     export_dir.mkdir(parents=True, exist_ok=True)
     part_paths: dict[str, Path] = {}
-    part_paths["extrude"] = create_extrude_cut_plate(sw, out_dir)
-    part_paths["revolve"] = create_revolve_boss_part(sw, out_dir)
-    part_paths["revolve_cut"] = create_revolve_cut_part(sw, out_dir)
-    editable_path, dimension_result = create_editable_dimension_plate(sw, out_dir)
+    operation_context: dict[str, Any] = {}
+    part_paths["extrude"], operation_context["extrude"] = create_extrude_cut_plate(sw, out_dir)
+    part_paths["revolve"], operation_context["revolve"] = create_revolve_boss_part(sw, out_dir)
+    part_paths["revolve_cut"], operation_context["revolve_cut"] = create_revolve_cut_part(sw, out_dir)
+    editable_path, dimension_result, operation_context["editable"] = create_editable_dimension_plate(sw, out_dir)
     part_paths["editable"] = editable_path
+    readback_operation_context(sw, part_paths, operation_context)
     reopen_modify_result = reopen_modify_dimension(sw, editable_path)
     asm_path, asm_result = create_assembly(sw, out_dir, part_paths)
     feature_reports = {
@@ -855,6 +1024,7 @@ def run_live(out_dir: Path, reports_dir: Path, export_dir: Path, force: bool, st
         "post_cleanup": post_cleanup,
         "parts": {k: str(v.resolve()) for k, v in part_paths.items()},
         "features": feature_reports,
+        "operation_context": operation_context,
         "assembly_features": assembly_features,
         "native_artifacts": native_artifacts,
         "dimension_edit": dimension_result,

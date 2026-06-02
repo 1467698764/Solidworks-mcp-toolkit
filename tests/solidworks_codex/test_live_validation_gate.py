@@ -19,6 +19,18 @@ def load_module():
     return module
 
 
+def with_readbacks(context):
+    for part in context.values():
+        for op in part["operations"].values():
+            op["readback"] = {
+                "source": "reopened_feature_tree",
+                "sketch": op["sketch"],
+                "feature_type": op["feature_type"],
+                "geometry": dict(op["geometry"]),
+            }
+    return context
+
+
 class LiveValidationGateSpecTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -80,6 +92,7 @@ class LiveValidationGateSpecTests(unittest.TestCase):
         self.assertIn("strict:live_capability_suite:interference_callback", result["failed"])
         self.assertIn("strict:live_capability_suite:assembly_mates_persisted", result["failed"])
         self.assertIn("strict:live_capability_suite:open_existing_modify_reopen", result["failed"])
+        self.assertIn("strict:live_capability_suite:operation_context_guards", result["failed"])
 
 
     def test_default_report_expectations_use_strict_live_checks(self):
@@ -88,6 +101,7 @@ class LiveValidationGateSpecTests(unittest.TestCase):
         self.assertIn("native_solidworks_artifacts", expectations["live_capability_suite"].strict_checks)
         self.assertIn("assembly_mates_persisted", expectations["live_capability_suite"].strict_checks)
         self.assertIn("open_existing_modify_reopen", expectations["live_capability_suite"].strict_checks)
+        self.assertIn("operation_context_guards", expectations["live_capability_suite"].strict_checks)
         self.assertIn("part_count", expectations["complete_shaper_v5"].strict_checks)
         self.assertIn("component_count", expectations["complete_shaper_v5"].strict_checks)
         self.assertIn("mate_semantics", expectations["complete_shaper_v5"].strict_checks)
@@ -107,6 +121,24 @@ class LiveValidationGateSpecTests(unittest.TestCase):
                     "persisted": True,
                     "save": {"ok": True, "errors": 0, "warnings": 0},
                 },
+                "operation_context": with_readbacks({
+                    "extrude": {"document": "extrude_cut_plate.SLDPRT", "active_title": "零件1", "saved_path": "C:/generated/extrude_cut_plate.SLDPRT", "operations": {
+                        "Body_Plate": {"sketch": "Sketch1", "profile": "rectangle", "geometry": {"lines": 4, "circles": 0, "centerlines": 0}, "feature_type": "Extrusion", "api": "FeatureExtrusion2"},
+                        "Round_Through_Hole": {"sketch": "Sketch2", "profile": "circle", "geometry": {"lines": 0, "circles": 1, "centerlines": 0}, "feature_type": "ICE", "api": "FeatureCut3"},
+                        "Rectangular_Window_Cut": {"sketch": "Sketch3", "profile": "rectangle", "geometry": {"lines": 4, "circles": 0, "centerlines": 0}, "feature_type": "ICE", "api": "FeatureCut3"},
+                    }},
+                    "revolve": {"document": "revolve_boss_part.SLDPRT", "active_title": "零件2", "saved_path": "C:/generated/revolve_boss_part.SLDPRT", "operations": {
+                        "Revolve_Boss_Profile": {"sketch": "Sketch1", "profile": "closed_revolve_profile_with_centerline", "geometry": {"lines": 5, "circles": 0, "centerlines": 1}, "feature_type": "Revolution", "api": "FeatureRevolve2"},
+                    }},
+                    "revolve_cut": {"document": "revolve_cut_part.SLDPRT", "active_title": "零件3", "saved_path": "C:/generated/revolve_cut_part.SLDPRT", "operations": {
+                        "Revolve_Boss_Profile": {"sketch": "Sketch1", "profile": "closed_revolve_profile_with_centerline", "geometry": {"lines": 5, "circles": 0, "centerlines": 1}, "feature_type": "Revolution", "api": "FeatureRevolve2"},
+                        "Revolve_Cut_Bore": {"sketch": "Sketch2", "profile": "closed_cut_profile_with_centerline", "geometry": {"lines": 4, "circles": 0, "centerlines": 1}, "feature_type": "RevCut", "api": "FeatureRevolveCut2"},
+                    }},
+                    "editable": {"document": "editable_dimension_plate.SLDPRT", "active_title": "零件4", "saved_path": "C:/generated/editable_dimension_plate.SLDPRT", "operations": {
+                        "Body_Editable_Plate": {"sketch": "Sketch1", "profile": "rectangle", "geometry": {"lines": 4, "circles": 0, "centerlines": 0}, "feature_type": "Extrusion", "api": "FeatureExtrusion2"},
+                        "Edited_Sketch_Dimension": {"sketch": "Sketch2", "profile": "circle", "geometry": {"lines": 0, "circles": 1, "centerlines": 0}, "feature_type": "ICE", "api": "FeatureCut3", "dimension": "D1@Edited_Sketch_Dimension"},
+                    }},
+                }),
                 "callbacks": {"interference": {"available": True, "count": 0}, "mass": {"available": True, "mass_kg": 0.2}},
                 "post_cleanup": {"locked_files": []},
                 "validation": {"ok": True, "failed_capabilities": []},
