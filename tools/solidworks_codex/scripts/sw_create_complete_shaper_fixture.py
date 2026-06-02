@@ -342,6 +342,23 @@ def preflight_solidworks_runtime(
             return {"ok": False, "failed": failed, "processes": snapshots, "lock_files": lock_files, "com_error": f"{type(exc).__name__}: {exc}"}
     return {"ok": not failed, "failed": failed, "processes": snapshots, "lock_files": lock_files, "out_dir": str(out_dir) if out_dir is not None else None, "max_private_memory_bytes": max_private_memory_bytes}
 
+
+def assert_solidworks_runtime_healthy(
+    stage: str,
+    process_snapshots: list[dict[str, Any]] | None = None,
+    max_private_memory_bytes: int = 1_900_000_000,
+) -> None:
+    snapshots = process_snapshots if process_snapshots is not None else solidworks_process_memory_snapshot()
+    high = [p for p in snapshots if int(p.get("private_memory_bytes", 0) or 0) > max_private_memory_bytes]
+    hung = [p for p in snapshots if p.get("responding") is False]
+    if high or hung:
+        raise RuntimeError(
+            f"SolidWorks unhealthy before {stage}: "
+            f"high_memory_pids={[p.get('id') for p in high]} "
+            f"not_responding_pids={[p.get('id') for p in hung]}"
+        )
+
+
 def require_pywin32() -> tuple[Any, Any]:
     try:
         import pythoncom  # type: ignore[import-not-found]
@@ -1294,6 +1311,7 @@ def construct_live_fixture(spec: CompleteShaperSpec, out_dir: Path, reports_dir:
         part_paths: dict[str, Path] = {}
         for part in spec.parts:
             stage = f"create_part:{part.name}"
+            assert_solidworks_runtime_healthy(stage)
             print(f"[complete-shaper] creating {part.name}", flush=True)
             part_paths[part.name] = create_part(sw, out_dir, part)
         stage = "new_assembly"
@@ -1305,6 +1323,7 @@ def construct_live_fixture(spec: CompleteShaperSpec, out_dir: Path, reports_dir:
         try:
             for part in spec.parts:
                 stage = f"insert_component:{part.name}"
+                assert_solidworks_runtime_healthy(stage)
                 print(f"[complete-shaper] inserting {part.name}", flush=True)
                 comp = add_component(sw, asm, part_paths[part.name], placements.get(part.name, (0, 0, 0)))
                 components.append(comp.Name2)
@@ -1315,10 +1334,13 @@ def construct_live_fixture(spec: CompleteShaperSpec, out_dir: Path, reports_dir:
                     component_objs.append(comp)
             asm_path = out_dir / "bullhead_shaper_complete.SLDASM"
             stage = "add_shaper_mate_network"
+            assert_solidworks_runtime_healthy(stage)
             mates = add_shaper_mate_network(asm, component_objs)
             stage = "assembly_rebuild"
+            assert_solidworks_runtime_healthy(stage)
             asm.ForceRebuild3(False)
             stage = "assembly_callbacks"
+            assert_solidworks_runtime_healthy(stage)
             callbacks = run_assembly_callbacks(asm, reports_dir)
             stage = "save_assembly"
             save_as(asm, asm_path)

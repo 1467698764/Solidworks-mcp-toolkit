@@ -406,7 +406,73 @@ def report_expectations(contract: GateContract, executions: Iterable[dict[str, A
     )
 
 
-def run_check(check: LiveCheck, timeout_seconds: int = 900) -> dict[str, Any]:
+def solidworks_process_snapshots() -> list[dict[str, Any]]:
+    script = (
+        "Get-Process SLDWORKS -ErrorAction SilentlyContinue | "
+        "Select-Object Id,Responding,PrivateMemorySize64 | ConvertTo-Json -Compress"
+    )
+    try:
+        proc = subprocess.run(
+            ["powershell", "-NoProfile", "-Command", script],
+            cwd=ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+            timeout=10,
+        )
+    except subprocess.TimeoutExpired:
+        return []
+    if not proc.stdout.strip():
+        return []
+    data = json.loads(proc.stdout)
+    if isinstance(data, dict):
+        data = [data]
+    return [
+        {
+            "id": int(item.get("Id", 0) or 0),
+            "responding": bool(item.get("Responding")),
+            "private_memory_bytes": int(item.get("PrivateMemorySize64", 0) or 0),
+        }
+        for item in data
+        if isinstance(item, dict)
+    ]
+
+
+def terminate_process(pid: int) -> None:
+    subprocess.run(
+        ["powershell", "-NoProfile", "-Command", f"Stop-Process -Id {int(pid)} -Force -ErrorAction SilentlyContinue"],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+        timeout=10,
+    )
+
+
+def cleanup_solidworks_after_timeout(
+    check: LiveCheck | None = None,
+    process_snapshots: list[dict[str, Any]] | None = None,
+    terminator: Any = terminate_process,
+    max_private_memory_bytes: int = 1_900_000_000,
+) -> dict[str, Any]:
+    snapshots = process_snapshots if process_snapshots is not None else solidworks_process_snapshots()
+    terminated: list[int] = []
+    for item in snapshots:
+        pid = int(item.get("id", 0) or 0)
+        unhealthy = item.get("responding") is False or int(item.get("private_memory_bytes", 0) or 0) > max_private_memory_bytes
+        if pid and unhealthy:
+            terminator(pid)
+            terminated.append(pid)
+    return {
+        "check": check.name if check else None,
+        "processes": snapshots,
+        "terminated_pids": terminated,
+    }
+
+
+def run_check(check: LiveCheck, timeout_seconds: int = 900, timeout_cleanup: Any = cleanup_solidworks_after_timeout) -> dict[str, Any]:
     try:
         proc = subprocess.run(
             check.command,
@@ -418,6 +484,10 @@ def run_check(check: LiveCheck, timeout_seconds: int = 900) -> dict[str, Any]:
             timeout=timeout_seconds,
         )
     except subprocess.TimeoutExpired as exc:
+        cleanup_requested = False
+        if timeout_cleanup is not None:
+            timeout_cleanup(check)
+            cleanup_requested = True
         return {
             "name": check.name,
             "returncode": 124,
@@ -425,6 +495,7 @@ def run_check(check: LiveCheck, timeout_seconds: int = 900) -> dict[str, Any]:
             "stderr_tail": f"timeout_after_{timeout_seconds}s",
             "command": list(check.command),
             "timeout_seconds": timeout_seconds,
+            "timeout_cleanup_requested": cleanup_requested,
         }
     return {
         "name": check.name,

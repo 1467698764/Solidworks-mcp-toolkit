@@ -343,6 +343,15 @@ class CompleteShaperSpecTests(unittest.TestCase):
         self.assertFalse(result["ok"])
         self.assertEqual(Path("tools/solidworks_codex/live_fixture/custom_shaper"), calls[0]["out_dir"])
 
+    def test_runtime_health_guard_raises_before_next_heavy_step_when_solidworks_is_unhealthy(self):
+        high = [{"name": "SLDWORKS", "id": 77, "private_memory_bytes": 2_600_000_000, "responding": False}]
+        with self.assertRaisesRegex(RuntimeError, "SolidWorks unhealthy before insert_component"):
+            self.module.assert_solidworks_runtime_healthy(
+                "insert_component",
+                process_snapshots=high,
+                max_private_memory_bytes=1_900_000_000,
+            )
+
 
     def test_live_builder_records_attach_failure_report_and_cleanup_state(self):
         spec = self.module.build_complete_shaper_spec()

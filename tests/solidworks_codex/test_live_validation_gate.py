@@ -307,6 +307,39 @@ class LiveValidationGateSpecTests(unittest.TestCase):
         self.assertEqual(124, result["returncode"])
         self.assertIn("timeout_after_3s", result["stderr_tail"])
 
+    def test_run_check_timeout_invokes_cleanup_hook_for_stuck_solidworks(self):
+        calls = []
+
+        def fake_run(*args, **kwargs):
+            raise self.module.subprocess.TimeoutExpired(cmd=args[0], timeout=kwargs.get("timeout"))
+
+        original_run = self.module.subprocess.run
+        try:
+            self.module.subprocess.run = fake_run
+            result = self.module.run_check(
+                self.module.LiveCheck("complete_shaper_v5", ("python", "heavy.py"), "heavy.json", "slow"),
+                timeout_seconds=3,
+                timeout_cleanup=lambda check: calls.append(check.name),
+            )
+        finally:
+            self.module.subprocess.run = original_run
+        self.assertEqual(["complete_shaper_v5"], calls)
+        self.assertTrue(result["timeout_cleanup_requested"])
+
+    def test_timeout_cleanup_only_terminates_unhealthy_solidworks_processes(self):
+        killed = []
+        result = self.module.cleanup_solidworks_after_timeout(
+            process_snapshots=[
+                {"id": 11, "responding": True, "private_memory_bytes": 500_000_000},
+                {"id": 12, "responding": False, "private_memory_bytes": 500_000_000},
+                {"id": 13, "responding": True, "private_memory_bytes": 2_500_000_000},
+            ],
+            terminator=lambda pid: killed.append(pid),
+            max_private_memory_bytes=1_900_000_000,
+        )
+        self.assertEqual([12, 13], killed)
+        self.assertEqual([12, 13], result["terminated_pids"])
+
 
     def test_gate_preflight_blocks_any_generated_lock_files_before_running_checks(self):
         with TemporaryDirectory() as tmp:
