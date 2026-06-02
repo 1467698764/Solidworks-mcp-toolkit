@@ -8,6 +8,7 @@ SolidWorks automation capabilities with inspectable artifacts and callback repor
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import math
 import shutil
@@ -221,6 +222,42 @@ def mate_selection_evidence_ok(mate: dict[str, Any]) -> bool:
     )
 
 
+def component_pair_matches(component_names: Any, expected_pair: list[str]) -> bool:
+    if not isinstance(component_names, list):
+        return False
+    text = " ".join(str(item) for item in component_names)
+    return all(part_name in text for part_name in expected_pair)
+
+
+def validate_assembly_inspect_mates(result: dict[str, Any]) -> dict[str, Any]:
+    failed: list[str] = []
+    details: dict[str, Any] = {}
+    inspect = result.get("assembly_inspect", {})
+    doc = inspect.get("active_document", {}) if isinstance(inspect, dict) else {}
+    if doc.get("type") != "assembly":
+        return {"ok": False, "failed": ["assembly_inspect:type"], "details": {"assembly_inspect": inspect}}
+    mate_features = {str(item.get("name", "")): item for item in doc.get("mate_like_features", []) if isinstance(item, dict)}
+    expected_types = {"Concentric_Mate": "MateConcentric", "Distance_Mate": "MateDistanceDim"}
+    mates = {str(item.get("name", "")): item for item in result.get("assembly_result", {}).get("mates", []) if isinstance(item, dict)}
+    for name, expected_type in expected_types.items():
+        mate_feature = mate_features.get(name)
+        mate_result = mates.get(name, {})
+        if not mate_feature:
+            failed.append(f"{name}:missing")
+            continue
+        if mate_feature.get("type") != expected_type:
+            failed.append(f"{name}:type")
+            details[name] = mate_feature
+        if mate_feature.get("suppressed") is True:
+            failed.append(f"{name}:suppressed")
+            details[name] = mate_feature
+        components = mate_result.get("components", [])
+        if not component_pair_matches(mate_feature.get("components"), [str(item).split("-")[0] for item in components]):
+            failed.append(f"{name}:components")
+            details[name] = {"inspect": mate_feature, "mate_result": mate_result}
+    return {"ok": not failed, "failed": failed, "details": details}
+
+
 def _feature_name_set(result: dict[str, Any], key: str) -> set[str]:
     return {str(item.get("name", "")) for item in result.get("features", {}).get(key, []) if isinstance(item, dict)}
 
@@ -279,6 +316,10 @@ def validate_live_result(result: dict[str, Any]) -> dict[str, Any]:
     if missing_mate_features:
         failed.append("assembly_mates_persisted")
         details["assembly_mates_persisted"] = {"missing": missing_mate_features, "present": sorted(assembly_feature_names)}
+    assembly_inspect_validation = validate_assembly_inspect_mates(result)
+    if not assembly_inspect_validation["ok"]:
+        failed.append("assembly_inspect_mates")
+        details["assembly_inspect_mates"] = assembly_inspect_validation
 
     callbacks = result.get("callbacks", {})
     mass = callbacks.get("mass", {})
@@ -810,14 +851,36 @@ def reopen_modify_dimension(sw: Any, path: Path, dimension: str = "D1@Edited_Ske
         "save": save_result,
     }
 
-def open_for_component(sw: Any, path: Path) -> Any:
+def open_doc(sw: Any, path: Path, doc_type: int) -> Any:
     pythoncom, win32_client = require_pywin32()
     errors = win32_client.VARIANT(pythoncom.VT_BYREF | pythoncom.VT_I4, 0)
     warnings = win32_client.VARIANT(pythoncom.VT_BYREF | pythoncom.VT_I4, 0)
-    model = sw.OpenDoc6(str(path.resolve()), 1, 1, "", errors, warnings)
+    model = sw.OpenDoc6(str(path.resolve()), doc_type, 1, "", errors, warnings)
     if model is None:
         raise RuntimeError(f"OpenDoc6 failed for {path}; errors={getattr(errors, 'value', errors)} warnings={getattr(warnings, 'value', warnings)}")
     return model
+
+
+def open_for_component(sw: Any, path: Path) -> Any:
+    return open_doc(sw, path, 1)
+
+
+def inspect_model_object_loader() -> Any:
+    script = Path(__file__).resolve().with_name("sw_assembly_inspect.py")
+    spec = importlib.util.spec_from_file_location("sw_assembly_inspect_for_live_capability_suite", script)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"could not load {script}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.inspect_model_object
+
+
+def inspect_assembly_report(sw: Any, path: Path) -> dict[str, Any]:
+    model = open_doc(sw, path, 2)
+    try:
+        return inspect_model_object_loader()(model)
+    finally:
+        close_doc(sw, model)
 
 
 def add_component(sw: Any, asm: Any, path: Path, xyz: tuple[float, float, float]) -> Any:
@@ -1108,6 +1171,7 @@ def run_live(out_dir: Path, reports_dir: Path, export_dir: Path, force: bool, st
         for key, path in part_paths.items()
     }
     assembly_features = inspect_features(sw, asm_path, 2)
+    assembly_inspect = inspect_assembly_report(sw, asm_path)
     callbacks = run_callbacks(sw, asm_path, reports_dir, export_dir)
     native_artifacts = native_artifact_report(asm_path, part_paths)
     closed_after = close_suite_documents(sw, spec)
@@ -1132,6 +1196,7 @@ def run_live(out_dir: Path, reports_dir: Path, export_dir: Path, force: bool, st
         "features": feature_reports,
         "operation_context": operation_context,
         "assembly_features": assembly_features,
+        "assembly_inspect": assembly_inspect,
         "native_artifacts": native_artifacts,
         "dimension_edit": dimension_result,
         "reopen_modify": reopen_modify_result,

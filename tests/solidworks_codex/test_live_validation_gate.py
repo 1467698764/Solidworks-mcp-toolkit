@@ -64,6 +64,19 @@ def capability_mates():
     ]
 
 
+def capability_assembly_inspect():
+    return {
+        "active_document": {
+            "type": "assembly",
+            "component_count_sampled": 4,
+            "mate_like_features": [
+                {"name": "Concentric_Mate", "type": "MateConcentric", "components": ["revolve_boss_part-1", "revolve_cut_part-1"], "suppressed": False},
+                {"name": "Distance_Mate", "type": "MateDistanceDim", "components": ["extrude_cut_plate-1", "editable_dimension_plate-1"], "suppressed": False},
+            ],
+        }
+    }
+
+
 def shaper_mates():
     return [
         {
@@ -237,6 +250,7 @@ class LiveValidationGateSpecTests(unittest.TestCase):
                 "native_artifacts": {"assembly_exists": True, "part_count": 4, "primary": True},
                 "assembly_features": [{"name": "Concentric_Mate"}, {"name": "Distance_Mate"}],
                 "assembly_result": {"component_count": 4, "mates": capability_mates()},
+                "assembly_inspect": capability_assembly_inspect(),
                 "reopen_modify": {
                     "dimension": "D1@Edited_Sketch_Dimension",
                     "after_reopen_m": 0.028,
@@ -304,6 +318,7 @@ class LiveValidationGateSpecTests(unittest.TestCase):
         report = {
             "assembly_features": [{"name": "Concentric_Mate"}, {"name": "Distance_Mate"}],
             "assembly_result": {"component_count": 4, "mates": capability_mates()},
+            "assembly_inspect": capability_assembly_inspect(),
         }
         self.assertFalse(self.module._strict_check_failed(report, "assembly_mates_persisted"))
 
@@ -312,6 +327,10 @@ class LiveValidationGateSpecTests(unittest.TestCase):
 
         report["assembly_result"]["mates"] = capability_mates()
         report["assembly_result"]["mates"][1]["selection_guard"]["component_pair"] = ["wrong-1", "editable_dimension_plate-1"]
+        self.assertTrue(self.module._strict_check_failed(report, "assembly_mates_persisted"))
+
+        report["assembly_result"]["mates"] = capability_mates()
+        report["assembly_inspect"]["active_document"]["mate_like_features"][0]["components"] = ["wrong-1", "revolve_cut_part-1"]
         self.assertTrue(self.module._strict_check_failed(report, "assembly_mates_persisted"))
 
     def test_shaper_strict_inspect_rejects_same_named_mates_without_details(self):

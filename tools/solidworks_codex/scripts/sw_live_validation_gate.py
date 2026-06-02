@@ -187,6 +187,24 @@ def _strict_check_failed(data: dict[str, Any], check: str) -> bool:
             return False
         return [str(item) for item in pair] == [str(item) for item in components]
 
+    def capability_inspect_mates_ok(data: dict[str, Any], mates: dict[str, dict[str, Any]]) -> bool:
+        inspect = data.get("assembly_inspect", {})
+        doc = inspect.get("active_document", {}) if isinstance(inspect, dict) else {}
+        if doc.get("type") != "assembly":
+            return False
+        mate_features = {str(item.get("name", "")): item for item in doc.get("mate_like_features", []) if isinstance(item, dict)}
+        expected_types = {"Concentric_Mate": "MateConcentric", "Distance_Mate": "MateDistanceDim"}
+        for name, expected_type in expected_types.items():
+            feature = mate_features.get(name)
+            mate = mates.get(name, {})
+            if not feature or feature.get("type") != expected_type or feature.get("suppressed") is True:
+                return False
+            components = mate.get("components", [])
+            semantic = [str(item).split("-")[0] for item in components]
+            if not _component_pair_matches(feature.get("components"), semantic):
+                return False
+        return True
+
     if check == "single_session_smoke":
         part_doc = (data.get("part_inspect") or data.get("inspect") or {}).get("active_document", {}) if isinstance(data.get("part_inspect") or data.get("inspect"), dict) else {}
         asm_doc = (data.get("assembly_inspect") or {}).get("active_document", {}) if isinstance(data.get("assembly_inspect"), dict) else {}
@@ -224,7 +242,7 @@ def _strict_check_failed(data: dict[str, Any], check: str) -> bool:
             mate = mates.get(name)
             if not mate or mate.get("ok") is not True or not mate_selection_ok(mate) or not mate_components_ok(mate):
                 return True
-        return False
+        return not capability_inspect_mates_ok(data, mates)
     if check == "open_existing_modify_reopen":
         reopen = data.get("reopen_modify", {})
         save = reopen.get("save", {}) if isinstance(reopen, dict) else {}
