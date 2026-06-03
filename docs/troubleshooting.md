@@ -155,11 +155,13 @@ Then run live checks serially:
 .\tools\solidworks_codex\swctl.ps1 live-gate -CleanupStale -Out tools\solidworks_codex\reports\live_validation_gate.json
 ```
 
-`CleanupStale` only removes known generated stale shaper directories. It should not touch `shaper_machine_v5`, `live_capability_suite`, user models, or unrelated workspace files. If SolidWorks repeatedly crashes, run the smaller checks first through the gate report rather than immediately rerunning the full shaper fixture.
+`CleanupStale` only removes known generated stale fixture directories. It should not touch `shaper_machine_v5`, `live_capability_suite`, user models, or unrelated workspace files. If SolidWorks repeatedly crashes, run the smaller checks first through the gate report rather than immediately rerunning a full fixture.
 
-## Live shaper status looks stale
+## Live fixture status looks stale
 
-The current stress fixture is `shaper_machine_v5`. Expected evidence in `tools/solidworks_codex/reports/shaper_machine_v5/complete_shaper_build.json` includes `24 parts`, `58 components`, `19 MateLock layout stabilizers`, structural-reference fixed evidence only, attached detail-instance layout, `Transform2.ArrayData` placement readback, and `0 interference` when healthy. Treat MateLock as fixture-layout stabilization evidence, not as proof of complete mechanism DOF or motion sweep. If the report shows functional components fixed, stale display-strip detail instances, mate errors, placement drift, or interference, treat the fixture as a failing test rather than a cosmetic display issue.
+The retained simple-mechanism fixture is `shaper_machine_v5`. Treat its report as current evidence only for the validator version that produced it. A healthy static fixture report should include native file readback, part feature evidence, component placement/readback, semantic mate participation, fixed/floating policy, model-understanding evidence, available interference callback with `0 interference`, and post-cleanup with no generated `~$` locks.
+
+If the report shows functional components fixed as a substitute for mates, hostless standard/detail components, mate errors, placement drift, nonzero interference, or a screenshot that looks scattered, treat the fixture as a failing regression. Do not explain it away as a display issue.
 
 ## Public copy guard or repo-health fails
 

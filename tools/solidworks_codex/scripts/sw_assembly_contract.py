@@ -3,8 +3,8 @@
 This is offline/read-only: it consumes JSON produced by sw_assembly_inspect.py and
 checks generic mechanical evidence such as required components, component
 Transform2 origins, and semantic mate references. It is intentionally not tied to
-one fixture; complex fixtures such as the bullhead shaper can use the same style
-of contract as a stress test.
+one fixture; named fixtures are only regression cases for the same evidence
+model.
 """
 from __future__ import annotations
 

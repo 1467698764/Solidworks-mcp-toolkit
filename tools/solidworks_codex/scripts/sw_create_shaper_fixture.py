@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create a high-fidelity SolidWorks bullhead shaper validation fixture.
+"""Create a legacy SolidWorks simple-mechanism validation fixture.
 
 The module intentionally exposes a pure, import-safe mechanism specification so
 unit tests and release gates can validate the fixture intent without requiring
@@ -108,7 +108,7 @@ def build_shaper_spec() -> ShaperSpec:
     )
     return ShaperSpec(
         name="shaper_quick_return_validation",
-        mechanism="bullhead shaper quick-return linkage",
+        mechanism="legacy quick-return mechanism fixture",
         parts=parts,
         joints=joints,
         adjustable_dimensions=dims,

@@ -5,7 +5,7 @@ This directory contains the local control layer used by the MCP server and by di
 ## Responsibilities
 
 - `swctl.ps1` is the stable command router for humans, tests, CI, and MCP.
-- `mcp/server.cjs` exposes the 35 MCP tools and delegates to `swctl.ps1`, including MCP entries such as `solidworks_tool_catalog`, `solidworks_handoff_bundle`, and `solidworks_worklog`.
+- `mcp/server.cjs` exposes the 36 MCP tools and delegates to `swctl.ps1`, including MCP entries such as `solidworks_tool_catalog`, `solidworks_handoff_bundle`, and `solidworks_worklog`.
 - `scripts/*.py` implement focused operations: inspect, compare, model understanding, validation profiles, guarded edits, worklog, handoff, live gates, and release gates.
 - `sandbox/report_before.json` and `sandbox/report_after.json` are deterministic offline fixtures used by tests and demos.
 
@@ -43,11 +43,11 @@ Offline tests prove syntax and report logic. Real CAD behavior is checked by the
 .\tools\solidworks_codex\swctl.ps1 live-gate -CleanupStale -Out tools\solidworks_codex\reports\live_validation_gate.json
 ```
 
-Live deliverables are native `.SLDASM/.SLDPRT`; STEP optional smoke is not the primary acceptance criterion. The live capability suite now checks `assembly_component_placements` component Transform2/origin placement readback and `part_geometry_readback` bbox/body/volume evidence from reopened native `.SLDPRT` files. SolidWorks AddMate `mate_error: 1` is treated as AddMate no-error, then verified with mate readback, component participation, and placement evidence. `assembly-contract` can also require part feature names and semantic counts so a model is not accepted as a plain block stack. The current bullhead shaper stress fixture is `shaper_machine_v5`; it targets `24 parts`, `58 components`, `19 MateLock layout stabilizers`, required part feature readback, native primary placement readback via `Transform2.ArrayData`, structural-reference fixed evidence only, attached detail instances, and `0 interference` when healthy. The current shaper is a stable fixture-level assembly; those MateLock constraints are not claimed as complete mechanism DOF or motion-sweep validation. Current shaper reports must be regenerated after validator changes; a stale `ok: true` report is not proof.
+Live deliverables are native `.SLDASM/.SLDPRT`; STEP optional smoke is not the primary acceptance criterion. The live capability suite checks `assembly_component_placements` component Transform2/origin placement readback and `part_geometry_readback` bbox/body/volume evidence from reopened native `.SLDPRT` files. SolidWorks AddMate `mate_error: 1` is treated as AddMate no-error, then verified with mate readback, component participation, and placement evidence. `assembly-contract` can also require part feature names and semantic counts so a model is not accepted as a plain block stack. The retained `shaper_machine_v5` fixture is a simple-mechanism regression case for native readback, mate participation, interference, model-understanding, and cleanup; it is not a showcase or proof that general mechanism assembly is solved. Current fixture reports must be regenerated after validator changes; a stale `ok: true` report is not proof.
 
 Required mates between two fixed components fail `assembly-contract` by default unless the manifest explicitly sets `allow_fixed_fixed: true` for a reference/documentation mate.
 
-`CleanupStale` is bounded to old generated shaper fixture directories. The gate runs serially, scans `~$` lock files, and avoids unnecessary SolidWorks windows where possible.
+`CleanupStale` is bounded to old generated fixture directories. The gate runs serially, scans `~$` lock files, and avoids unnecessary SolidWorks windows where possible.
 
 ## MCP entry point
 

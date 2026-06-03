@@ -16,7 +16,7 @@ GROUP_RULES = {
     "read_only": ["probe", "inspect", "summary", "selection", "mass"],
     "write_guarded": ["backup", "set_dimension", "component_state", "rebuild"],
     "export_verify": ["export", "interference", "compare", "preflight", "audit", "finalize"],
-    "analysis": ["issue", "design_review", "change_plan", "report_search", "report_context"],
+    "analysis": ["issue", "design_review", "change_plan", "report_search", "report_context", "model_understand", "diagnose"],
     "handoff": ["worklog", "handoff"],
     "macro_generation": ["template_macro", "mate_macro"],
     "external_reference": ["existing_mcp"],

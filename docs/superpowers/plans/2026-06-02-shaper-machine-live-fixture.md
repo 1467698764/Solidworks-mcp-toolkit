@@ -2,7 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build a high-fidelity functional SolidWorks bullhead shaper / quick-return mechanism fixture and use it to live-validate the SolidWorks Codex toolchain beyond the prior two-plate smoke fixture.
+**Historical note:** This plan is kept as a record of an earlier fixture effort. Its wording is no longer the project stance; the fixture is now treated as a simple mechanism regression case, not as a showcase or proof of general CAD capability.
+
+**Goal:** Build a SolidWorks simple-mechanism regression fixture and use it to live-validate the SolidWorks Codex toolchain beyond the prior two-plate smoke fixture.
 
 **Architecture:** Add a focused fixture generator script that separates deterministic mechanism specification from SolidWorks COM construction. Unit tests cover the pure mechanism spec and expected validation manifest; live SolidWorks runs create ignored fixture artifacts under `tools/solidworks_codex/live_fixture/shaper_machine/` and reports under `tools/solidworks_codex/reports/shaper_machine/`.
 

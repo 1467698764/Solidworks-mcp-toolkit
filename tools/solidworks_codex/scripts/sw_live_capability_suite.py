@@ -2,7 +2,7 @@
 """Live SolidWorks capability suite.
 
 Builds a deliberately small, auditable set of parts/assembly operations that are
-independent from the bullhead shaper model. The suite exists to prove individual
+independent from any retained mechanism fixture. The suite exists to prove individual
 SolidWorks automation capabilities with inspectable artifacts and callback reports.
 """
 from __future__ import annotations

@@ -122,14 +122,14 @@ def shaper_primary_components():
 
 def shaper_inspect_evidence():
     builder = load_shaper_builder()
-    return {"active_document": {"type": "assembly", "component_count_sampled": 58, "components": shaper_primary_components(), "mate_like_features": [
+    return {"active_document": {"type": "assembly", "component_count_sampled": builder.expected_assembly_component_minimum(), "components": shaper_primary_components(), "mate_like_features": [
         {"name": name, "type": builder.expected_inspect_mate_type(expected["type"]), "components": [f"{expected['semantic_pair'][0]}-1", f"{expected['semantic_pair'][1]}-1"], "suppressed": False}
         for name, expected in builder.expected_shaper_mate_contract().items()
     ]}}
 
 
 def shaper_understanding_evidence():
-    return {"baseline": {"inventory": {"component_count": 58}}, "cad_evidence_graph": {"spatial_evidence": {"near_or_overlap_pairs": [
+    return {"baseline": {"inventory": {"component_count": load_shaper_builder().expected_assembly_component_minimum()}}, "cad_evidence_graph": {"spatial_evidence": {"near_or_overlap_pairs": [
         {"a": f"{left}-1", "b": f"{right}-1", "relation": "near", "gap_m": 0.002}
         for left, right in load_shaper_builder().expected_shaper_functional_connection_contract()
     ]}}}
@@ -363,7 +363,7 @@ class LiveValidationGateSpecTests(unittest.TestCase):
             shaper.write_text(json.dumps({
                 "ok": True,
                 "part_count": 24,
-                "component_count": 58,
+                "component_count": load_shaper_builder().expected_assembly_component_minimum(),
                 "mates": shaper_mates(),
                 "callbacks": {"interference": {"available": True, "count": 0}, "mass": {"available": True, "mass_kg": 15.125546510666322}},
                 "part_feature_evidence": shaper_part_feature_evidence(),
@@ -399,9 +399,9 @@ class LiveValidationGateSpecTests(unittest.TestCase):
         report["mates"] = [
             mate for mate in shaper_mates()
             if mate["name"] not in {
-                "LayoutLock_ram_with_dovetail_and_tool_mount_To_column_frame_with_window",
-                "LayoutLock_clapper_tool_head_To_ram_with_dovetail_and_tool_mount",
-                "LayoutLock_work_table_with_t_slots_To_table_cross_slide",
+                "Ram_Left_Way_Parallel",
+                "Tool_Head_Ram_Parallel",
+                "Table_Slide_Parallel",
             }
         ]
         self.assertTrue(self.module._strict_check_failed(report, "mate_semantics"))
@@ -455,7 +455,7 @@ class LiveValidationGateSpecTests(unittest.TestCase):
         report = {
             "ok": True,
             "part_count": 24,
-            "component_count": 58,
+            "component_count": load_shaper_builder().expected_assembly_component_minimum(),
             "mates": [
                 {"name": "Bed_Column_Distance_Mate", "kind": "distance", "semantic_pair": ["cast_bed_with_t_slots", "column_frame_with_window"], "ok": True},
                 {"name": "BullGear_CrankShaft_Concentric_Mate", "kind": "concentric", "semantic_pair": ["bull_gear_crank_disk", "crank_center_shaft"], "ok": True},
@@ -463,7 +463,7 @@ class LiveValidationGateSpecTests(unittest.TestCase):
                 {"name": "Rocker_Pivot_Concentric_Mate", "kind": "concentric", "semantic_pair": ["slotted_rocker_arm", "rocker_pivot_shaft"], "ok": True},
             ],
             "callbacks": {"interference": {"available": True, "count": 0}, "mass": {"available": True, "mass_kg": 15.0}},
-            "inspect": {"active_document": {"type": "assembly", "component_count_sampled": 58, "components": shaper_primary_components(), "mate_like_features": [
+            "inspect": {"active_document": {"type": "assembly", "component_count_sampled": load_shaper_builder().expected_assembly_component_minimum(), "components": shaper_primary_components(), "mate_like_features": [
                 {"name": "Bed_Column_Distance_Mate"},
                 {"name": "BullGear_CrankShaft_Concentric_Mate"},
                 {"name": "Crank_Link_Concentric_Mate"},
@@ -479,7 +479,7 @@ class LiveValidationGateSpecTests(unittest.TestCase):
         report = {
             "ok": True,
             "part_count": 24,
-            "component_count": 58,
+            "component_count": load_shaper_builder().expected_assembly_component_minimum(),
             "mates": shaper_mates(),
             "callbacks": {"interference": {"available": True, "count": 0}, "mass": {"available": True, "mass_kg": 15.0}},
             "inspect": shaper_inspect_evidence(),

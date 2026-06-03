@@ -38,9 +38,10 @@ class ToolCatalogTests(unittest.TestCase):
             self.assertIn("solidworks_worklog", names)
             self.assertIn("solidworks_report_context", names)
             self.assertIn("solidworks_model_understand", names)
+            self.assertIn("solidworks_assembly_diagnose", names)
             self.assertIn("read_only", data["groups"])
             self.assertIn("handoff", data["groups"])
-            self.assertGreaterEqual(data["count"], 28)
+            self.assertGreaterEqual(data["count"], 29)
             self.assertTrue(any("Do not blindly replay templates" in item for item in data["operator_notes"]))
 
 
@@ -80,6 +81,10 @@ class ToolCatalogTests(unittest.TestCase):
             self.assertEqual(by_cli["assembly-contract"]["workflow"], "verify_export")
             self.assertEqual(by_cli["assembly-contract"]["safety"], "verification_or_export")
             self.assertFalse(by_cli["assembly-contract"]["solidworks_required"])
+            self.assertEqual(by_cli["assembly-diagnose"]["workflow"], "analysis")
+            self.assertEqual(by_cli["assembly-diagnose"]["safety"], "read_only")
+            self.assertEqual(by_cli["assembly-diagnose"]["mcp"], "solidworks_assembly_diagnose")
+            self.assertFalse(by_cli["assembly-diagnose"]["solidworks_required"])
             self.assertEqual(by_cli["handoff-bundle"]["workflow"], "handoff")
             self.assertEqual(by_cli["report-context"]["mcp"], "solidworks_report_context")
             self.assertEqual(by_cli["model-understand"]["mcp"], "solidworks_model_understand")

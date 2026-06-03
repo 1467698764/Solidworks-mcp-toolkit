@@ -6,8 +6,8 @@
 
 ## What is considered ready
 
-- 35 MCP tools are documented and routed through the local PowerShell/Python control layer.
-- Offline unit tests cover report parsing, context/search/model-understand flows, guarded change verification, release gates, public-copy guard, live-gate validation logic, validation profiles, and shaper fixture contracts.
+- 36 MCP tools are documented and routed through the local PowerShell/Python control layer.
+- Offline unit tests cover report parsing, context/search/model-understand flows, guarded change verification, release gates, public-copy guard, live-gate validation logic, validation profiles, and fixture-level assembly contracts.
 - Native `.SLDASM/.SLDPRT` artifacts are treated as the deliverable for CAD work; STEP optional smoke is only supplemental.
 - Intent-scoped validation profiles exist: `draft_part`, `single_part`, `assembly`, `mechanism_assembly`, and `engineering_release`.
 - `runtime_budget` and `extra_checks` let the reasoning model scale validation without forcing full engineering release checks on every draft.
@@ -31,25 +31,16 @@ Evidence summary:
 - `mate_error: 1` on AddMate calls, which is SolidWorks AddMate no-error
 - post-cleanup lock files empty
 
-Bullhead shaper stress fixture target:
+Simple mechanism regression fixture:
 
 ```text
 tools/solidworks_codex/live_fixture/shaper_machine_v5/bullhead_shaper_complete.SLDASM
 tools/solidworks_codex/reports/shaper_machine_v5/complete_shaper_build.json
 ```
 
-Target evidence:
+This fixture should be read as a regression target with known limitations, not as a showcase. Current readiness claims should focus on the generic evidence it can exercise: native file creation, part feature readback, component placement/readback, semantic mate participation, fixed/floating policy, interference callback, model-understanding output, and cleanup. A passing JSON report is not enough if the SolidWorks window shows a scattered assembly or the mate graph is only fixture-stabilized.
 
-- `24 parts`
-- `58 components`
-- `19 MateLock layout stabilizers`
-- placement restore API: `Transform2.ArrayData`
-- interference callback available, `0 interference`
-- strict gate must pass current freshness, placement, MateLock readback, geometry, fixed-state, attached-detail, model-understanding, interference, and cleanup checks
-
-This bullhead shaper is a stress test, not the boundary of the project. Its current passed state is a stable fixture-level assembly with MateLock layout stabilizers, not a claim of complete mechanism DOF or motion sweep. Its value is that it exercises real SolidWorks features that previously failed or were untrusted: cuts, sketch selection isolation, revolved features, reopen/modify/rebuild persistence, mate creation/readback, component transforms, interference callbacks, and cleanup behavior.
-
-Old shaper JSON should not be treated as proof after validator changes. The current gate rejects stale reports and re-evaluates strict checks from current source. Recent live shaper runs correctly fail when SolidWorks reports placement drift, mate errors, or interference; the latest accepted v5 run has validation `ok: true`, `0 interference`, 19/19 MateLock mates ok, and zero primary placement drift. Future work remains replacing fixture locks with true DOF-aware mates and motion validation where the design intent requires it.
+Old fixture JSON should not be treated as proof after validator changes. The current direction is to replace fixture-specific placement confidence with general assembly diagnosis, interface indexing, mate-group planning, visual screenshot evidence, and local repair. Until those are implemented and live-verified, the project should not claim general mechanism assembly competence.
 
 ## Recommended real-model workflow
 
@@ -72,7 +63,7 @@ These are intentionally not claimed as solved globally:
 
 - Full general DOF solver and motion sweep validation are profile-scoped targets, not universal default checks.
 - DFM/DFA and strength/stiffness screens are currently lightweight evidence gates unless the task explicitly requests deeper engineering validation.
-- The live capability suite now proves a broad native feature/mate/geometry path. The shaper fixture now proves stable native assembly layout/readback/interference cleanup; the next hard step is DOF-aware mechanism motion, and the goal remains generalized CAD reliability for many model types.
+- The live capability suite proves a useful native feature/mate/geometry path, but broad CAD usefulness still depends on assembly diagnosis, interface indexing, local repair, mate groups, visual validation, and mechanism-lite checks. Named fixtures are regression cases, not the project identity.
 
 ## Key files
 

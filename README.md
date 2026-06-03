@@ -1,4 +1,4 @@
-﻿# SolidWorks Codex MCP
+# SolidWorks Codex MCP
 
 [English](README.en.md)
 
@@ -13,7 +13,7 @@
 
 ## 核心能力
 
-- **35 个保守 MCP 工具**，由本地 CLI 路径和测试覆盖支撑。
+- **36 个保守 MCP 工具**，由本地 CLI 路径和测试覆盖支撑。
 - **模型理解，而不只是自动化建模**：`model-understand` 会生成任务相关的 CAD 证据图，覆盖组件、尺寸、mate 证据、transform、空间关系、孔系/制造证据、决策就绪度和缺失信息；复杂 fixture 还可以用语义配合网络证明功能子装配之间确实被约束。
 - **不束缚强模型推理**：`report-context`、`report-search`、`worklog`、`handoff-bundle`、`tool-catalog` 提供上下文和检索能力，但不强行规定单一输出格式或固定领域流程。
 - **机械通用性**：示例和 fixture 聚焦通用机械结构，例如板件、壳体、定位界面、孔系、紧固件、间隙、坐标变换和可制造性证据，不绑定单一行业案例或个人课题场景。
@@ -86,7 +86,7 @@ cd <repo>
 
 - `solidworks_compare_reports`
 - `solidworks_change_verify`
-- `assembly-contract`（CLI）：离线校验 inspect 报告是否满足装配合约，包括组件前缀、Transform2/origin 位置、语义 mate 类型、mate 参与组件和 suppressed 状态；用于把牛头刨床这类复杂试刀石的验收条件抽成可复用机制。`complete_shaper_v5` 每次 spec/live 运行都会写出 `tools/solidworks_codex/reports/shaper_machine_v5/complete_shaper_assembly_contract.json`，可直接配合对应 inspect 报告做离线复验。
+- `assembly-contract`（CLI）：离线校验 inspect 报告是否满足装配合约，包括组件前缀、Transform2/origin 位置、语义 mate 类型、mate 参与组件和 suppressed 状态；用于把任意机械装配的验收条件抽成可复用机制。现有 fixture 只作为回归样例，不能替代通用装配诊断、接口索引和局部修复能力。
 - `solidworks_interference_check`
 - `solidworks_mass_properties`
 - `solidworks_export`
@@ -176,11 +176,11 @@ node tools\solidworks_codex\mcp\smoke-test.cjs
 .\tools\solidworks_codex\swctl.ps1 live-gate -CleanupStale -Out tools\solidworks_codex\reports\live_validation_gate.json
 ```
 
-该 gate 会隐藏 SolidWorks 窗口并串行执行三个层级的 live 验证，避免多开窗口和并行 COM 会话：
+该 gate 会隐藏 SolidWorks 窗口并串行执行几个层级的 live 验证，避免多开窗口和并行 COM 会话：
 
 - `live_session_smoke`：最小实机链路，生成两个小零件和一个装配，创建距离配合，直接 inspect 当前 ModelDoc2，不启动第二个 SolidWorks 会话；要求 mate 回读到参与组件、干涉为 0、退出后无锁文件。
 - `live_capability_suite`：验证拉伸、拉伸切除、旋转拉伸、旋转切除、草图尺寸读取/修改/rebuild/save、装配插入、同心配合、距离配合、干涉回调、质量回调、关闭文档和文件锁探测。每个会生成特征的操作还会记录选择隔离证据：创建特征前已清空选择、只选中目标草图、当前活动文档标题、重开后特征实际消耗的草图名和几何计数。每个 live mate 还必须记录清空选择后的计数、创建配合前 2 个选中实体、组件对、保存后 mate feature，以及 inspect 回读到的 mate 类型、参与组件和未 suppressed 状态；inspect 回读组件必须匹配声明的语义合约组件对，而不能只匹配创建时碰巧选中的组件。干涉回调必须可用且 count 为 0，非零干涉会让 gate 失败。
-- `complete_shaper_v5`：牛头刨床只是复杂机械试刀石；它生成原生装配体 `tools/solidworks_codex/live_fixture/shaper_machine_v5/bullhead_shaper_complete.SLDASM`，并校验 24 个零件、58 个组件实例、主要功能组件的 Transform2/origin 位置回读、7 个覆盖结构、导轨、刀头、工作台和快回传动的语义配合网络及其参与组件、配合创建时的 2 实体选择证据、质量、干涉为 0、inspect/model-understanding 证据、post-cleanup 无锁文件。
+- `complete_shaper_v5`：保留的简单机构装配回归样例，路径为 `tools/solidworks_codex/live_fixture/shaper_machine_v5/bullhead_shaper_complete.SLDASM`，报告为 `tools/solidworks_codex/reports/shaper_machine_v5/complete_shaper_build.json`。它用于暴露装配诊断、接口选择、mate 网络、干涉和 cleanup 问题；不应被当作项目能力上限、展示性成果或通用装配能力已经成熟的证明。
 
 验收主产物始终是原生 `.SLDASM/.SLDPRT`；STEP 只作为 optional smoke，不作为交付判定。`-CleanupStale` 只会删除已知旧失败生成目录 `shaper_machine`/`shaper_machine_v2`/`shaper_machine_v3`/`shaper_machine_v4`，不会触碰 `shaper_machine_v5`、`live_capability_suite` 或仓库其它目录。gate 运行前和每个 live check 之间都会检查 `tools/solidworks_codex/live_fixture/**/~$*`；如果重型 check 超时，会记录 timeout cleanup 结果并只清理无响应或超过内存阈值的 `SLDWORKS.exe`。
 

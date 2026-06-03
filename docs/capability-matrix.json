@@ -1,6 +1,6 @@
 {
-  "timestamp": "2026-06-03T15:52:20",
-  "count": 49,
+  "timestamp": "2026-06-03T19:15:11",
+  "count": 50,
   "capabilities": [
     {
       "cli": "assembly-contract",
@@ -11,6 +11,24 @@
       "required": [],
       "properties": [],
       "description": "CLI-only support command."
+    },
+    {
+      "cli": "assembly-diagnose",
+      "mcp": "solidworks_assembly_diagnose",
+      "workflow": "analysis",
+      "safety": "read_only",
+      "solidworks_required": false,
+      "required": [
+        "report"
+      ],
+      "properties": [
+        "lock_root",
+        "near_tolerance_m",
+        "out",
+        "report",
+        "standard_part_regex"
+      ],
+      "description": "Diagnose an assembly inspect report: fixed/floating state, mate graph gaps, bad mates, isolated/no-mate components, bbox spacing, standard-part attachment, and lock-file hints."
     },
     {
       "cli": "audit",
@@ -701,9 +719,9 @@
     }
   ],
   "coverage": {
-    "cli_commands": 49,
-    "mcp_tools": 35,
-    "mapped_mcp_tools": 35,
+    "cli_commands": 50,
+    "mcp_tools": 36,
+    "mapped_mcp_tools": 36,
     "has_cli_for_every_local_mcp": true,
     "has_safety_for_every_capability": true,
     "has_workflow_for_every_capability": true,

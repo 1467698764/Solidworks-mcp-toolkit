@@ -15,7 +15,7 @@ Codex / MCP client
 
 ## Runtime boundaries
 
-- `server.cjs` exposes 35 MCP tools and translates tool arguments into `swctl.ps1` commands.
+- `server.cjs` exposes 36 MCP tools and translates tool arguments into `swctl.ps1` commands.
 - `swctl.ps1` is the stable command router used by humans, tests, CI, and MCP.
 - Python scripts implement focused operations: inspect, summary, compare, model-understand, worklog, handoff, release gates, validation profiles, and guarded write helpers.
 - SolidWorks COM is only touched by commands that need live model state or model mutation. Offline gates use fixtures and generated reports.
@@ -46,9 +46,9 @@ Live gate is where runtime truth outranks source assumptions. It validates Solid
 
 - `live_session_smoke` proves the minimal COM/session/mate/interference/cleanup path.
 - `live_capability_suite` proves feature creation and edit primitives: extrude, cut, revolve, revolved cut, sketch dimension read/modify/rebuild/save, assembly insert, concentric mate, distance mate, interference, mass, component placement readback, part_geometry_readback from reopened native parts, close/cleanup.
-- `complete_shaper_v5` uses a bullhead shaper as a stress test: 24 parts, 58 components, 19 MateLock layout stabilizers, native primary component placement via Transform2.ArrayData, required part feature readback, attached detail-instance layout, final fixed-state policy, and interference evidence. The shaper report is accepted only when current source freshness, MateLock readback, placement, geometry, model-understanding, fixed-state, and cleanup gates all pass; it does not claim complete mechanism DOF or motion-sweep validation yet.
+- `complete_shaper_v5` is retained as a simple-mechanism regression fixture. It is useful only when it exposes generic assembly-control gaps: component inventory, native placement/readback, part feature evidence, semantic mate participation, fixed/floating policy, interference, visual coherence, and cleanup. It is not architectural proof that general mechanism assembly is solved.
 
-The bullhead shaper is not the product boundary; it is a deliberately hard fixture that forces the generic control layer to prove real assembly behavior.
+No single named fixture is the product boundary. The architecture should make ordinary mechanical parts and assemblies routine through design intent, interface indexing, local repair, profile-scoped validation, and native readback.
 
 ## Safety model
 

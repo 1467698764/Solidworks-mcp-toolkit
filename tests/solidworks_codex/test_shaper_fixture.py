@@ -76,7 +76,7 @@ class ShaperFixtureSpecTests(unittest.TestCase):
         manifest = self.module.spec_to_manifest(shaper)
 
         self.assertEqual(manifest["name"], "shaper_quick_return_validation")
-        self.assertEqual(manifest["mechanism"], "bullhead shaper quick-return linkage")
+        self.assertEqual(manifest["mechanism"], "legacy quick-return mechanism fixture")
         self.assertGreaterEqual(manifest["part_count"], 14)
         self.assertGreaterEqual(manifest["joint_count"], 10)
         self.assertIn("quick_return", manifest["functional_requirements"])

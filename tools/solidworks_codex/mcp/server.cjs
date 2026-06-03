@@ -228,6 +228,11 @@ const toolSchemas = [
     inputSchema: { type: 'object', properties: { report: { type: 'string' }, task: { type: 'string' }, view: { type: 'string', enum: ['auto','general','dimension-edit','assembly-constraints','interference-clearance','manufacturing-holes','spatial-assembly'] }, out: { type: 'string' }, json_out: { type: 'string' } }, required: ['report'], additionalProperties: false }
   },
   {
+    name: 'solidworks_assembly_diagnose',
+    description: 'Diagnose an assembly inspect report: fixed/floating state, mate graph gaps, bad mates, isolated/no-mate components, bbox spacing, standard-part attachment, and lock-file hints.',
+    inputSchema: { type: 'object', properties: { report: { type: 'string' }, out: { type: 'string' }, lock_root: { type: 'string' }, near_tolerance_m: { type: 'number' }, standard_part_regex: { type: 'string' } }, required: ['report'], additionalProperties: false }
+  },
+  {
     name: 'solidworks_worklog',
     description: 'Append a durable worklog event for multi-turn decisions, assumptions, verification, failures, and next steps.',
     inputSchema: {
@@ -482,6 +487,13 @@ async function callTool(name, input) {
       if (input?.view) args.push('-View', input.view);
       if (input?.out) args.push('-Out', input.out);
       if (input?.json_out) args.push('-JsonOut', input.json_out);
+      break;
+    case 'solidworks_assembly_diagnose':
+      args.push('assembly-diagnose', '-Report', input.report);
+      if (input?.out) args.push('-Out', input.out);
+      if (input?.lock_root) args.push('-OutDir', input.lock_root);
+      if (input?.near_tolerance_m !== undefined) args.push('-DistanceMm', String(input.near_tolerance_m * 1000));
+      if (input?.standard_part_regex) args.push('-Target', input.standard_part_regex);
       break;
     case 'solidworks_worklog':
       args.push('worklog', '-Message', input.message);

@@ -1,10 +1,10 @@
 # SolidWorks Codex Usage Guide
 
-The MCP wrapper currently exposes **35 MCP tools** across read-only inspection, analysis, handoff, guarded writes, export/verify, release gates, and the optional live SolidWorks gate.
+The MCP wrapper currently exposes **36 MCP tools** across read-only inspection, analysis, handoff, guarded writes, export/verify, release gates, and the optional live SolidWorks gate.
 
 This project is a general SolidWorks MCP/control layer. It does not try to replace engineering judgment with one rigid CAD template. It collects reviewable evidence from native `.SLDASM/.SLDPRT` models: components, features, dimensions, mates, transforms, spatial relationships, interference, mass, file locks, and runtime callbacks. A reasoning model can then choose an acceptance depth that matches the user intent.
 
-The bullhead shaper is a stress test, not the project boundary. It exists because a hard mechanism exposes real failures in cuts, revolves, sketch selection, reopen/modify/rebuild persistence, mate creation/readback, component transforms, interference callbacks, and cleanup behavior. Lighter part work should not be blocked by full mechanism-release checks.
+The project should be judged as a general SolidWorks MCP/control layer, not by a single named fixture. The existing shaper fixture is a small mechanism regression case: useful for exposing cuts, revolves, sketch selection, reopen/modify/rebuild persistence, mate creation/readback, component transforms, interference callbacks, and cleanup behavior, but not impressive enough to define the project. Lighter part work should not be blocked by full mechanism-release checks, and mechanism work should not pass on fixture-specific placement alone.
 
 ## Core rules
 
@@ -110,7 +110,7 @@ Live gate layers:
 
 - `live_session_smoke`: minimal COM/session/mate/interference/cleanup path.
 - `live_capability_suite`: extrude, cut, revolve, revolved cut, sketch dimension read/modify/rebuild/save, assembly insertion, concentric mate, distance mate, interference callback, mass callback, close/cleanup, selection-isolation evidence, `assembly_component_placements` component Transform2/origin placement readback, and `part_geometry_readback` bbox/body/volume evidence from reopened native `.SLDPRT` files.
-- `complete_shaper_v5`: bullhead shaper stress test at `tools/solidworks_codex/live_fixture/shaper_machine_v5/bullhead_shaper_complete.SLDASM` with report `tools/solidworks_codex/reports/shaper_machine_v5/complete_shaper_build.json`.
+- `complete_shaper_v5`: retained simple-mechanism regression fixture at `tools/solidworks_codex/live_fixture/shaper_machine_v5/bullhead_shaper_complete.SLDASM` with report `tools/solidworks_codex/reports/shaper_machine_v5/complete_shaper_build.json`. It is a gap detector for assembly diagnosis, interface selection, mate-network evidence, interference, and cleanup; it is not a capability showcase.
 
 Current live capability suite evidence:
 
@@ -120,22 +120,18 @@ Current live capability suite evidence:
 - `assembly_component_placements` solved origins match the accepted native assembly layout
 - post cleanup has no `~$` lock files
 
-Bullhead shaper target evidence:
+Simple mechanism regression evidence should stay modest and current:
 
-- `24 parts`
-- `58 components`
-- `19 MateLock layout stabilizers`
-- primary components placed/restored from native Transform2 readback
-- required part feature readback for holes, windows, slots, dovetails, lightening cuts, tool bevels, and fastener details
-- primary component restore API: `Transform2.ArrayData`
-- final fixed-state policy: structural references may be fixed; moving functional parts must not be accepted as fixed-layout evidence
-- attached detail-instance layout; screws/washers/oil cups must not be parked on a detached display strip
-- verified MateLock layout-stabilizer network with selection and component-pair evidence
-- fixture-level MateLock constraints stabilize the authored layout; they are not a claim of complete mechanism DOF or motion-sweep validation
-- interference callback expected to report `0 interference`
-- post cleanup must have no `~$` lock files
+- native `.SLDASM/.SLDPRT` files are required;
+- part feature readback should cover holes, windows, slots, dovetails, lightening cuts, tool bevels, and standard/detail features when those details are accepted;
+- primary component placement evidence should come from native Transform/readback, not unchecked display placement;
+- structural references may be fixed, but moving functional parts must not be accepted as fixed-layout evidence;
+- standard/detail components must have host/attachment evidence or be omitted from the accepted assembly with a recorded reason;
+- mate evidence must be semantic, varied enough for the intended joint, read back from SolidWorks, and connected to participating components;
+- interference callback should be available and report `0 interference` for static acceptance;
+- post cleanup must have no generated `~$` lock files.
 
-Do not treat an old `complete_shaper_build.json` with `ok: true` as current truth. The gate checks report freshness and recomputes strict evidence from the current scripts; stale shaper reports or assemblies with fixed/floating/mate contradictions, detached detail strips, MateLock errors, placement drift, or nonzero interference must be regenerated and revalidated.
+Do not treat an old `complete_shaper_build.json` with `ok: true` as current truth. The gate checks report freshness and recomputes strict evidence from the current scripts. If the screenshot, mate graph, placement evidence, or model-understanding output says the assembly is scattered or only fixture-stabilized, treat it as a failing regression, not as a cosmetic display issue.
 
 `-CleanupStale` is bounded to old generated directories: `shaper_machine`, `shaper_machine_v2`, `shaper_machine_v3`, and `shaper_machine_v4`. It must not touch `shaper_machine_v5`, `live_capability_suite`, user models, or unrelated workspace files.
 

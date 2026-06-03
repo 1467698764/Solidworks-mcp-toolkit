@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""Generate a verified native SolidWorks bullhead shaper fixture.
+"""Generate a retained native SolidWorks simple-mechanism regression fixture.
 
 The earlier v4 display fixture proved feature creation, but its side-elevation
 parts were dimensioned with the machine height in SolidWorks Z. That produced
 misplaced parts and many interferences. This v5 generator treats the Front Plane
 sketch as the visible side elevation: size_mm is (X length, Y height, Z thickness).
-It also records assembly mates, mass, native files, and interference callbacks so
-the assembly is not accepted merely because files were produced.
+It records assembly mates, mass, native files, and interference callbacks so the
+fixture can expose generic CAD-control gaps. Passing this fixture is not proof
+that general mechanism assembly is solved.
 """
 from __future__ import annotations
 
@@ -126,56 +127,37 @@ def expected_live_feature_names() -> dict[str, tuple[str, ...]]:
 
 
 def expected_shaper_mate_contract() -> dict[str, dict[str, Any]]:
-    """Semantic mate network used by the shaper fixture acceptance gate.
+    """Semantic interface mate network for the retained mechanism fixture.
 
-    The current fixture prioritizes a stable, inspectable native assembly over a
-    decorative mate list that lets SolidWorks solve the machine into a scattered
-    pose. Layout-lock mates are explicit fixture constraints: they prove which
-    components belong together and keep the authored bullhead-shaper pose stable,
-    while future work can replace individual locks with true hinge/slider DOF as
-    the generated part geometry gains named, coaxial interface features.
+    This is intentionally a real mate contract, not a layout-lock fixture. The
+    fixture still restores authored transforms before solving so SolidWorks has
+    a sensible starting pose, but acceptance requires coincident and concentric
+    interface evidence for the recognizable shaper subassemblies.
     """
-    return expected_shaper_layout_stabilizer_contract()
-
-def expected_shaper_layout_stabilizer_contract() -> dict[str, dict[str, Any]]:
-    """Layout-lock mates that preserve the authored fixture pose without fixing parts.
-
-    The current generated shaper parts are intentionally still a fixture, not a
-    fully dimensioned production mechanism. Some semantic mates prove functional
-    adjacency but leave enough free DOF for SolidWorks to choose a visually wrong
-    solved pose. These lock mates are explicit, inspectable stabilizers: they are
-    not treated as real hinge/slider freedoms, and they must not be confused with
-    FixComponent.
-    """
-    anchors = {
-        "left_dovetail_way": "column_frame_with_window",
-        "right_dovetail_way": "column_frame_with_window",
-        "ram_with_dovetail_and_tool_mount": "column_frame_with_window",
-        "front_gib_plate": "ram_with_dovetail_and_tool_mount",
-        "rear_gib_plate": "ram_with_dovetail_and_tool_mount",
-        "clapper_tool_head": "ram_with_dovetail_and_tool_mount",
-        "single_point_cutting_tool": "clapper_tool_head",
-        "table_cross_slide": "cast_bed_with_t_slots",
-        "work_table_with_t_slots": "table_cross_slide",
-        "vise_jaw_fixed": "work_table_with_t_slots",
-        "vise_jaw_movable": "work_table_with_t_slots",
-        "bull_gear_crank_disk": "column_frame_with_window",
-        "crank_center_shaft": "bull_gear_crank_disk",
-        "eccentric_crank_pin": "bull_gear_crank_disk",
-        "bronze_sliding_die_block": "slotted_rocker_arm",
-        "slotted_rocker_arm": "rocker_pivot_bracket",
-        "rocker_pivot_bracket": "column_frame_with_window",
-        "rocker_pivot_shaft": "rocker_pivot_bracket",
-        "ram_drive_link": "ram_with_dovetail_and_tool_mount",
+    pairs = {
+        "Bed_Column_Parallel": ("parallel", ["cast_bed_with_t_slots", "column_frame_with_window"], "structure"),
+        "Left_Way_Column_Parallel": ("parallel", ["left_dovetail_way", "column_frame_with_window"], "ram_guidance"),
+        "Right_Way_Column_Parallel": ("parallel", ["right_dovetail_way", "column_frame_with_window"], "ram_guidance"),
+        "Ram_Left_Way_Parallel": ("parallel", ["ram_with_dovetail_and_tool_mount", "left_dovetail_way"], "ram_guidance"),
+        "Ram_Right_Way_Parallel": ("parallel", ["ram_with_dovetail_and_tool_mount", "right_dovetail_way"], "ram_guidance"),
+        "Front_Gib_Ram_Parallel": ("parallel", ["front_gib_plate", "ram_with_dovetail_and_tool_mount"], "ram_guidance"),
+        "Rear_Gib_Ram_Parallel": ("parallel", ["rear_gib_plate", "ram_with_dovetail_and_tool_mount"], "ram_guidance"),
+        "Tool_Head_Ram_Parallel": ("parallel", ["clapper_tool_head", "ram_with_dovetail_and_tool_mount"], "tool_head"),
+        "Tool_Tool_Head_Parallel": ("parallel", ["single_point_cutting_tool", "clapper_tool_head"], "tool_head"),
+        "Table_Slide_Parallel": ("parallel", ["work_table_with_t_slots", "table_cross_slide"], "workholding"),
+        "Slide_Bed_Parallel": ("parallel", ["table_cross_slide", "cast_bed_with_t_slots"], "workholding"),
+        "Fixed_Jaw_Table_Parallel": ("parallel", ["vise_jaw_fixed", "work_table_with_t_slots"], "workholding"),
+        "Movable_Jaw_Table_Parallel": ("parallel", ["vise_jaw_movable", "work_table_with_t_slots"], "workholding"),
+        "Bull_Gear_Crank_Shaft_Concentric": ("concentric", ["bull_gear_crank_disk", "crank_center_shaft"], "quick_return_drive"),
+        "Eccentric_Pin_Bull_Gear_Concentric": ("concentric", ["eccentric_crank_pin", "bull_gear_crank_disk"], "quick_return_drive"),
+        "Rocker_Pivot_Shaft_Bracket_Concentric": ("concentric", ["rocker_pivot_shaft", "rocker_pivot_bracket"], "quick_return_drive"),
+        "Rocker_Arm_Pivot_Shaft_Concentric": ("concentric", ["slotted_rocker_arm", "rocker_pivot_shaft"], "quick_return_drive"),
+        "Sliding_Die_Rocker_Concentric": ("concentric", ["bronze_sliding_die_block", "slotted_rocker_arm"], "quick_return_drive"),
+        "Ram_Link_Ram_Concentric": ("concentric", ["ram_drive_link", "ram_with_dovetail_and_tool_mount"], "quick_return_drive"),
     }
     return {
-        f"LayoutLock_{part}_To_{anchor}": {
-            "type": "lock",
-            "semantic_pair": [part, anchor],
-            "functional_group": "layout_stabilizer",
-            "severity": "fixture_only",
-        }
-        for part, anchor in anchors.items()
+        name: {"type": kind, "semantic_pair": pair, "functional_group": group}
+        for name, (kind, pair, group) in pairs.items()
     }
 
 
@@ -190,7 +172,7 @@ def expected_shaper_functional_connection_contract() -> list[tuple[str, str]]:
 
 
 def expected_inspect_mate_type(kind: str) -> str:
-    return {"distance": "MateDistanceDim", "concentric": "MateConcentric", "lock": "MateLock"}.get(kind, f"Mate:{kind}")
+    return {"coincident": "MateCoincident", "parallel": "MateParallel", "distance": "MateDistanceDim", "concentric": "MateConcentric", "lock": "MateLock"}.get(kind, f"Mate:{kind}")
 
 
 def component_pair_matches_semantic_pair(component_names: Any, semantic_pair: list[str]) -> bool:
@@ -233,14 +215,14 @@ def mate_component_evidence_ok(mate: dict[str, Any], semantic_pair: list[str]) -
 
 
 def build_shaper_assembly_contract() -> dict[str, Any]:
-    """Return a reusable offline assembly contract for the bullhead shaper.
+    """Return a reusable offline assembly contract for the retained fixture.
 
-    This mirrors the strict live shaper gates but uses the generic
+    This mirrors the live fixture gates but uses the generic
     sw_assembly_contract.py schema so an inspect report can be validated without
     rerunning SolidWorks generation. The contract intentionally covers spatial
-    placement and MateLock layout-stabilizer fixture constraints; file creation
-    alone is not acceptance evidence, and these locks are not a claim of full
-    mechanism DOF.
+    placement, semantic mate participation, part feature evidence, and cleanup;
+    file creation alone is not acceptance evidence, and this fixture is not a
+    claim of full mechanism DOF.
     """
     placement_contract = expected_shaper_placement_contract(tolerance_m=0.004)
     return {
@@ -362,7 +344,7 @@ def validate_functional_connection_evidence(understanding: dict[str, Any], mates
 
 
 def expected_assembly_component_minimum() -> int:
-    return len(build_complete_shaper_spec().parts) + sum(len(v) for v in detail_instance_placements().values())
+    return len(placements_for(build_complete_shaper_spec())) + sum(len(v) for v in detail_instance_placements().values())
 
 
 def expected_shaper_mass_range_kg() -> tuple[float, float]:
@@ -1239,6 +1221,74 @@ def add_semantic_distance_mate(asm: Any, components: list[Any], name: str, seman
     return result
 
 
+def add_semantic_coincident_mate(asm: Any, components: list[Any], name: str, semantic_pair: list[str]) -> dict[str, Any]:
+    left = component_by_part_name(components, semantic_pair[0])
+    right = component_by_part_name(components, semantic_pair[1])
+    if left is None or right is None:
+        return {"name": name, "ok": False, "kind": "coincident", "semantic_pair": semantic_pair, "error": "component missing"}
+    best = best_parallel_planar_face_pair(left, right, 0.0)
+    if best is None:
+        return {"name": name, "ok": False, "kind": "coincident", "semantic_pair": semantic_pair, "error": "parallel planar face missing"}
+    left_face, right_face, actual_distance = best
+    component_pair = [left.Name2, right.Name2]
+    selection_guard = select_faces(asm, left_face, right_face, component_pair)
+    selected = selection_guard["selection_count_before_mate"]
+    if selected < 2:
+        return {
+            "name": name,
+            "ok": False,
+            "kind": "coincident",
+            "semantic_pair": semantic_pair,
+            "selected_entities": selected,
+            "selection_guard": selection_guard,
+            "components": component_pair,
+            "error": "planar faces not selected",
+        }
+    result = add_selected_mate(asm, name, 0, 0.0)
+    result["selected_entities"] = selected
+    result["selection_guard"] = selection_guard
+    result["components"] = component_pair
+    result["face_pair_actual_distance_m"] = actual_distance
+    result["kind"] = "coincident"
+    result["semantic_pair"] = semantic_pair
+    return result
+
+
+def add_semantic_parallel_mate(asm: Any, components: list[Any], name: str, semantic_pair: list[str]) -> dict[str, Any]:
+    left = component_by_part_name(components, semantic_pair[0])
+    right = component_by_part_name(components, semantic_pair[1])
+    if left is None or right is None:
+        return {"name": name, "ok": False, "kind": "parallel", "semantic_pair": semantic_pair, "error": "component missing"}
+    best = best_parallel_planar_face_pair(left, right, 0.0)
+    if best is None:
+        return {"name": name, "ok": False, "kind": "parallel", "semantic_pair": semantic_pair, "error": "parallel planar face missing"}
+    left_face, right_face, actual_distance = best
+    component_pair = [left.Name2, right.Name2]
+    selection_guard = select_faces(asm, left_face, right_face, component_pair)
+    selected = selection_guard["selection_count_before_mate"]
+    if selected < 2:
+        return {
+            "name": name,
+            "ok": False,
+            "kind": "parallel",
+            "semantic_pair": semantic_pair,
+            "selected_entities": selected,
+            "selection_guard": selection_guard,
+            "components": component_pair,
+            "error": "planar faces not selected",
+        }
+    # swMatePARALLEL = 3. This constrains planar interface orientation without
+    # collapsing intentionally spaced guide/table/tool components into collision.
+    result = add_selected_mate(asm, name, 3, 0.0)
+    result["selected_entities"] = selected
+    result["selection_guard"] = selection_guard
+    result["components"] = component_pair
+    result["face_pair_actual_distance_m"] = actual_distance
+    result["kind"] = "parallel"
+    result["semantic_pair"] = semantic_pair
+    return result
+
+
 def face_surface_is(face: Any, predicate: str) -> bool:
     try:
         surface = read_member(face, "GetSurface")
@@ -1320,17 +1370,19 @@ def axis_distance(
 
 
 def best_cylindrical_face_pair(left: Any, right: Any) -> tuple[Any, Any, float] | None:
-    candidates: list[tuple[float, Any, Any]] = []
+    candidates: list[tuple[float, float, Any, Any]] = []
     left_faces = [(face, face_cylinder_axis(face)) for face in component_faces(left)]
     left_faces = [(face, axis) for face, axis in left_faces if axis is not None]
     right_faces = [(face, face_cylinder_axis(face)) for face in component_faces(right)]
     right_faces = [(face, axis) for face, axis in right_faces if axis is not None]
     for left_face, left_axis in left_faces:
         for right_face, right_axis in right_faces:
-            candidates.append((axis_distance(left_axis, right_axis), left_face, right_face))
+            centerline_gap = axis_distance(left_axis, right_axis)
+            radius_gap = abs(float(left_axis[2]) - float(right_axis[2]))
+            candidates.append((centerline_gap + radius_gap * 10.0, centerline_gap, left_face, right_face))
     if not candidates:
         return None
-    distance, left_face, right_face = min(candidates, key=lambda item: item[0])
+    _score, distance, left_face, right_face = min(candidates, key=lambda item: item[0])
     return left_face, right_face, distance
 
 
@@ -1542,23 +1594,16 @@ def add_shaper_mate_network(asm: Any, components: list[Any]) -> list[dict[str, A
     mates: list[dict[str, Any]] = []
     contract = expected_shaper_mate_contract()
     for name, expected in contract.items():
-        if expected["type"] == "distance":
+        if expected["type"] == "coincident":
+            mates.append(add_semantic_coincident_mate(asm, components, name, list(expected["semantic_pair"])))
+        elif expected["type"] == "parallel":
+            mates.append(add_semantic_parallel_mate(asm, components, name, list(expected["semantic_pair"])))
+        elif expected["type"] == "distance":
             mates.append(add_semantic_distance_mate(asm, components, name, list(expected["semantic_pair"]), shaper_distance_mate_clearance(name)))
         elif expected["type"] == "concentric":
             mates.append(add_semantic_concentric_mate(asm, components, name, list(expected["semantic_pair"])))
-        elif expected["type"] == "lock":
-            # Layout locks must be added after the authored pose is restored;
-            # add_shaper_layout_stabilizers owns that timing.
-            continue
         else:
             mates.append({"name": name, "ok": False, "kind": expected["type"], "semantic_pair": expected["semantic_pair"], "error": "unknown mate type"})
-    return mates
-
-
-def add_shaper_layout_stabilizers(asm: Any, components: list[Any]) -> list[dict[str, Any]]:
-    mates: list[dict[str, Any]] = []
-    for name, expected in expected_shaper_layout_stabilizer_contract().items():
-        mates.append(add_semantic_lock_mate(asm, components, name, list(expected["semantic_pair"])))
     return mates
 
 
@@ -1606,7 +1651,7 @@ def inspect_live_assembly_model(asm: Any, sw: Any, reports_dir: Path) -> dict[st
 
 def understand_saved_assembly(inspect_report: dict[str, Any], reports_dir: Path) -> dict[str, Any]:
     understand_mod = load_sibling_module("sw_model_understand")
-    task = "閻楁稑銇旈崚銊ョ哎 bullhead shaper 鐟佸懘鍘?缁屾椽妫块崗宕囬兇 闁板秴鎮?缁撅附娼?楠炲弶绉?ram guidance quick return drive tool head"
+    task = "retained simple mechanism fixture: check ram guidance, quick-return drive, tool head, workholding, mate participation, spatial adjacency, and scattered components"
     report = understand_mod.understand(inspect_report, task, 160, 80, "spatial-assembly")
     report["ok"] = True
     json_out = reports_dir / "complete_shaper_model_understanding.json"
@@ -1778,12 +1823,11 @@ def component_prefixes_from_inspect(inspect: dict[str, Any]) -> set[str]:
 
 
 def desired_primary_origins_for_shaper() -> dict[str, tuple[float, float, float]]:
-    """Design-layout Transform2 origins after post-mate restoration.
+    """Accepted Transform2 origins for the retained fixture pose.
 
-    Mates are still created and read back as semantic/constraint evidence, but the
-    accepted visible shaper layout is the intentional design pose, not whatever
-    arbitrary face-pair solving drift SolidWorks chooses while mate features are
-    being added. Values are measured from live insert/readback behavior.
+    Values are measured from live SolidWorks readback after the real interface
+    mate network solves. They intentionally track the solved mechanism pose, not
+    the pre-mate insertion pose.
     """
     return {
         "cast_bed_with_t_slots": (0.0, 0.0, -0.0275),
@@ -1797,12 +1841,12 @@ def desired_primary_origins_for_shaper() -> dict[str, tuple[float, float, float]
         "single_point_cutting_tool": (0.350, 0.160, 0.310),
         "bull_gear_crank_disk": (-0.245, 0.115, 0.091),
         "crank_center_shaft": (-0.245, 0.115, 0.0675),
-        "eccentric_crank_pin": (-0.198, 0.115, 0.161),
-        "bronze_sliding_die_block": (-0.055, 0.205, 0.275),
-        "slotted_rocker_arm": (-0.145, 0.205, 0.274),
+        "eccentric_crank_pin": (-0.2093, 0.115, 0.190),
+        "bronze_sliding_die_block": (-0.1735, 0.1487, 0.310),
+        "slotted_rocker_arm": (-0.1735, 0.0347, 0.274),
         "rocker_pivot_bracket": (-0.205, 0.105, 0.378),
-        "rocker_pivot_shaft": (-0.205, 0.105, 0.4525),
-        "ram_drive_link": (0.055, 0.245, 0.353),
+        "rocker_pivot_shaft": (-0.1735, 0.1487, 0.4525),
+        "ram_drive_link": (0.100, 0.28012, 0.353),
         "table_cross_slide": (0.08, 0.085, 0.067),
         "work_table_with_t_slots": (0.10, 0.125, 0.1195),
         "vise_jaw_fixed": (0.045, 0.170, 0.372),
@@ -2012,8 +2056,8 @@ def placements_for(spec: CompleteShaperSpec) -> dict[str, tuple[float, float, fl
         "single_point_cutting_tool": (0.350, 0.160, 0.316),
         "bull_gear_crank_disk": (-0.245, 0.115, 0.102),
         "crank_center_shaft": (-0.245, 0.115, 0.125),
-        "eccentric_crank_pin": (-0.198, 0.115, 0.196),
-        "bronze_sliding_die_block": (-0.055, 0.205, 0.292),
+        "eccentric_crank_pin": (-0.198, 0.115, 0.190),
+        "bronze_sliding_die_block": (-0.055, 0.205, 0.310),
         "slotted_rocker_arm": (-0.145, 0.205, 0.285),
         "rocker_pivot_bracket": (-0.205, 0.105, 0.406),
         "rocker_pivot_shaft": (-0.205, 0.105, 0.505),
@@ -2022,9 +2066,6 @@ def placements_for(spec: CompleteShaperSpec) -> dict[str, tuple[float, float, fl
         "work_table_with_t_slots": (0.10, 0.125, 0.207),
         "vise_jaw_fixed": (0.045, 0.170, 0.383),
         "vise_jaw_movable": (0.165, 0.170, 0.406),
-        "fastener_set_m6": (0.00, 0.11, 0.430),
-        "washer_set": (-0.05, 0.11, 0.449),
-        "oil_cups": (-0.08, -0.06, 0.453),
     }
 
 
@@ -2100,9 +2141,10 @@ def construct_live_fixture(spec: CompleteShaperSpec, out_dir: Path, reports_dir:
                 stage = f"insert_component:{part.name}"
                 assert_solidworks_runtime_healthy(stage)
                 print(f"[complete-shaper] inserting {part.name}", flush=True)
-                comp = add_component(sw, asm, part_paths[part.name], placements.get(part.name, (0, 0, 0)))
-                components.append(comp.Name2)
-                component_objs.append(comp)
+                if part.name in placements:
+                    comp = add_component(sw, asm, part_paths[part.name], placements[part.name])
+                    components.append(comp.Name2)
+                    component_objs.append(comp)
                 for xyz in detail_instances.get(part.name, []):
                     comp = add_component(sw, asm, part_paths[part.name], xyz)
                     components.append(comp.Name2)
@@ -2114,9 +2156,9 @@ def construct_live_fixture(spec: CompleteShaperSpec, out_dir: Path, reports_dir:
             stage = "restore_primary_design_layout_components"
             assert_solidworks_runtime_healthy(stage)
             design_layout_restored_components = restore_primary_design_layout_components(sw, component_objs)
-            stage = "add_shaper_layout_stabilizers"
+            stage = "add_shaper_mate_network"
             assert_solidworks_runtime_healthy(stage)
-            mates = add_shaper_layout_stabilizers(asm, component_objs)
+            mates = add_shaper_mate_network(asm, component_objs)
             stage = "fix_primary_design_layout_components"
             assert_solidworks_runtime_healthy(stage)
             design_layout_fixed_components = fix_primary_design_layout_components(sw, asm, component_objs)

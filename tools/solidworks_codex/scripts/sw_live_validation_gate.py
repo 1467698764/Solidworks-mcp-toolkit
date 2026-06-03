@@ -3,7 +3,7 @@
 
 This is an explicit opt-in gate for local machines that have SolidWorks + pywin32.
 Downstream checks import pythoncom/win32com.client; keep those names in this header so swctl selects a pywin32-capable Python before launching the gate.
-It runs the focused capability suite and the native bullhead shaper fixture in one
+It runs focused capability checks and retained fixture regressions in one
 serialized process, then validates the emitted JSON reports instead of trusting
 only process exit codes.
 """
@@ -105,7 +105,7 @@ def build_gate_contract() -> GateContract:
                     "tools/solidworks_codex/reports/shaper_machine_v5",
                 ),
                 report_json=shaper_report,
-                purpose="prove display-grade native bullhead shaper assembly with strict component/mate/mass/interference/cleanup evidence",
+                purpose="exercise a retained simple-mechanism fixture for native readback, mate participation, interference, and cleanup evidence",
             ),
         ),
         notes=(
@@ -454,7 +454,7 @@ def _strict_check_failed(data: dict[str, Any], check: str) -> bool:
     if check == "part_count":
         return int(data.get("part_count", 0) or 0) != 24
     if check == "component_count":
-        return int(data.get("component_count", 0) or 0) != 58
+        return int(data.get("component_count", 0) or 0) != _load_shaper_builder_module().expected_assembly_component_minimum()
     if check == "mate_semantics":
         mates = data.get("mates", [])
         required = _expected_runtime_mates()
@@ -479,7 +479,8 @@ def _strict_check_failed(data: dict[str, Any], check: str) -> bool:
     if check == "inspect_model_understand":
         inspect = data.get("inspect", {})
         doc = inspect.get("active_document", {}) if isinstance(inspect, dict) else {}
-        if doc.get("type") != "assembly" or int(doc.get("component_count_sampled", 0) or 0) < 58:
+        expected_component_count = _load_shaper_builder_module().expected_assembly_component_minimum()
+        if doc.get("type") != "assembly" or int(doc.get("component_count_sampled", 0) or 0) < expected_component_count:
             return True
         if not _shaper_component_placements_ok(doc):
             return True
@@ -498,7 +499,7 @@ def _strict_check_failed(data: dict[str, Any], check: str) -> bool:
         understanding = data.get("model_understanding", {})
         inv = ((understanding.get("baseline") or {}).get("inventory") or {}) if isinstance(understanding, dict) else {}
         spatial = (((understanding.get("cad_evidence_graph") or {}).get("spatial_evidence") or {}) if isinstance(understanding, dict) else {})
-        if int(inv.get("component_count", 0) or 0) < 58:
+        if int(inv.get("component_count", 0) or 0) < expected_component_count:
             return True
         relations = spatial.get("near_or_overlap_pairs") or []
         relation_texts = [f"{r.get('a')} {r.get('b')}" for r in relations if isinstance(r, dict)]

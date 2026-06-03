@@ -1,8 +1,8 @@
 ﻿#!/usr/bin/env python3
 """Minimal SolidWorks live session smoke.
 
-This smoke is intentionally much smaller than the capability suite or bullhead
-shaper. It proves one hidden SolidWorks session can start, create two tiny parts,
+This smoke is intentionally much smaller than the capability suite or retained
+fixture. It proves one hidden SolidWorks session can start, create two tiny parts,
 insert them into one assembly, create a mate, inspect the currently-open part and
 assembly objects without starting another session, run an interference callback,
 close, exit, and release generated file locks.
