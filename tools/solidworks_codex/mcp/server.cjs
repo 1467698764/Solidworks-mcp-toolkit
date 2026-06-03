@@ -263,6 +263,11 @@ const toolSchemas = [
     inputSchema: { type: 'object', properties: { macro_manifest: { type: 'string' }, after_report: { type: 'string' }, out: { type: 'string' } }, required: ['macro_manifest', 'after_report'], additionalProperties: false }
   },
   {
+    name: 'solidworks_mate_group_live_protocol',
+    description: 'Generate a controlled per-group live SolidWorks work order for reviewed mate group macros: backup, selection evidence, macro run, rebuild, inspect, execution check, interference, and cleanup.',
+    inputSchema: { type: 'object', properties: { macro_manifest: { type: 'string' }, validation_report: { type: 'string' }, model: { type: 'string' }, out: { type: 'string' }, markdown_out: { type: 'string' } }, required: ['macro_manifest', 'validation_report'], additionalProperties: false }
+  },
+  {
     name: 'solidworks_assembly_review_pipeline',
     description: 'Run the read-only assembly review pipeline from one inspect report and write diagnosis, interface index, repair plan, mate group plan, and manifest artifacts.',
     inputSchema: { type: 'object', properties: { report: { type: 'string' }, out_dir: { type: 'string' }, near_tolerance_m: { type: 'number' }, standard_part_regex: { type: 'string' } }, required: ['report'], additionalProperties: false }
@@ -558,6 +563,12 @@ async function callTool(name, input) {
     case 'solidworks_mate_group_execution_check':
       args.push('mate-group-execution-check', '-Report', input.macro_manifest, '-After', input.after_report);
       if (input?.out) args.push('-Out', input.out);
+      break;
+    case 'solidworks_mate_group_live_protocol':
+      args.push('mate-group-live-protocol', '-Report', input.macro_manifest, '-FromReport', input.validation_report);
+      if (input?.model) args.push('-Model', input.model);
+      if (input?.out) args.push('-Out', input.out);
+      if (input?.markdown_out) args.push('-JsonOut', input.markdown_out);
       break;
     case 'solidworks_assembly_review_pipeline':
       args.push('assembly-review-pipeline', '-Report', input.report);

@@ -19,6 +19,7 @@ GROUP_RULES = {
     "analysis": ["issue", "design_review", "change_plan", "report_search", "report_context", "model_understand", "diagnose"],
     "handoff": ["worklog", "handoff"],
     "macro_generation": ["template_macro", "mate_macro", "mate_group_macro"],
+    "live_protocol": ["mate_group_live_protocol"],
     "external_reference": ["existing_mcp"],
 }
 

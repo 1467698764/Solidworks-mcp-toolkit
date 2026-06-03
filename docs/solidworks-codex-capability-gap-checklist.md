@@ -151,7 +151,7 @@ Status values:
 | Width/symmetry | missing | Slider centered between guide faces, symmetric jaws, centered plates. | Remaining DOF matches intent. |
 | Limit distance/angle | missing | Travel stops, hinge limits, slider stroke. | Mechanism samples endpoints and midpoints. |
 | Slot/path/cam/gear mates | missing/defer | Mechanism-specific, use when SolidWorks API support is reliable. | Optional until standard mechanism_lite is stable. |
-| Mate groups | partial/offline-ready | Read-only mate group plans, validation gates, and reviewable preselect macro drafts exist; live application/readback is still pending. | Every functional connection has group id and DOF expectation. |
+| Mate groups | partial/offline-ready | Read-only mate group plans, validation gates, reviewable preselect macro drafts, expected mate names, after-inspect execution checks, and per-group live work protocols exist; automatic live entity selection/application is still pending. | Every functional connection has group id, DOF expectation, reviewed live steps, and readback check. |
 | Standard part attachment | partial/offline-ready | Hostless standard parts are detected and grouped into candidate concentric/coincident attachment plans; live entity selection is still required. | No accepted standard/detail component is isolated or hostless. |
 
 ### 6.5 Incremental Repair
@@ -161,7 +161,7 @@ Status values:
 | Open/current-document handoff | partial | Continue from active SolidWorks window or specified native file. | Diagnosis does not require regeneration. |
 | Local fault localization | partial/offline-ready | Assembly diagnosis, repair plan, interface index, and mate group plan localize bad mates, hostless standard parts, and isolated components. | Repair plan names the affected subgraph. |
 | Rollback copies | missing/partial | Preserve original native files before mutation. | Report lists rollback paths. |
-| Selective mate repair | partial/offline-ready | Reviewable mate group macro drafts can be generated per actionable group; automated live deletion/add/readback is still pending. | Untouched components keep file timestamps/transforms unless affected. |
+| Selective mate repair | partial/offline-ready | Reviewable mate group macro drafts and live protocols can be generated per actionable group; after-inspect execution checks verify expected named mates; automated live deletion/add/entity selection is still pending. | Untouched components keep file timestamps/transforms unless affected, and each changed group has rebuild/inspect/execution-check evidence. |
 | Selective part repair | missing | Edit only affected feature/sketch; rebuild dependent assembly. | Report lists changed feature and downstream checks. |
 | Full rebuild justification | missing | Record reason: stale base, invalid topology, missing interface, cheaper regeneration. | Full rebuild is a deliberate decision, not default behavior. |
 
@@ -222,7 +222,7 @@ This order matters because later work depends on earlier evidence.
 | 1 | Existing assembly diagnosis | Implemented offline. | Given an inspect report, report inventory, mate graph, isolated nodes, fixed/floating, bad mates, bbox gaps, standard-part host gaps, and locks. |
 | 2 | Interface index extraction | Implemented offline heuristic. | Component bbox, nearest-neighbor, contact candidates, fixed-root hints, and standard-part hints are indexed; live face/axis identity is pending. |
 | 3 | Repair planning | Implemented offline. | Diagnosis turns into ordered repair actions and read-only assembly review pipeline artifacts. |
-| 4 | Mate group executor | Partial/offline-ready. | Mate group plans, validation gates, and reviewable macro drafts exist; live group application, readback, and interference checks remain next. |
+| 4 | Mate group executor | Partial/offline-ready. | Mate group plans, validation gates, reviewable macro drafts, live execution protocols, and after-inspect execution checks exist; automatic live group application and live face/axis selection remain next. |
 | 5 | Visual validation gate | Catches failures humans see immediately. | SolidWorks window screenshot is part of blocking evidence for assemblies. |
 | 6 | Mechanism_lite | Makes simple machines credible. | Slider-crank/quick-return samples limits and collisions. |
 | 7 | Engineering_lite | Moves from usable CAD to practical review. | BOM/material/mass/fit/DFM/DFA warnings are available when requested. |

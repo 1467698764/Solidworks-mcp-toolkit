@@ -1,6 +1,6 @@
 # SolidWorks Codex Usage Guide
 
-The MCP wrapper currently exposes **43 MCP tools** across read-only inspection, analysis, handoff, guarded writes, export/verify, release gates, and the optional live SolidWorks gate.
+The MCP wrapper currently exposes **44 MCP tools** across read-only inspection, analysis, handoff, guarded writes, export/verify, release gates, and the optional live SolidWorks gate.
 
 This project is a general SolidWorks MCP/control layer. It does not try to replace engineering judgment with one rigid CAD template. It collects reviewable evidence from native `.SLDASM/.SLDPRT` models: components, features, dimensions, mates, transforms, spatial relationships, interference, mass, file locks, and runtime callbacks. A reasoning model can then choose an acceptance depth that matches the user intent.
 
@@ -60,6 +60,38 @@ Allowing the command to launch SolidWorks is explicit:
 .\tools\solidworks_codex\swctl.ps1 compare -Before tools\solidworks_codex\reports\assembly_before.json -After tools\solidworks_codex\reports\assembly_after.json -Out tools\solidworks_codex\reports\assembly_delta.md -JsonOut tools\solidworks_codex\reports\assembly_delta.json
 .\tools\solidworks_codex\swctl.ps1 change-verify -Report tools\solidworks_codex\reports\assembly_delta.json -AllowDimension 'D1@Sketch1@plate.SLDPRT'
 ```
+
+## Mate group repair protocol
+
+For an existing assembly, use the read-only review pipeline before any mate
+mutation. It produces diagnosis, interface candidates, repair actions, and a
+mate group plan:
+
+```powershell
+.\tools\solidworks_codex\swctl.ps1 assembly-review-pipeline `
+  -Report tools\solidworks_codex\reports\assembly_before.json `
+  -OutDir tools\solidworks_codex\reports\assembly_review
+.\tools\solidworks_codex\swctl.ps1 mate-group-validate `
+  -Report tools\solidworks_codex\reports\assembly_review\mate_group_plan.json `
+  -Out tools\solidworks_codex\reports\assembly_review\mate_group_validation.json
+.\tools\solidworks_codex\swctl.ps1 mate-group-macro `
+  -Report tools\solidworks_codex\reports\assembly_review\mate_group_plan.json `
+  -OutDir tools\solidworks_codex\macros\mate_groups `
+  -Out tools\solidworks_codex\reports\assembly_review\mate_group_macro_manifest.json
+.\tools\solidworks_codex\swctl.ps1 mate-group-live-protocol `
+  -Report tools\solidworks_codex\reports\assembly_review\mate_group_macro_manifest.json `
+  -FromReport tools\solidworks_codex\reports\assembly_review\mate_group_validation.json `
+  -Model 'C:\path\to\assembly.SLDASM' `
+  -Out tools\solidworks_codex\reports\assembly_review\mate_group_live_protocol.json `
+  -JsonOut tools\solidworks_codex\reports\assembly_review\mate_group_live_protocol.md
+```
+
+`mate-group-live-protocol` is not a blind executor. It is a controlled work
+order for live SolidWorks sessions: one group at a time, backup first, capture
+selection evidence, run only reviewed macros, rebuild, inspect, run
+`mate-group-execution-check`, check interference, and clean up locks/windows
+before moving to the next group. If upstream validation has blocking findings,
+the protocol output is blocked and contains no executable group steps.
 
 ## Assembly contract and model understanding
 
