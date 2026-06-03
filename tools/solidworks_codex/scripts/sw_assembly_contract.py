@@ -83,6 +83,36 @@ def all_components_fixed(component_names: Any, by_key: dict[str, list[dict[str, 
     return len(matches) >= 2 and all(component.get("fixed") is True for component in matches[:2])
 
 
+def part_feature_evidence(report: dict[str, Any]) -> dict[str, Any]:
+    evidence = report.get("part_feature_evidence") if isinstance(report, dict) else {}
+    if not isinstance(evidence, dict):
+        evidence = active_document(report).get("part_feature_evidence")
+    return evidence if isinstance(evidence, dict) else {}
+
+
+def feature_names(features: Any) -> set[str]:
+    if not isinstance(features, list):
+        return set()
+    return {str(item.get("name", "")) for item in features if isinstance(item, dict) and item.get("name") is not None}
+
+
+def semantic_feature_count(features: Any, semantic: str) -> int:
+    if not isinstance(features, list):
+        return 0
+    total = 0
+    target = str(semantic).casefold()
+    for item in features:
+        if not isinstance(item, dict):
+            continue
+        if str(item.get("semantic", "")).casefold() != target:
+            continue
+        try:
+            total += int(item.get("count", 1) or 1)
+        except (TypeError, ValueError):
+            total += 1
+    return total
+
+
 def mate_status_unsolved(mate: dict[str, Any]) -> bool:
     status = mate.get("status", mate.get("solver_status"))
     if status is None:
@@ -191,6 +221,38 @@ def validate(report: dict[str, Any], contract: dict[str, Any]) -> dict[str, Any]
             add_decision(target, "mate_components", str(name), {"actual": mate.get("components"), "expected_semantic_pair": semantic_pair}, "mate references expected components" if ok else "mate component references do not match semantic pair", "blocking" if ok else severity)
         if not spec.get("allow_fixed_fixed") and all_components_fixed(mate.get("components"), by_key):
             add_decision(decision_bucket(severity, accepted, warnings, not_applicable, failed), "mate_between_fixed_components", str(name), {"components": mate.get("components")}, "mate references only fixed components and cannot prove an active assembly constraint", severity)
+
+    part_evidence = part_feature_evidence(report)
+    for name, spec in (contract.get("part_features") or {}).items():
+        spec = spec if isinstance(spec, dict) else {}
+        severity = severity_of(spec)
+        if severity not in KNOWN_SEVERITIES:
+            add_decision(failed, "contract_severity", str(name), {"severity": severity, "allowed": sorted(KNOWN_SEVERITIES)}, "unknown part feature contract severity")
+            continue
+        if severity == "not_applicable":
+            add_decision(not_applicable, "part_feature_not_applicable", str(name), spec, "part feature check marked not_applicable", severity)
+            continue
+        evidence = part_evidence.get(str(name))
+        required = spec.get("required", True)
+        if required and (not isinstance(evidence, dict) or evidence.get("ok") is False):
+            add_decision(decision_bucket(severity, accepted, warnings, not_applicable, failed), "part_feature_missing", str(name), spec, "required part feature evidence missing or failed", severity)
+            continue
+        if not isinstance(evidence, dict):
+            continue
+        features = evidence.get("features", [])
+        names = feature_names(features)
+        add_decision(accepted, "part_feature_evidence", str(name), {"feature_count": len(names)}, "part feature evidence present")
+        for required_name in spec.get("required_names", []) or []:
+            ok = any(str(required_name) in actual for actual in names)
+            target = accepted if ok else decision_bucket(severity, accepted, warnings, not_applicable, failed)
+            add_decision(target, "part_feature_name", f"{name}:{required_name}", {"available": sorted(names), "required": required_name}, "required part feature name present" if ok else "required part feature name missing", "blocking" if ok else severity)
+        for semantic, expected in (spec.get("required_semantics") or {}).items():
+            expected = expected if isinstance(expected, dict) else {}
+            minimum = int(expected.get("min_count", 1) or 1)
+            actual = semantic_feature_count(features, str(semantic))
+            ok = actual >= minimum
+            target = accepted if ok else decision_bucket(severity, accepted, warnings, not_applicable, failed)
+            add_decision(target, "part_feature_semantic", f"{name}:{semantic}", {"actual": actual, "minimum": minimum}, "required semantic feature count met" if ok else "required semantic feature count below contract", "blocking" if ok else severity)
 
     return {
         "timestamp": datetime.now().isoformat(timespec="seconds"),

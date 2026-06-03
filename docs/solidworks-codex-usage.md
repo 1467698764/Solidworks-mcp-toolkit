@@ -63,7 +63,27 @@ Allowing the command to launch SolidWorks is explicit:
 
 ## Assembly contract and model understanding
 
-`assembly-contract` is a reusable offline gate for inspect reports. It checks document type, minimum component count, required component prefixes, required component suppression, Transform/origin tolerance, semantic mate type, mate suppression state, mate error/status when reported, fixed-fixed mate risk, and expected participating components. Contract entries may set severity to `blocking`, `warning`, or `not_applicable`; warnings are reported without failing the command, while unknown severities fail so contracts stay reviewable. Component matching removes only SolidWorks instance suffixes such as `-1`, so hyphenated part names remain precise and substring pair matches are rejected. A required mate between two fixed components is blocking by default because it cannot prove an active constraint; use `allow_fixed_fixed: true` only for explicit reference/documentation mates.
+`assembly-contract` is a reusable offline gate for inspect reports. It checks document type, minimum component count, required component prefixes, required component suppression, Transform/origin tolerance, required part feature names/semantic counts, semantic mate type, mate suppression state, mate error/status when reported, fixed-fixed mate risk, and expected participating components. Contract entries may set severity to `blocking`, `warning`, or `not_applicable`; warnings are reported without failing the command, while unknown severities fail so contracts stay reviewable. Component matching removes only SolidWorks instance suffixes such as `-1`, so hyphenated part names remain precise and substring pair matches are rejected. A required mate between two fixed components is blocking by default because it cannot prove an active constraint; use `allow_fixed_fixed: true` only for explicit reference/documentation mates.
+
+Shape checks stay proportional. A quick draft can omit `part_features`, a normal part/assembly can require only the user-visible semantic features, and a strict mechanism/release profile can add more checks later. Example manifest fragment:
+
+```json
+{
+  "part_features": {
+    "base_plate": {
+      "required_names": ["Base_Boss", "Mounting_Holes"],
+      "required_semantics": {
+        "through_hole": { "min_count": 4 }
+      }
+    },
+    "optional_guard": {
+      "required": true,
+      "required_names": ["Guard_Rib"],
+      "severity": "warning"
+    }
+  }
+}
+```
 
 SolidWorks AddMate error values follow the SolidWorks API enum; `mate_error: 1` means the AddMate call reported no error. It is not enough by itself: solved placement, mate feature readback, suppressed/fixed state, and component participation still need separate evidence.
 
@@ -106,6 +126,7 @@ Bullhead shaper target evidence:
 - `58 components`
 - `19 MateLock layout stabilizers`
 - primary components placed/restored from native Transform2 readback
+- required part feature readback for holes, windows, slots, dovetails, lightening cuts, tool bevels, and fastener details
 - primary component restore API: `Transform2.ArrayData`
 - final fixed-state policy: structural references may be fixed; moving functional parts must not be accepted as fixed-layout evidence
 - attached detail-instance layout; screws/washers/oil cups must not be parked on a detached display strip
