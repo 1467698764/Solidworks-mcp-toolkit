@@ -1,6 +1,6 @@
 # SolidWorks Codex Usage Guide
 
-The MCP wrapper currently exposes **44 MCP tools** across read-only inspection, analysis, handoff, guarded writes, export/verify, release gates, and the optional live SolidWorks gate.
+The MCP wrapper currently exposes **45 MCP tools** across read-only inspection, analysis, handoff, guarded writes, export/verify, release gates, and the optional live SolidWorks gate.
 
 This project is a general SolidWorks MCP/control layer. It does not try to replace engineering judgment with one rigid CAD template. It collects reviewable evidence from native `.SLDASM/.SLDPRT` models: components, features, dimensions, mates, transforms, spatial relationships, interference, mass, file locks, and runtime callbacks. A reasoning model can then choose an acceptance depth that matches the user intent.
 
@@ -84,6 +84,13 @@ mate group plan:
   -Model 'C:\path\to\assembly.SLDASM' `
   -Out tools\solidworks_codex\reports\assembly_review\mate_group_live_protocol.json `
   -JsonOut tools\solidworks_codex\reports\assembly_review\mate_group_live_protocol.md
+.\tools\solidworks_codex\swctl.ps1 selection-report `
+  -Out tools\solidworks_codex\reports\assembly_review\selection_before_mate.json
+.\tools\solidworks_codex\swctl.ps1 mate-selection-check `
+  -Report tools\solidworks_codex\reports\assembly_review\mate_group_macro_manifest.json `
+  -FromReport tools\solidworks_codex\reports\assembly_review\selection_before_mate.json `
+  -Mate MG_crank_shaft_01_concentric `
+  -Out tools\solidworks_codex\reports\assembly_review\mate_selection_check.json
 ```
 
 `mate-group-live-protocol` is not a blind executor. It is a controlled work
@@ -92,6 +99,10 @@ selection evidence, run only reviewed macros, rebuild, inspect, run
 `mate-group-execution-check`, check interference, and clean up locks/windows
 before moving to the next group. If upstream validation has blocking findings,
 the protocol output is blocked and contains no executable group steps.
+`mate-selection-check` is the pre-macro guard: it compares the current
+`selection-report` against the expected mate macro, requires exactly two
+supported face/edge/axis/plane-style entities, and blocks component-level or
+wrong-component selections before a macro can be treated as reviewed.
 
 ## Assembly contract and model understanding
 

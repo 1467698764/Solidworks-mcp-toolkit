@@ -1,13 +1,13 @@
 # SolidWorks Codex Capability Matrix
 
-- Timestamp: `2026-06-03T20:58:22`
-- Capability count: `58`
+- Timestamp: `2026-06-03T21:08:56`
+- Capability count: `59`
 
 ## Coverage
 
-- CLI commands: `58`
-- MCP tools: `44`
-- MCP tools mapped to CLI: `44`
+- CLI commands: `59`
+- MCP tools: `45`
+- MCP tools mapped to CLI: `45`
 - CLI for every local MCP tool: `True`
 - Safety label for every capability: `True`
 - Workflow label for every capability: `True`
@@ -51,6 +51,7 @@
 | `mate-group-plan` | `solidworks_mate_group_plan` | `analysis` | `read_only` | `False` | `repair_plan, interface_index` |
 | `mate-group-validate` | `solidworks_mate_group_validate` | `analysis` | `read_only` | `False` | `mate_group_plan` |
 | `mate-macro` | `solidworks_mate_macro` | `macro_generation` | `generated_reviewable_artifact` | `False` | `mate` |
+| `mate-selection-check` | `solidworks_mate_selection_check` | `analysis` | `read_only` | `False` | `macro_manifest, selection_report` |
 | `mcp-tools` | `solidworks_existing_mcp_tools` | `external_reference` | `offline_reference` | `False` | `-` |
 | `model-understand` | `solidworks_model_understand` | `analysis` | `read_only` | `False` | `report` |
 | `offline-demo` | `solidworks_offline_demo` | `handoff` | `offline_or_read_only` | `False` | `-` |

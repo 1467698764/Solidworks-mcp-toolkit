@@ -151,7 +151,7 @@ Status values:
 | Width/symmetry | missing | Slider centered between guide faces, symmetric jaws, centered plates. | Remaining DOF matches intent. |
 | Limit distance/angle | missing | Travel stops, hinge limits, slider stroke. | Mechanism samples endpoints and midpoints. |
 | Slot/path/cam/gear mates | missing/defer | Mechanism-specific, use when SolidWorks API support is reliable. | Optional until standard mechanism_lite is stable. |
-| Mate groups | partial/offline-ready | Read-only mate group plans, validation gates, reviewable preselect macro drafts, expected mate names, after-inspect execution checks, and per-group live work protocols exist; automatic live entity selection/application is still pending. | Every functional connection has group id, DOF expectation, reviewed live steps, and readback check. |
+| Mate groups | partial/offline-ready | Read-only mate group plans, validation gates, reviewable preselect macro drafts, expected mate names, selection-report prechecks, after-inspect execution checks, and per-group live work protocols exist; automatic live entity selection/application is still pending. | Every functional connection has group id, DOF expectation, reviewed live steps, pre-macro selection evidence, and readback check. |
 | Standard part attachment | partial/offline-ready | Hostless standard parts are detected and grouped into candidate concentric/coincident attachment plans; live entity selection is still required. | No accepted standard/detail component is isolated or hostless. |
 
 ### 6.5 Incremental Repair

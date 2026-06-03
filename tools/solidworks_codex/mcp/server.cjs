@@ -258,6 +258,11 @@ const toolSchemas = [
     inputSchema: { type: 'object', properties: { mate_group_plan: { type: 'string' }, out: { type: 'string' } }, required: ['mate_group_plan'], additionalProperties: false }
   },
   {
+    name: 'solidworks_mate_selection_check',
+    description: 'Validate current selection-report evidence against a mate macro manifest before running a reviewed mate macro: exactly two supported entity selections on expected components.',
+    inputSchema: { type: 'object', properties: { macro_manifest: { type: 'string' }, selection_report: { type: 'string' }, expected_mate_name: { type: 'string' }, out: { type: 'string' } }, required: ['macro_manifest', 'selection_report'], additionalProperties: false }
+  },
+  {
     name: 'solidworks_mate_group_execution_check',
     description: 'Check after-inspect evidence for mate group macro execution: expected named mates exist, are unsuppressed, and report no solver/API errors.',
     inputSchema: { type: 'object', properties: { macro_manifest: { type: 'string' }, after_report: { type: 'string' }, out: { type: 'string' } }, required: ['macro_manifest', 'after_report'], additionalProperties: false }
@@ -558,6 +563,11 @@ async function callTool(name, input) {
       break;
     case 'solidworks_mate_group_validate':
       args.push('mate-group-validate', '-Report', input.mate_group_plan);
+      if (input?.out) args.push('-Out', input.out);
+      break;
+    case 'solidworks_mate_selection_check':
+      args.push('mate-selection-check', '-Report', input.macro_manifest, '-FromReport', input.selection_report);
+      if (input?.expected_mate_name) args.push('-Mate', input.expected_mate_name);
       if (input?.out) args.push('-Out', input.out);
       break;
     case 'solidworks_mate_group_execution_check':

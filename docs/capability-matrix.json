@@ -1,6 +1,6 @@
 {
-  "timestamp": "2026-06-03T20:58:22",
-  "count": 58,
+  "timestamp": "2026-06-03T21:08:56",
+  "count": 59,
   "capabilities": [
     {
       "cli": "assembly-contract",
@@ -450,6 +450,24 @@
       "description": "Generate reviewable VBA macro for adding a mate between two preselected entities."
     },
     {
+      "cli": "mate-selection-check",
+      "mcp": "solidworks_mate_selection_check",
+      "workflow": "analysis",
+      "safety": "read_only",
+      "solidworks_required": false,
+      "required": [
+        "macro_manifest",
+        "selection_report"
+      ],
+      "properties": [
+        "expected_mate_name",
+        "macro_manifest",
+        "out",
+        "selection_report"
+      ],
+      "description": "Validate current selection-report evidence against a mate macro manifest before running a reviewed mate macro: exactly two supported entity selections on expected components."
+    },
+    {
       "cli": "mcp-tools",
       "mcp": "solidworks_existing_mcp_tools",
       "workflow": "external_reference",
@@ -854,9 +872,9 @@
     }
   ],
   "coverage": {
-    "cli_commands": 58,
-    "mcp_tools": 44,
-    "mapped_mcp_tools": 44,
+    "cli_commands": 59,
+    "mcp_tools": 45,
+    "mapped_mcp_tools": 45,
     "has_cli_for_every_local_mcp": true,
     "has_safety_for_every_capability": true,
     "has_workflow_for_every_capability": true,
