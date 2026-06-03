@@ -72,10 +72,10 @@ def sample_assembly_inspect():
             "type": "assembly",
             "component_count_sampled": 4,
             "components": [
-                {"name2": "extrude_cut_plate-1", "transform": {"origin_m": [0.00, 0.00, 0.00]}},
+                {"name2": "extrude_cut_plate-1", "transform": {"origin_m": [0.00, 0.00, -0.006]}},
                 {"name2": "revolve_boss_part-1", "transform": {"origin_m": [0.12, 0.00, 0.00]}},
-                {"name2": "revolve_cut_part-1", "transform": {"origin_m": [0.20, 0.075, 0.00]}},
-                {"name2": "editable_dimension_plate-1", "transform": {"origin_m": [0.00, 0.10, 0.00]}},
+                {"name2": "revolve_cut_part-1", "transform": {"origin_m": [0.12, 0.075, 0.00]}},
+                {"name2": "editable_dimension_plate-1", "transform": {"origin_m": [0.00, 0.10, 0.026]}},
             ],
             "mate_like_features": [
                 {"name": "Concentric_Mate", "type": "MateConcentric", "components": ["revolve_boss_part-1", "revolve_cut_part-1"], "suppressed": False},
@@ -202,10 +202,10 @@ class LiveCapabilitySuiteSpecTests(unittest.TestCase):
     def test_expected_contract_requires_component_placement_readback(self):
         contract = self.module.expected_live_contract()
         placements = contract["assembly_inspect"]["component_placements"]
-        self.assertEqual(placements["extrude_cut_plate"]["origin_m"], (0.00, 0.00, 0.00))
+        self.assertEqual(placements["extrude_cut_plate"]["origin_m"], (0.00, 0.00, -0.006))
         self.assertEqual(placements["revolve_boss_part"]["origin_m"], (0.12, 0.00, 0.00))
-        self.assertEqual(placements["revolve_cut_part"]["origin_m"], (0.20, 0.075, 0.00))
-        self.assertEqual(placements["editable_dimension_plate"]["origin_m"], (0.00, 0.10, 0.00))
+        self.assertEqual(placements["revolve_cut_part"]["origin_m"], (0.12, 0.075, 0.00))
+        self.assertEqual(placements["editable_dimension_plate"]["origin_m"], (0.00, 0.10, 0.026))
         self.assertLessEqual(placements["extrude_cut_plate"]["tolerance_m"], 0.003)
 
     def test_validate_live_result_rejects_missing_or_far_component_placement_readback(self):

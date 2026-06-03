@@ -81,10 +81,10 @@ def expected_live_contract() -> dict[str, Any]:
             "document": "capability_suite.SLDASM",
             "active_document_type": "assembly",
             "component_placements": {
-                "extrude_cut_plate": {"origin_m": (0.00, 0.00, 0.00), "tolerance_m": 0.003},
+                "extrude_cut_plate": {"origin_m": (0.00, 0.00, -0.006), "tolerance_m": 0.003},
                 "revolve_boss_part": {"origin_m": (0.12, 0.00, 0.00), "tolerance_m": 0.003},
-                "revolve_cut_part": {"origin_m": (0.20, 0.075, 0.00), "tolerance_m": 0.003},
-                "editable_dimension_plate": {"origin_m": (0.00, 0.10, 0.00), "tolerance_m": 0.003},
+                "revolve_cut_part": {"origin_m": (0.12, 0.075, 0.00), "tolerance_m": 0.003},
+                "editable_dimension_plate": {"origin_m": (0.00, 0.10, 0.026), "tolerance_m": 0.003},
             },
             "mates": {
                 "Concentric_Mate": {

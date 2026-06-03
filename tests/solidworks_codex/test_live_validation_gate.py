@@ -82,10 +82,10 @@ def capability_assembly_inspect():
             "type": "assembly",
             "component_count_sampled": 4,
             "components": [
-                {"name2": "extrude_cut_plate-1", "transform": {"origin_m": [0.00, 0.00, 0.00]}},
+                {"name2": "extrude_cut_plate-1", "transform": {"origin_m": [0.00, 0.00, -0.006]}},
                 {"name2": "revolve_boss_part-1", "transform": {"origin_m": [0.12, 0.00, 0.00]}},
-                {"name2": "revolve_cut_part-1", "transform": {"origin_m": [0.20, 0.075, 0.00]}},
-                {"name2": "editable_dimension_plate-1", "transform": {"origin_m": [0.00, 0.10, 0.00]}},
+                {"name2": "revolve_cut_part-1", "transform": {"origin_m": [0.12, 0.075, 0.00]}},
+                {"name2": "editable_dimension_plate-1", "transform": {"origin_m": [0.00, 0.10, 0.026]}},
             ],
             "mate_like_features": [
                 {"name": "Concentric_Mate", "type": "MateConcentric", "components": ["revolve_boss_part-1", "revolve_cut_part-1"], "suppressed": False},
