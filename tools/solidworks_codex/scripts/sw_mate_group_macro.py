@@ -19,16 +19,25 @@ def load_json(path: Path) -> dict[str, Any]:
 
 
 def safe_name(text: str) -> str:
-    name = re.sub(r"[^A-Za-z0-9_.-]+", "_", text).strip("_")
+    name = re.sub(r"[^A-Za-z0-9_.]+", "_", text).strip("_")
     return name or "mate"
 
 
-def annotated_macro(group: dict[str, Any], mate: dict[str, Any]) -> str:
+def expected_mate_name(group_id: str, index: int, mate_type: str) -> str:
+    return f"MG_{safe_name(group_id)}_{index:02d}_{safe_name(mate_type)}"
+
+
+def annotated_macro(group: dict[str, Any], mate: dict[str, Any], mate_name: str) -> str:
     mate_type = str(mate.get("type", "")).casefold()
     base = macro(mate_type, float(mate.get("distance_m", 0.0) or 0.0), float(mate.get("angle_deg", 0.0) or 0.0), bool(mate.get("flip", False)))
+    base = base.replace(
+        "    Part.ForceRebuild3 False",
+        f'    If Not MateFeature Is Nothing Then MateFeature.Name = "{mate_name}"\n    Part.ForceRebuild3 False',
+    )
     header = [
         "' Mate group macro draft.",
         f"' Group: {group.get('group_id')}",
+        f"' Expected mate name: {mate_name}",
         f"' Components: {', '.join(str(c) for c in group.get('components', []))}",
         f"' Selection intent: {mate.get('selection_intent', '')}",
         "' Review, preselect exactly two live SolidWorks entities, run, rebuild, then inspect.",
@@ -51,12 +60,14 @@ def build_macros(plan: dict[str, Any], *, out_dir: Path) -> dict[str, Any]:
             if mate_type not in SUPPORTED_TYPES or mate_type not in MATE_TYPES:
                 skipped.append({"group_id": group_id, "mate_type": mate_type, "reason": "unsupported_mate_type"})
                 continue
+            mate_name = expected_mate_name(group_id, index, mate_type)
             path = out_dir / f"{safe_name(group_id)}_{index:02d}_{mate_type}.swp.vba"
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(annotated_macro(group, mate), encoding="utf-8")
+            path.write_text(annotated_macro(group, mate, mate_name), encoding="utf-8")
             macros.append({
                 "group_id": group_id,
                 "mate_type": mate_type,
+                "expected_mate_name": mate_name,
                 "macro": str(path.resolve()),
                 "components": group.get("components", []),
                 "selection_intent": mate.get("selection_intent", ""),

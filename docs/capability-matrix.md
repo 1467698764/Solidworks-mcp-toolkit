@@ -1,13 +1,13 @@
 # SolidWorks Codex Capability Matrix
 
-- Timestamp: `2026-06-03T20:30:56`
-- Capability count: `56`
+- Timestamp: `2026-06-03T20:48:11`
+- Capability count: `57`
 
 ## Coverage
 
-- CLI commands: `56`
-- MCP tools: `42`
-- MCP tools mapped to CLI: `42`
+- CLI commands: `57`
+- MCP tools: `43`
+- MCP tools mapped to CLI: `43`
 - CLI for every local MCP tool: `True`
 - Safety label for every capability: `True`
 - Workflow label for every capability: `True`
@@ -45,6 +45,7 @@
 | `issue-report` | `solidworks_issue_report` | `analysis` | `read_only` | `False` | `report` |
 | `live-gate` | `-` | `release_gate` | `offline_gate` | `True` | `-` |
 | `mass` | `solidworks_mass_properties` | `discover` | `read_only` | `True` | `-` |
+| `mate-group-execution-check` | `solidworks_mate_group_execution_check` | `verify_export` | `verification_or_export` | `False` | `macro_manifest, after_report` |
 | `mate-group-macro` | `solidworks_mate_group_macro` | `macro_generation` | `generated_reviewable_artifact` | `False` | `mate_group_plan` |
 | `mate-group-plan` | `solidworks_mate_group_plan` | `analysis` | `read_only` | `False` | `repair_plan, interface_index` |
 | `mate-group-validate` | `solidworks_mate_group_validate` | `analysis` | `read_only` | `False` | `mate_group_plan` |

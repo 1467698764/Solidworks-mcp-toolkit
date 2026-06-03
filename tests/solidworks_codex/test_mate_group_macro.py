@@ -63,6 +63,7 @@ class MateGroupMacroTests(unittest.TestCase):
             self.assertEqual(data["mode"], "reviewable_mate_group_macros")
             self.assertEqual(data["document"]["title"], "macro_fixture.SLDASM")
             self.assertEqual(len(data["macros"]), 2)
+            self.assertEqual(data["macros"][0]["expected_mate_name"], "MG_standard_bolt_m6_1_01_concentric")
             self.assertEqual(data["skipped"][0]["group_id"], "classify_handle-1")
             first_macro = Path(data["macros"][0]["macro"])
             self.assertTrue(first_macro.exists())
@@ -70,6 +71,7 @@ class MateGroupMacroTests(unittest.TestCase):
             self.assertIn("Preselect exactly two mate entities", text)
             self.assertIn("Group: standard_bolt_m6-1", text)
             self.assertIn("Mate type: concentric", text)
+            self.assertIn('MateFeature.Name = "MG_standard_bolt_m6_1_01_concentric"', text)
             self.assertTrue(data["preselect_required"])
 
     def test_swctl_routes_mate_group_macro(self):

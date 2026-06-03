@@ -258,6 +258,11 @@ const toolSchemas = [
     inputSchema: { type: 'object', properties: { mate_group_plan: { type: 'string' }, out: { type: 'string' } }, required: ['mate_group_plan'], additionalProperties: false }
   },
   {
+    name: 'solidworks_mate_group_execution_check',
+    description: 'Check after-inspect evidence for mate group macro execution: expected named mates exist, are unsuppressed, and report no solver/API errors.',
+    inputSchema: { type: 'object', properties: { macro_manifest: { type: 'string' }, after_report: { type: 'string' }, out: { type: 'string' } }, required: ['macro_manifest', 'after_report'], additionalProperties: false }
+  },
+  {
     name: 'solidworks_assembly_review_pipeline',
     description: 'Run the read-only assembly review pipeline from one inspect report and write diagnosis, interface index, repair plan, mate group plan, and manifest artifacts.',
     inputSchema: { type: 'object', properties: { report: { type: 'string' }, out_dir: { type: 'string' }, near_tolerance_m: { type: 'number' }, standard_part_regex: { type: 'string' } }, required: ['report'], additionalProperties: false }
@@ -548,6 +553,10 @@ async function callTool(name, input) {
       break;
     case 'solidworks_mate_group_validate':
       args.push('mate-group-validate', '-Report', input.mate_group_plan);
+      if (input?.out) args.push('-Out', input.out);
+      break;
+    case 'solidworks_mate_group_execution_check':
+      args.push('mate-group-execution-check', '-Report', input.macro_manifest, '-After', input.after_report);
       if (input?.out) args.push('-Out', input.out);
       break;
     case 'solidworks_assembly_review_pipeline':
