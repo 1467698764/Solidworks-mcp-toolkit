@@ -26,7 +26,7 @@ Codex / MCP client
 1. Read-only commands produce JSON or Markdown evidence reports.
 2. Analysis commands consume inspect/session reports and generate context, search results, design reviews, change plans, model understanding, or handoff bundles.
 3. Write commands stay narrow: backup first, one dimension/component/feature workflow at a time, rebuild, inspect, compare, verify.
-4. Assembly contract commands convert user intent into reusable evidence gates: component existence, Transform/origin placement, semantic mate network, suppressed state, and participation evidence.
+4. Assembly contract commands convert user intent into reusable evidence gates: component existence, Transform/origin placement, semantic mate network, suppressed state, and participation evidence. They support blocking/warning/not_applicable severities so contract evidence can stay profile-aware.
 5. Release commands validate the repository itself: GitHub readiness, repo health, public copy guard, release-tree, audit, capability matrix, and finalize.
 
 ## Validation architecture
@@ -45,7 +45,7 @@ The project separates validation into four practical layers:
 Live gate is where runtime truth outranks source assumptions. It validates SolidWorks-native behavior through three gates:
 
 - `live_session_smoke` proves the minimal COM/session/mate/interference/cleanup path.
-- `live_capability_suite` proves feature creation and edit primitives: extrude, cut, revolve, revolved cut, sketch dimension read/modify/rebuild/save, assembly insert, concentric mate, distance mate, interference, mass, close/cleanup.
+- `live_capability_suite` proves feature creation and edit primitives: extrude, cut, revolve, revolved cut, sketch dimension read/modify/rebuild/save, assembly insert, concentric mate, distance mate, interference, mass, component placement readback, close/cleanup.
 - `complete_shaper_v5` uses a bullhead shaper as a stress test: 24 parts, 58 components, 22 semantic mates, 21 restored/fixed primary components via Transform2.ArrayData, and 0 interference.
 
 The bullhead shaper is not the product boundary; it is a deliberately hard fixture that forces the generic control layer to prove real assembly behavior.

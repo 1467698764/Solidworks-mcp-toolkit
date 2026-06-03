@@ -87,6 +87,59 @@ class AssemblyContractTests(unittest.TestCase):
             self.assertIn("component_origin", kinds)
             self.assertIn("mate_components", kinds)
 
+
+
+    def test_contract_matches_solidworks_instance_suffix_without_breaking_hyphenated_names(self):
+        report = self.sample_report()
+        report["active_document"]["components"][2]["name2"] = "drive-shaft-1"
+        report["active_document"]["mate_like_features"][1]["components"] = ["drive-shaft-1", "bearing_block-1"]
+        contract = self.sample_contract()
+        contract["components"].pop("drive_shaft")
+        contract["components"]["drive-shaft"] = {"required": True}
+        contract["mates"]["Shaft_Bearing_Concentric"]["semantic_pair"] = ["drive-shaft", "bearing_block"]
+        result = __import__("runpy").run_path(str(ROOT / "tools/solidworks_codex/scripts/sw_assembly_contract.py"))["validate"](report, contract)
+        self.assertTrue(result["ok"], result)
+        accepted = {(item["kind"], item["key"]) for item in result["accepted"]}
+        self.assertIn(("component_present", "drive-shaft"), accepted)
+        self.assertIn(("mate_components", "Shaft_Bearing_Concentric"), accepted)
+
+    def test_contract_does_not_accept_substring_component_pair_matches(self):
+        report = self.sample_report()
+        report["active_document"]["components"].append({"name2": "pinion-1", "suppressed": False, "transform": {"origin_m": [0.2, 0.0, 0.0]}})
+        report["active_document"]["mate_like_features"].append({"name": "Pin_Plate_Mate", "type": "MateConcentric", "components": ["pinion-1", "base_plate-1"], "suppressed": False})
+        contract = {"document_type": "assembly", "components": {"pin": {"required": False}, "base_plate": {"required": True}}, "mates": {"Pin_Plate_Mate": {"type": "MateConcentric", "semantic_pair": ["pin", "base_plate"]}}}
+        result = __import__("runpy").run_path(str(ROOT / "tools/solidworks_codex/scripts/sw_assembly_contract.py"))["validate"](report, contract)
+        self.assertFalse(result["ok"], result)
+        self.assertIn("mate_components", {item["kind"] for item in result["failed"]})
+
+    def test_contract_supports_warning_severity_without_blocking_exit_code(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            report = root / "inspect.json"
+            contract = root / "contract.json"
+            out = root / "contract_result.json"
+            warning_contract = self.sample_contract()
+            warning_contract["components"]["optional_guard"] = {"required": True, "severity": "warning", "reason": "nice-to-have guard component for release profile"}
+            warning_contract["mates"]["Optional_Guard_Mate"] = {"type": "MateCoincident", "semantic_pair": ["optional_guard", "base_plate"], "severity": "warning"}
+            report.write_text(json.dumps(self.sample_report()), encoding="utf-8")
+            contract.write_text(json.dumps(warning_contract), encoding="utf-8")
+            proc = run_py("tools/solidworks_codex/scripts/sw_assembly_contract.py", "--report", str(report), "--contract", str(contract), "--out", str(out))
+            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+            data = json.loads(out.read_text(encoding="utf-8-sig"))
+            self.assertTrue(data["ok"], data)
+            self.assertEqual(data["summary"]["failed"], 0)
+            self.assertGreaterEqual(data["summary"]["warnings"], 2)
+            warning_kinds = {item["kind"] for item in data["warnings"]}
+            self.assertIn("component_missing", warning_kinds)
+            self.assertIn("mate_missing", warning_kinds)
+
+    def test_contract_rejects_unknown_severity_to_keep_contracts_reviewable(self):
+        contract = self.sample_contract()
+        contract["components"]["base_plate"]["severity"] = "maybe"
+        result = __import__("runpy").run_path(str(ROOT / "tools/solidworks_codex/scripts/sw_assembly_contract.py"))["validate"](self.sample_report(), contract)
+        self.assertFalse(result["ok"])
+        self.assertIn("contract_severity", {item["kind"] for item in result["failed"]})
+
     def test_swctl_exposes_assembly_contract_exit_code(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)

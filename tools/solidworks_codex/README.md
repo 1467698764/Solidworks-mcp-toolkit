@@ -43,7 +43,7 @@ Offline tests prove syntax and report logic. Real CAD behavior is checked by the
 .\tools\solidworks_codex\swctl.ps1 live-gate -CleanupStale -Out tools\solidworks_codex\reports\live_validation_gate.json
 ```
 
-Live deliverables are native `.SLDASM/.SLDPRT`; STEP optional smoke is not the primary acceptance criterion. The current bullhead shaper stress fixture is `shaper_machine_v5` and records `24 parts`, `58 components`, `22 semantic mates`, `21 restored/fixed primary components`, `Transform2.ArrayData`, a verified mate network, and `0 interference` when healthy.
+Live deliverables are native `.SLDASM/.SLDPRT`; STEP optional smoke is not the primary acceptance criterion. The live capability suite now checks `assembly_component_placements` component Transform2/origin placement readback for its inserted assembly components. The current bullhead shaper stress fixture is `shaper_machine_v5` and records `24 parts`, `58 components`, `22 semantic mates`, `21 restored/fixed primary components`, `Transform2.ArrayData`, a verified mate network, and `0 interference` when healthy.
 
 `CleanupStale` is bounded to old generated shaper fixture directories. The gate runs serially, scans `~$` lock files, and avoids unnecessary SolidWorks windows where possible.
 

@@ -63,7 +63,7 @@ Allowing the command to launch SolidWorks is explicit:
 
 ## Assembly contract and model understanding
 
-`assembly-contract` is a reusable offline gate for inspect reports. It checks document type, minimum component count, required component prefixes, Transform/origin tolerance, semantic mate type, mate suppression state, and expected participating components.
+`assembly-contract` is a reusable offline gate for inspect reports. It checks document type, minimum component count, required component prefixes, Transform/origin tolerance, semantic mate type, mate suppression state, and expected participating components. Contract entries may set severity to `blocking`, `warning`, or `not_applicable`; warnings are reported without failing the command, while unknown severities fail so contracts stay reviewable. Component matching removes only SolidWorks instance suffixes such as `-1`, so hyphenated part names remain precise and substring pair matches are rejected.
 
 ```powershell
 .\tools\solidworks_codex\swctl.ps1 assembly-contract `
@@ -87,7 +87,7 @@ The underlying script flag is `--cleanup-stale`; `CleanupStale` is the PowerShel
 Live gate layers:
 
 - `live_session_smoke`: minimal COM/session/mate/interference/cleanup path.
-- `live_capability_suite`: extrude, cut, revolve, revolved cut, sketch dimension read/modify/rebuild/save, assembly insertion, concentric mate, distance mate, interference callback, mass callback, close/cleanup, and selection-isolation evidence.
+- `live_capability_suite`: extrude, cut, revolve, revolved cut, sketch dimension read/modify/rebuild/save, assembly insertion, concentric mate, distance mate, interference callback, mass callback, close/cleanup, and selection-isolation evidence, and `assembly_component_placements` component Transform2/origin placement readback for the inserted assembly components.
 - `complete_shaper_v5`: bullhead shaper stress test at `tools/solidworks_codex/live_fixture/shaper_machine_v5/bullhead_shaper_complete.SLDASM` with report `tools/solidworks_codex/reports/shaper_machine_v5/complete_shaper_build.json`.
 
 Current shaper evidence:

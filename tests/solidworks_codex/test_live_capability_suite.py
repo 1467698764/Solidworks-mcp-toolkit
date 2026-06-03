@@ -71,6 +71,12 @@ def sample_assembly_inspect():
         "active_document": {
             "type": "assembly",
             "component_count_sampled": 4,
+            "components": [
+                {"name2": "extrude_cut_plate-1", "transform": {"origin_m": [0.00, 0.00, 0.00]}},
+                {"name2": "revolve_boss_part-1", "transform": {"origin_m": [0.12, 0.00, 0.00]}},
+                {"name2": "revolve_cut_part-1", "transform": {"origin_m": [0.20, 0.075, 0.00]}},
+                {"name2": "editable_dimension_plate-1", "transform": {"origin_m": [0.00, 0.10, 0.00]}},
+            ],
             "mate_like_features": [
                 {"name": "Concentric_Mate", "type": "MateConcentric", "components": ["revolve_boss_part-1", "revolve_cut_part-1"], "suppressed": False},
                 {"name": "Distance_Mate", "type": "MateDistanceDim", "components": ["extrude_cut_plate-1", "editable_dimension_plate-1"], "suppressed": False},
@@ -191,6 +197,49 @@ class LiveCapabilitySuiteSpecTests(unittest.TestCase):
         self.assertIn("components", capability.acceptance_checks)
         self.assertIn("not_suppressed", capability.acceptance_checks)
 
+
+
+    def test_expected_contract_requires_component_placement_readback(self):
+        contract = self.module.expected_live_contract()
+        placements = contract["assembly_inspect"]["component_placements"]
+        self.assertEqual(placements["extrude_cut_plate"]["origin_m"], (0.00, 0.00, 0.00))
+        self.assertEqual(placements["revolve_boss_part"]["origin_m"], (0.12, 0.00, 0.00))
+        self.assertEqual(placements["revolve_cut_part"]["origin_m"], (0.20, 0.075, 0.00))
+        self.assertEqual(placements["editable_dimension_plate"]["origin_m"], (0.00, 0.10, 0.00))
+        self.assertLessEqual(placements["extrude_cut_plate"]["tolerance_m"], 0.003)
+
+    def test_validate_live_result_rejects_missing_or_far_component_placement_readback(self):
+        result = {
+            "features": {
+                "extrude": [{"name": "Body_Plate"}, {"name": "Round_Through_Hole"}, {"name": "Rectangular_Window_Cut"}],
+                "revolve": [{"name": "Revolve_Boss_Profile"}],
+                "revolve_cut": [{"name": "Revolve_Boss_Profile"}, {"name": "Revolve_Cut_Bore"}],
+                "editable": [{"name": "Body_Editable_Plate"}, {"name": "Edited_Sketch_Dimension"}],
+            },
+            "dimension_edit": {"dimension": "D1@Edited_Sketch_Dimension", "before_m": 0.02, "after_m": 0.024},
+            "reopen_modify": {"dimension": "D1@Edited_Sketch_Dimension", "before_m": 0.024, "target_m": 0.028, "after_reopen_m": 0.028, "persisted": True, "save": {"ok": True, "errors": 0, "warnings": 0}},
+            "assembly_result": {"component_count": 4, "mates": sample_mates()},
+            "assembly_features": [{"name": "Concentric_Mate"}, {"name": "Distance_Mate"}],
+            "assembly_inspect": sample_assembly_inspect(),
+            "callbacks": {"mass": {"available": True, "mass_kg": 1.0}, "interference": {"available": True, "count": 0}},
+            "native_artifacts": {"assembly_exists": True, "part_count": 4, "part_files": ["a.SLDPRT", "b.SLDPRT", "c.SLDPRT", "d.SLDPRT"]},
+            "cleanup": {"locked_files": []},
+            "post_cleanup": {"locked_files": []},
+            "operation_context": sample_operation_context(self.module),
+        }
+        validation = self.module.validate_live_result(result)
+        self.assertTrue(validation["ok"], validation)
+
+        del result["assembly_inspect"]["active_document"]["components"][0]["transform"]
+        validation = self.module.validate_live_result(result)
+        self.assertFalse(validation["ok"])
+        self.assertIn("assembly_component_placements", validation["failed_capabilities"])
+
+        result["assembly_inspect"] = sample_assembly_inspect()
+        result["assembly_inspect"]["active_document"]["components"][2]["transform"]["origin_m"] = [9.0, 9.0, 9.0]
+        validation = self.module.validate_live_result(result)
+        self.assertFalse(validation["ok"])
+        self.assertIn("assembly_component_placements", validation["failed_capabilities"])
 
     def test_expected_contract_includes_reopen_persistence_check(self):
         contract = self.module.expected_live_contract()

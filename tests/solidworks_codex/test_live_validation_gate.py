@@ -81,6 +81,12 @@ def capability_assembly_inspect():
         "active_document": {
             "type": "assembly",
             "component_count_sampled": 4,
+            "components": [
+                {"name2": "extrude_cut_plate-1", "transform": {"origin_m": [0.00, 0.00, 0.00]}},
+                {"name2": "revolve_boss_part-1", "transform": {"origin_m": [0.12, 0.00, 0.00]}},
+                {"name2": "revolve_cut_part-1", "transform": {"origin_m": [0.20, 0.075, 0.00]}},
+                {"name2": "editable_dimension_plate-1", "transform": {"origin_m": [0.00, 0.10, 0.00]}},
+            ],
             "mate_like_features": [
                 {"name": "Concentric_Mate", "type": "MateConcentric", "components": ["revolve_boss_part-1", "revolve_cut_part-1"], "suppressed": False},
                 {"name": "Distance_Mate", "type": "MateDistanceDim", "components": ["extrude_cut_plate-1", "editable_dimension_plate-1"], "suppressed": False},
@@ -284,6 +290,7 @@ class LiveValidationGateSpecTests(unittest.TestCase):
         self.assertIn("assembly_mates_persisted", expectations["live_capability_suite"].strict_checks)
         self.assertIn("open_existing_modify_reopen", expectations["live_capability_suite"].strict_checks)
         self.assertIn("operation_context_guards", expectations["live_capability_suite"].strict_checks)
+        self.assertIn("assembly_component_placements", expectations["live_capability_suite"].strict_checks)
         self.assertIn("part_count", expectations["complete_shaper_v5"].strict_checks)
         self.assertIn("component_count", expectations["complete_shaper_v5"].strict_checks)
         self.assertIn("mate_semantics", expectations["complete_shaper_v5"].strict_checks)
@@ -392,6 +399,18 @@ class LiveValidationGateSpecTests(unittest.TestCase):
         report["assembly_result"]["mates"] = capability_mates()
         report["assembly_inspect"]["active_document"]["mate_like_features"][0]["components"] = ["wrong-1", "revolve_cut_part-1"]
         self.assertTrue(self.module._strict_check_failed(report, "assembly_mates_persisted"))
+
+
+    def test_capability_gate_rejects_missing_or_far_component_placement_readback(self):
+        report = {"assembly_inspect": capability_assembly_inspect()}
+        self.assertFalse(self.module._strict_check_failed(report, "assembly_component_placements"))
+
+        del report["assembly_inspect"]["active_document"]["components"][0]["transform"]
+        self.assertTrue(self.module._strict_check_failed(report, "assembly_component_placements"))
+
+        report = {"assembly_inspect": capability_assembly_inspect()}
+        report["assembly_inspect"]["active_document"]["components"][2]["transform"]["origin_m"] = [9.0, 9.0, 9.0]
+        self.assertTrue(self.module._strict_check_failed(report, "assembly_component_placements"))
 
     def test_shaper_strict_inspect_rejects_same_named_mates_without_details(self):
         report = {

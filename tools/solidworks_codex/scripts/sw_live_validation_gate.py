@@ -127,6 +127,7 @@ def capability_suite_strict_checks() -> tuple[str, ...]:
     return (
         "native_solidworks_artifacts",
         "assembly_mates_persisted",
+        "assembly_component_placements",
         "open_existing_modify_reopen",
         "operation_context_guards",
         "interference_callback",
@@ -168,6 +169,46 @@ def _functional_connection_pairs() -> list[tuple[str, str]]:
     shaper = _load_shaper_builder_module()
     return [tuple(pair) for pair in shaper.expected_shaper_functional_connection_contract()]
 
+
+
+def _load_capability_suite_module() -> Any:
+    module_name = "_solidworks_codex_live_capability_suite_contract"
+    existing = sys.modules.get(module_name)
+    if existing is not None:
+        return existing
+    script = ROOT / "tools" / "solidworks_codex" / "scripts" / "sw_live_capability_suite.py"
+    spec = importlib.util.spec_from_file_location(module_name, script)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"could not load capability suite module spec from {script}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _expected_capability_component_placements() -> dict[str, dict[str, Any]]:
+    suite = _load_capability_suite_module()
+    return suite.expected_live_contract()["assembly_inspect"]["component_placements"]
+
+
+def _capability_component_placements_ok(doc: dict[str, Any]) -> bool:
+    components = doc.get("components", [])
+    if not isinstance(components, list):
+        return False
+    by_name = {str(component.get("name2", "")): component for component in components if isinstance(component, dict)}
+    for component_name, expected in _expected_capability_component_placements().items():
+        component = by_name.get(f"{component_name}-1")
+        if not component:
+            return False
+        origin = _component_origin(component)
+        expected_origin = expected.get("origin_m")
+        tolerance = float(expected.get("tolerance_m", 0.003))
+        if origin is None or not isinstance(expected_origin, (list, tuple)) or len(expected_origin) != 3:
+            return False
+        for index, value in enumerate(expected_origin):
+            if abs(origin[index] - float(value)) > tolerance:
+                return False
+    return True
 
 def _load_shaper_builder_module() -> Any:
     """Load the shaper builder by file path, independent of the caller's cwd.
@@ -320,6 +361,10 @@ def _strict_check_failed(data: dict[str, Any], check: str) -> bool:
     if check == "native_solidworks_artifacts":
         native = data.get("native_artifacts", {})
         return not native.get("assembly_exists") or int(native.get("part_count", 0) or 0) < 4 or not native.get("primary")
+    if check == "assembly_component_placements":
+        inspect = data.get("assembly_inspect", {})
+        doc = inspect.get("active_document", {}) if isinstance(inspect, dict) else {}
+        return doc.get("type") != "assembly" or not _capability_component_placements_ok(doc)
     if check == "assembly_mates_persisted":
         names = {str(item.get("name", "")) for item in data.get("assembly_features", []) if isinstance(item, dict)}
         if not {"Concentric_Mate", "Distance_Mate"}.issubset(names):

@@ -52,6 +52,7 @@ def build_capability_matrix() -> CapabilityMatrix:
         C("read_modify_rebuild", "editable_dimension_plate.SLDPRT", ("before_after_dimension_delta",), "read existing parameter, modify, rebuild and save"),
         C("open_existing_modify_reopen", "editable_dimension_plate.SLDPRT", ("open_existing", "modify_save", "reopen_persisted"), "open a saved native part, read/modify/save a dimension, close it, and reopen to prove persistence"),
         C("assembly_insert_component", "capability_suite.SLDASM", ("component_count>=3",), "insert generated components into assembly"),
+        C("assembly_component_placements", "capability_suite.SLDASM", ("Transform2.origin_m", "placement_tolerance"), "inspect native assembly and verify inserted component origins"),
         C("assembly_mate_concentric", "capability_suite.SLDASM", ("Concentric_Mate",), "add at least one concentric mate or record mate API error"),
         C("assembly_mate_distance", "capability_suite.SLDASM", ("Distance_Mate",), "add at least one distance mate or record mate API error"),
         C("assembly_mate_inspect_readback", "capability_suite.SLDASM", ("mate_like_features", "components", "not_suppressed"), "reopen/inspect native assembly and verify mate type plus participating components"),
@@ -79,6 +80,12 @@ def expected_live_contract() -> dict[str, Any]:
         "assembly_inspect": {
             "document": "capability_suite.SLDASM",
             "active_document_type": "assembly",
+            "component_placements": {
+                "extrude_cut_plate": {"origin_m": (0.00, 0.00, 0.00), "tolerance_m": 0.003},
+                "revolve_boss_part": {"origin_m": (0.12, 0.00, 0.00), "tolerance_m": 0.003},
+                "revolve_cut_part": {"origin_m": (0.20, 0.075, 0.00), "tolerance_m": 0.003},
+                "editable_dimension_plate": {"origin_m": (0.00, 0.10, 0.00), "tolerance_m": 0.003},
+            },
             "mates": {
                 "Concentric_Mate": {
                     "type": "MateConcentric",
@@ -277,6 +284,50 @@ def _feature_name_set(result: dict[str, Any], key: str) -> set[str]:
     return {str(item.get("name", "")) for item in result.get("features", {}).get(key, []) if isinstance(item, dict)}
 
 
+
+def component_origin(component: dict[str, Any]) -> list[float] | None:
+    transform = component.get("transform")
+    if isinstance(transform, dict):
+        origin = transform.get("origin_m")
+        if isinstance(origin, list) and len(origin) == 3:
+            try:
+                return [float(value) for value in origin]
+            except (TypeError, ValueError):
+                return None
+    raw = component.get("transform_array") or component.get("transform_m")
+    if isinstance(raw, list) and len(raw) >= 12:
+        try:
+            return [float(raw[9]), float(raw[10]), float(raw[11])]
+        except (TypeError, ValueError):
+            return None
+    return None
+
+
+def validate_assembly_component_placements(result: dict[str, Any]) -> dict[str, Any]:
+    failed: list[str] = []
+    details: dict[str, Any] = {}
+    inspect = result.get("assembly_inspect", {})
+    doc = inspect.get("active_document", {}) if isinstance(inspect, dict) else {}
+    components = doc.get("components", [])
+    if not isinstance(components, list):
+        return {"ok": False, "failed": ["components"], "details": {"components": components}}
+    by_name = {str(component.get("name2", "")): component for component in components if isinstance(component, dict)}
+    placements = expected_live_contract()["assembly_inspect"]["component_placements"]
+    for component_name, expected in placements.items():
+        component = by_name.get(f"{component_name}-1")
+        if not component:
+            failed.append(f"{component_name}:missing")
+            details[component_name] = {"expected": expected, "actual": None}
+            continue
+        origin = component_origin(component)
+        expected_origin = expected.get("origin_m")
+        tolerance = float(expected.get("tolerance_m", 0.003))
+        ok = origin is not None and isinstance(expected_origin, (list, tuple)) and len(expected_origin) == 3 and all(abs(origin[i] - float(expected_origin[i])) <= tolerance for i in range(3))
+        if not ok:
+            failed.append(f"{component_name}:origin")
+            details[component_name] = {"expected": expected_origin, "actual": origin, "tolerance_m": tolerance}
+    return {"ok": not failed, "failed": failed, "details": details}
+
 def validate_live_result(result: dict[str, Any]) -> dict[str, Any]:
     """Validate live SolidWorks evidence without trusting the script exit code."""
     failed: list[str] = []
@@ -335,6 +386,10 @@ def validate_live_result(result: dict[str, Any]) -> dict[str, Any]:
     if not assembly_inspect_validation["ok"]:
         failed.append("assembly_inspect_mates")
         details["assembly_inspect_mates"] = assembly_inspect_validation
+    placement_validation = validate_assembly_component_placements(result)
+    if not placement_validation["ok"]:
+        failed.append("assembly_component_placements")
+        details["assembly_component_placements"] = placement_validation
 
     callbacks = result.get("callbacks", {})
     mass = callbacks.get("mass", {})
