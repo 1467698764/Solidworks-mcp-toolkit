@@ -238,6 +238,11 @@ const toolSchemas = [
     inputSchema: { type: 'object', properties: { diagnosis: { type: 'string' }, out: { type: 'string' }, markdown_out: { type: 'string' } }, required: ['diagnosis'], additionalProperties: false }
   },
   {
+    name: 'solidworks_interface_index',
+    description: 'Build a read-only heuristic component/interface index from an inspect report: bbox contact candidates, nearest neighbors, standard-part hints, and root/suppression role hints.',
+    inputSchema: { type: 'object', properties: { report: { type: 'string' }, out: { type: 'string' }, near_tolerance_m: { type: 'number' }, standard_part_regex: { type: 'string' } }, required: ['report'], additionalProperties: false }
+  },
+  {
     name: 'solidworks_worklog',
     description: 'Append a durable worklog event for multi-turn decisions, assumptions, verification, failures, and next steps.',
     inputSchema: {
@@ -504,6 +509,12 @@ async function callTool(name, input) {
       args.push('assembly-repair-plan', '-Report', input.diagnosis);
       if (input?.out) args.push('-Out', input.out);
       if (input?.markdown_out) args.push('-JsonOut', input.markdown_out);
+      break;
+    case 'solidworks_interface_index':
+      args.push('interface-index', '-Report', input.report);
+      if (input?.out) args.push('-Out', input.out);
+      if (input?.near_tolerance_m !== undefined) args.push('-DistanceMm', String(input.near_tolerance_m * 1000));
+      if (input?.standard_part_regex) args.push('-Target', input.standard_part_regex);
       break;
     case 'solidworks_worklog':
       args.push('worklog', '-Message', input.message);

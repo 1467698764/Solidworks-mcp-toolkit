@@ -1,13 +1,13 @@
 # SolidWorks Codex Capability Matrix
 
-- Timestamp: `2026-06-03T19:19:32`
-- Capability count: `51`
+- Timestamp: `2026-06-03T19:22:51`
+- Capability count: `52`
 
 ## Coverage
 
-- CLI commands: `51`
-- MCP tools: `37`
-- MCP tools mapped to CLI: `37`
+- CLI commands: `52`
+- MCP tools: `38`
+- MCP tools mapped to CLI: `38`
 - CLI for every local MCP tool: `True`
 - Safety label for every capability: `True`
 - Workflow label for every capability: `True`
@@ -39,6 +39,7 @@
 | `github-readiness` | `-` | `release_gate` | `offline_gate` | `False` | `-` |
 | `handoff-bundle` | `solidworks_handoff_bundle` | `handoff` | `offline_or_read_only` | `False` | `report` |
 | `inspect` | `solidworks_inspect` | `discover` | `read_only` | `True` | `-` |
+| `interface-index` | `solidworks_interface_index` | `analysis` | `read_only` | `False` | `report` |
 | `interference` | `solidworks_interference_check` | `verify_export` | `verification_or_export` | `True` | `-` |
 | `issue-report` | `solidworks_issue_report` | `analysis` | `read_only` | `False` | `report` |
 | `live-gate` | `-` | `release_gate` | `offline_gate` | `True` | `-` |
