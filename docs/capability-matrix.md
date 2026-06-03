@@ -1,13 +1,13 @@
 # SolidWorks Codex Capability Matrix
 
-- Timestamp: `2026-06-03T19:15:11`
-- Capability count: `50`
+- Timestamp: `2026-06-03T19:19:32`
+- Capability count: `51`
 
 ## Coverage
 
-- CLI commands: `50`
-- MCP tools: `36`
-- MCP tools mapped to CLI: `36`
+- CLI commands: `51`
+- MCP tools: `37`
+- MCP tools mapped to CLI: `37`
 - CLI for every local MCP tool: `True`
 - Safety label for every capability: `True`
 - Workflow label for every capability: `True`
@@ -24,6 +24,7 @@
 | --- | --- | --- | --- | --- | --- |
 | `assembly-contract` | `-` | `verify_export` | `verification_or_export` | `False` | `-` |
 | `assembly-diagnose` | `solidworks_assembly_diagnose` | `analysis` | `read_only` | `False` | `report` |
+| `assembly-repair-plan` | `solidworks_assembly_repair_plan` | `analysis` | `read_only` | `False` | `diagnosis` |
 | `audit` | `solidworks_audit` | `release_gate` | `offline_gate` | `False` | `-` |
 | `backup` | `solidworks_backup` | `guarded_edit` | `guarded_write` | `False` | `files` |
 | `backup-status` | `solidworks_backup_status` | `guarded_edit` | `guarded_write` | `False` | `report` |
