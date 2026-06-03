@@ -58,22 +58,41 @@ def expected_names(items: list[dict[str, Any]]) -> list[str]:
     return [str(item.get("expected_mate_name")) for item in items if item.get("expected_mate_name")]
 
 
-def build_group_steps(group_id: str, items: list[dict[str, Any]], model: str) -> list[dict[str, Any]]:
+def quote_arg(value: str) -> str:
+    return f'"{value}"' if value and any(ch.isspace() for ch in value) else value
+
+
+def report_name(group_id: str, suffix: str) -> str:
+    return f"tools/solidworks_codex/reports/{group_id}_{suffix}.json"
+
+
+def build_group_steps(group_id: str, items: list[dict[str, Any]], model: str, macro_manifest_path: str = "") -> list[dict[str, Any]]:
     names = expected_names(items)
     macros = [str(item.get("macro") or item.get("path") or "") for item in items]
+    before_snapshot = report_name(group_id, "before_snapshot")
+    before_inspect = report_name(group_id, "before_inspect")
+    selection_report = report_name(group_id, "selection_report")
+    after_inspect = report_name(group_id, "after_inspect")
+    execution_check = report_name(group_id, "execution_check")
+    interference = report_name(group_id, "interference")
     return [
         {
             "action": "backup_native_files",
             "tool": "solidworks_backup",
             "reason": "preserve rollback point before mutating mates",
             "inputs": {"model": model, "components": components_for(items)},
+            "command_hint": f"swctl.ps1 backup -Files {quote_arg(model or '<assembly.SLDASM>')} -Out {report_name(group_id, 'backup')}",
             "blocking_if": ["backup_missing", "backup_status_not_ok"],
         },
         {
             "action": "capture_before_snapshot",
             "tool": "solidworks_session_snapshot + solidworks_inspect",
             "reason": "record document/process/window state before this mate group",
-            "outputs": [f"{group_id}_before_snapshot.json", f"{group_id}_before_inspect.json"],
+            "outputs": [before_snapshot, before_inspect],
+            "command_hints": [
+                f"swctl.ps1 session-snapshot -SessionName {group_id}_before -OutDir tools/solidworks_codex/reports",
+                f"swctl.ps1 inspect -Out {before_inspect}",
+            ],
         },
         {
             "action": "select_live_entities_for_macro",
@@ -81,6 +100,7 @@ def build_group_steps(group_id: str, items: list[dict[str, Any]], model: str) ->
             "reason": "macro drafts require two reviewed SolidWorks selections; never infer live faces from bbox only",
             "expected_components": components_for(items),
             "expected_mates": names,
+            "command_hint": f"swctl.ps1 selection-report -Out {selection_report}",
             "blocking_if": ["wrong_document", "selection_component_mismatch", "selection_entity_type_mismatch"],
         },
         {
@@ -89,6 +109,10 @@ def build_group_steps(group_id: str, items: list[dict[str, Any]], model: str) ->
             "reason": "block wrong-count, wrong-component, or component-level selections before running any reviewed mate macro",
             "expected_components": components_for(items),
             "expected_mates": names,
+            "command_hints": [
+                f"swctl.ps1 mate-selection-check -Report {quote_arg(macro_manifest_path or '<macro_manifest.json>')} -FromReport {selection_report} -Mate {name} -Out {report_name(group_id + '_' + name, 'selection_check')}"
+                for name in names
+            ],
             "blocking_if": ["selection_count", "unsupported_selection_type", "selection_component_mismatch"],
         },
         {
@@ -103,25 +127,29 @@ def build_group_steps(group_id: str, items: list[dict[str, Any]], model: str) ->
             "action": "rebuild",
             "tool": "solidworks_rebuild",
             "reason": "force solver/rebuild state immediately after the group",
+            "command_hint": f"swctl.ps1 rebuild -Out {report_name(group_id, 'rebuild')}",
             "blocking_if": ["rebuild_error"],
         },
         {
             "action": "inspect_after_group",
             "tool": "solidworks_inspect",
             "reason": "read back actual mate names, components, suppression, and solver status",
-            "outputs": [f"{group_id}_after_inspect.json"],
+            "outputs": [after_inspect],
+            "command_hint": f"swctl.ps1 inspect -Out {after_inspect}",
         },
         {
             "action": "mate_group_execution_check",
             "tool": "solidworks_mate_group_execution_check",
             "reason": "verify expected named mates exist and report no solver/API errors",
             "expected_mates": names,
+            "command_hint": f"swctl.ps1 mate-group-execution-check -Report {quote_arg(macro_manifest_path or '<macro_manifest.json>')} -After {after_inspect} -Out {execution_check}",
             "blocking_if": ["mate_missing", "mate_error"],
         },
         {
             "action": "interference_check",
             "tool": "solidworks_interference_check",
             "reason": "catch newly introduced physical clashes before continuing",
+            "command_hint": f"swctl.ps1 interference -Out {interference}",
             "blocking_if": ["unexpected_interference"],
         },
         {
@@ -133,7 +161,7 @@ def build_group_steps(group_id: str, items: list[dict[str, Any]], model: str) ->
     ]
 
 
-def build_protocol(manifest: dict[str, Any], validation: dict[str, Any] | None, model: str) -> dict[str, Any]:
+def build_protocol(manifest: dict[str, Any], validation: dict[str, Any] | None, model: str, macro_manifest_path: str = "") -> dict[str, Any]:
     blockers = validation_blockers(validation)
     macros = macro_items(manifest)
     findings = {"blocking": blockers, "warning": [], "accepted": []}
@@ -156,7 +184,7 @@ def build_protocol(manifest: dict[str, Any], validation: dict[str, Any] | None, 
             "components": components_for(items),
             "expected_mates": expected_names(items),
             "mate_types": [str(item.get("mate_type")) for item in items if item.get("mate_type")],
-            "steps": build_group_steps(gid, items, model),
+            "steps": build_group_steps(gid, items, model, macro_manifest_path),
         })
     findings["accepted"].append({
         "kind": "protocol_ready",
@@ -217,7 +245,11 @@ def markdown(protocol: dict[str, Any]) -> str:
             "",
         ]
         for i, step in enumerate(group["steps"], 1):
-            lines.append(f"{i}. `{step['action']}` via `{step['tool']}` — {step['reason']}")
+            lines.append(f"{i}. `{step['action']}` via `{step['tool']}` - {step['reason']}")
+            if step.get("command_hint"):
+                lines.append(f"   - Command: `{step['command_hint']}`")
+            for hint in step.get("command_hints", []) or []:
+                lines.append(f"   - Command: `{hint}`")
         lines.append("")
     return "\n".join(lines)
 
@@ -231,7 +263,7 @@ def main() -> None:
     parser.add_argument("--markdown-out", default="")
     args = parser.parse_args()
 
-    protocol = build_protocol(load_json(Path(args.macro_manifest)), load_json(Path(args.validation_report)), args.model)
+    protocol = build_protocol(load_json(Path(args.macro_manifest)), load_json(Path(args.validation_report)), args.model, args.macro_manifest)
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(protocol, ensure_ascii=False, indent=2), encoding="utf-8")

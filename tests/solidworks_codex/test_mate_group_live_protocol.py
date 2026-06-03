@@ -101,6 +101,12 @@ class MateGroupLiveProtocolTests(unittest.TestCase):
                 "cleanup_locks_and_windows",
             ]:
                 self.assertIn(action, first_steps)
+            steps_by_action = {step["action"]: step for step in data["groups"][0]["steps"]}
+            self.assertIn("swctl.ps1 selection-report", steps_by_action["select_live_entities_for_macro"]["command_hint"])
+            selection_check_hints = steps_by_action["mate_selection_check"]["command_hints"]
+            self.assertTrue(any("-Mate MG_ram_to_ways_01_coincident" in item for item in selection_check_hints))
+            self.assertTrue(any("-Report " in item and "-FromReport " in item for item in selection_check_hints))
+            self.assertIn("swctl.ps1 mate-group-execution-check", steps_by_action["mate_group_execution_check"]["command_hint"])
             self.assertIn("MG_ram_to_ways_01_coincident", md.read_text(encoding="utf-8-sig"))
 
     def test_live_protocol_blocks_when_validation_has_blocking_findings(self):
