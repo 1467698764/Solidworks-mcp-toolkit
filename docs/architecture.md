@@ -15,7 +15,7 @@ Codex / MCP client
 
 ## Runtime boundaries
 
-- `server.cjs` exposes 39 MCP tools and translates tool arguments into `swctl.ps1` commands.
+- `server.cjs` exposes 40 MCP tools and translates tool arguments into `swctl.ps1` commands.
 - `swctl.ps1` is the stable command router used by humans, tests, CI, and MCP.
 - Python scripts implement focused operations: inspect, summary, compare, model-understand, worklog, handoff, release gates, validation profiles, and guarded write helpers.
 - SolidWorks COM is only touched by commands that need live model state or model mutation. Offline gates use fixtures and generated reports.

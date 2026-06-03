@@ -5,7 +5,7 @@ Use this before publishing or tagging a release.
 ## Positioning
 
 - Lead with practical SolidWorks MCP workflows, not raw tool count.
-- Mention the 39 conservative tools without making ranking claims.
+- Mention the 40 conservative tools without making ranking claims.
 - Highlight `model-understand`, `report-context`, `worklog`, `handoff-bundle`, and `tool-catalog` as differentiators.
 - State clearly that write operations are guarded by backup/rebuild/compare/audit.
 

@@ -1,6 +1,6 @@
 {
-  "timestamp": "2026-06-03T19:41:18",
-  "count": 53,
+  "timestamp": "2026-06-03T20:08:50",
+  "count": 54,
   "capabilities": [
     {
       "cli": "assembly-contract",
@@ -45,6 +45,23 @@
         "out"
       ],
       "description": "Build a read-only local repair plan from an assembly diagnosis JSON: bad mate resolution order, hostless standard-part host suggestions, and isolated-component intent questions."
+    },
+    {
+      "cli": "assembly-review-pipeline",
+      "mcp": "solidworks_assembly_review_pipeline",
+      "workflow": "analysis",
+      "safety": "read_only",
+      "solidworks_required": false,
+      "required": [
+        "report"
+      ],
+      "properties": [
+        "near_tolerance_m",
+        "out_dir",
+        "report",
+        "standard_part_regex"
+      ],
+      "description": "Run the read-only assembly review pipeline from one inspect report and write diagnosis, interface index, repair plan, mate group plan, and manifest artifacts."
     },
     {
       "cli": "audit",
@@ -770,9 +787,9 @@
     }
   ],
   "coverage": {
-    "cli_commands": 53,
-    "mcp_tools": 39,
-    "mapped_mcp_tools": 39,
+    "cli_commands": 54,
+    "mcp_tools": 40,
+    "mapped_mcp_tools": 40,
     "has_cli_for_every_local_mcp": true,
     "has_safety_for_every_capability": true,
     "has_workflow_for_every_capability": true,

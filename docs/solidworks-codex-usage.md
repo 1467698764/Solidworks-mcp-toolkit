@@ -1,6 +1,6 @@
 # SolidWorks Codex Usage Guide
 
-The MCP wrapper currently exposes **39 MCP tools** across read-only inspection, analysis, handoff, guarded writes, export/verify, release gates, and the optional live SolidWorks gate.
+The MCP wrapper currently exposes **40 MCP tools** across read-only inspection, analysis, handoff, guarded writes, export/verify, release gates, and the optional live SolidWorks gate.
 
 This project is a general SolidWorks MCP/control layer. It does not try to replace engineering judgment with one rigid CAD template. It collects reviewable evidence from native `.SLDASM/.SLDPRT` models: components, features, dimensions, mates, transforms, spatial relationships, interference, mass, file locks, and runtime callbacks. A reasoning model can then choose an acceptance depth that matches the user intent.
 
