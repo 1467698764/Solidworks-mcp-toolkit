@@ -243,6 +243,11 @@ const toolSchemas = [
     inputSchema: { type: 'object', properties: { report: { type: 'string' }, out: { type: 'string' }, near_tolerance_m: { type: 'number' }, standard_part_regex: { type: 'string' } }, required: ['report'], additionalProperties: false }
   },
   {
+    name: 'solidworks_mate_group_plan',
+    description: 'Build a read-only mate group plan from an assembly repair plan and interface index: grouped candidate mates, components, evidence, and per-group verification.',
+    inputSchema: { type: 'object', properties: { repair_plan: { type: 'string' }, interface_index: { type: 'string' }, out: { type: 'string' }, markdown_out: { type: 'string' } }, required: ['repair_plan', 'interface_index'], additionalProperties: false }
+  },
+  {
     name: 'solidworks_worklog',
     description: 'Append a durable worklog event for multi-turn decisions, assumptions, verification, failures, and next steps.',
     inputSchema: {
@@ -515,6 +520,11 @@ async function callTool(name, input) {
       if (input?.out) args.push('-Out', input.out);
       if (input?.near_tolerance_m !== undefined) args.push('-DistanceMm', String(input.near_tolerance_m * 1000));
       if (input?.standard_part_regex) args.push('-Target', input.standard_part_regex);
+      break;
+    case 'solidworks_mate_group_plan':
+      args.push('mate-group-plan', '-Report', input.repair_plan, '-FromReport', input.interface_index);
+      if (input?.out) args.push('-Out', input.out);
+      if (input?.markdown_out) args.push('-JsonOut', input.markdown_out);
       break;
     case 'solidworks_worklog':
       args.push('worklog', '-Message', input.message);

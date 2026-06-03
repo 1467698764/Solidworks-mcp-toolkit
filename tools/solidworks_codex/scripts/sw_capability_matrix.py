@@ -57,6 +57,7 @@ WORKFLOW_BY_CLI = {
     "assembly-diagnose": "analysis",
     "assembly-repair-plan": "analysis",
     "interface-index": "analysis",
+    "mate-group-plan": "analysis",
     "session-snapshot": "handoff",
     "start-session-snapshot": "handoff",
     "worklog": "handoff",
@@ -80,7 +81,7 @@ SAFETY_BY_WORKFLOW = {
 }
 
 SOLIDWORKS_NOT_REQUIRED = {
-    "summary", "compare", "issue-report", "design-review", "change-plan", "workflow-plan", "report-search", "report-context", "model-understand", "assembly-diagnose", "assembly-repair-plan", "interface-index",
+    "summary", "compare", "issue-report", "design-review", "change-plan", "workflow-plan", "report-search", "report-context", "model-understand", "assembly-diagnose", "assembly-repair-plan", "interface-index", "mate-group-plan",
     "worklog", "handoff-bundle", "tool-catalog", "offline-demo", "preflight", "audit", "finalize",
     "github-readiness", "repo-health", "release-tree", "public-copy-guard", "template-macro", "mate-macro",
     "mcp-tools", "session-snapshot", "capability-matrix", "backup", "backup-status", "restore-backup", "change-verify", "assembly-contract",
@@ -117,6 +118,7 @@ MCP_TO_CLI = {
     "solidworks_assembly_diagnose": "assembly-diagnose",
     "solidworks_assembly_repair_plan": "assembly-repair-plan",
     "solidworks_interface_index": "interface-index",
+    "solidworks_mate_group_plan": "mate-group-plan",
     "solidworks_worklog": "worklog",
     "solidworks_handoff_bundle": "handoff-bundle",
     "solidworks_tool_catalog": "tool-catalog",
