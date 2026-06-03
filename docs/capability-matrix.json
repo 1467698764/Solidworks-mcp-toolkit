@@ -1,6 +1,6 @@
 {
-  "timestamp": "2026-06-02T20:10:34",
-  "count": 48,
+  "timestamp": "2026-06-03T15:52:20",
+  "count": 49,
   "capabilities": [
     {
       "cli": "assembly-contract",
@@ -668,6 +668,18 @@
       "description": "Generate a grouped catalog of all SolidWorks Codex MCP tools and when to use them."
     },
     {
+      "cli": "workflow-plan",
+      "mcp": null,
+      "workflow": "analysis",
+      "safety": "read_only",
+      "solidworks_required": false,
+      "required": [
+        "Target"
+      ],
+      "properties": [],
+      "description": "CLI-only support command."
+    },
+    {
       "cli": "worklog",
       "mcp": "solidworks_worklog",
       "workflow": "handoff",
@@ -689,7 +701,7 @@
     }
   ],
   "coverage": {
-    "cli_commands": 48,
+    "cli_commands": 49,
     "mcp_tools": 35,
     "mapped_mcp_tools": 35,
     "has_cli_for_every_local_mcp": true,

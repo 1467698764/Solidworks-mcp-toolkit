@@ -94,6 +94,88 @@ class GenericDesignToolsTests(unittest.TestCase):
             self.assertTrue(data["requires_backup"])
             self.assertLessEqual(len(data["steps"]), 8)
 
+    def test_workflow_plan_supports_single_part_and_part_to_assembly_loops(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            out_md = root / "workflow.md"
+            out_json = root / "workflow.json"
+            proc = run_py(
+                "tools/solidworks_codex/scripts/sw_workflow_plan.py",
+                "--goal", "设计一个带沉头孔和加强筋的安装支架，先单独建模自检，再装到小型传动组件里检查配合和干涉",
+                "--intent", "part_to_assembly",
+                "--runtime-budget", "fast",
+                "--out", str(out_md),
+                "--json-out", str(out_json),
+            )
+            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+            text = out_md.read_text(encoding="utf-8-sig")
+            data = json.loads(out_json.read_text(encoding="utf-8-sig"))
+
+            self.assertIn("Mechanical CAD Workflow Plan", text)
+            self.assertEqual("part_to_assembly", data["intent"])
+            self.assertEqual("fast", data["runtime_budget"])
+            self.assertIn("stage_graph", data)
+            stage_names = [stage["name"] for stage in data["stage_graph"]]
+            for expected in (
+                "design_brief",
+                "part_model",
+                "part_self_check",
+                "part_feedback_edit",
+                "assembly_insert",
+                "assembly_self_check",
+                "handoff_or_iterate",
+            ):
+                self.assertIn(expected, stage_names)
+
+            by_name = {stage["name"]: stage for stage in data["stage_graph"]}
+            self.assertEqual("single_part", by_name["part_self_check"]["validation_profile"])
+            self.assertEqual("assembly", by_name["assembly_self_check"]["validation_profile"])
+            self.assertIn("part_geometry_readback", by_name["part_self_check"]["required_evidence"])
+            self.assertIn("assembly_component_placements", by_name["assembly_self_check"]["required_evidence"])
+            self.assertIn("static_interference", by_name["assembly_self_check"]["blocking_checks"])
+            self.assertTrue(any(edge["from"] == "part_self_check" and edge["to"] == "part_feedback_edit" for edge in data["feedback_edges"]))
+            self.assertTrue(any(edge["from"] == "assembly_self_check" and edge["to"] == "part_feedback_edit" for edge in data["feedback_edges"]))
+            self.assertTrue(any(action["tool"] == "template-macro" for action in data["candidate_actions"]))
+            self.assertTrue(any(action["tool"] == "assembly-contract" for action in data["candidate_actions"]))
+            self.assertNotIn("bullhead", text.lower())
+
+    def test_swctl_exposes_workflow_plan_as_generic_analysis_command(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            out_md = root / "workflow.md"
+            out_json = root / "workflow.json"
+            proc = subprocess.run(
+                [
+                    "powershell",
+                    "-NoProfile",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(ROOT / "tools/solidworks_codex/swctl.ps1"),
+                    "workflow-plan",
+                    "-Target",
+                    "create a bearing bracket, check the part, then fit it into an assembly",
+                    "-Action",
+                    "part_to_assembly",
+                    "-View",
+                    "fast",
+                    "-Out",
+                    str(out_md),
+                    "-JsonOut",
+                    str(out_json),
+                ],
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+            )
+            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+            data = json.loads(out_json.read_text(encoding="utf-8-sig"))
+            self.assertEqual("part_to_assembly", data["intent"])
+            self.assertEqual("fast", data["runtime_budget"])
+            self.assertIn("assembly_self_check", [stage["name"] for stage in data["stage_graph"]])
+
 
 if __name__ == "__main__":
     unittest.main()

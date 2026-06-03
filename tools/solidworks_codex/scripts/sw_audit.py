@@ -117,6 +117,8 @@ def check_design_tools() -> dict[str, Any]:
     review_json = "tools/solidworks_codex/reports/audit_design_review.json"
     plan_md = "tools/solidworks_codex/reports/audit_change_plan.md"
     plan_json = "tools/solidworks_codex/reports/audit_change_plan.json"
+    workflow_md = "tools/solidworks_codex/reports/audit_workflow_plan.md"
+    workflow_json = "tools/solidworks_codex/reports/audit_workflow_plan.json"
     r1 = run([
         "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "tools/solidworks_codex/swctl.ps1",
         "design-review", "-Report", "tools/solidworks_codex/sandbox/report_after.json", "-Target", "locating interfaces, floating components, editable dimensions, and manufacturability evidence", "-Out", review_md, "-JsonOut", review_json,
@@ -125,16 +127,24 @@ def check_design_tools() -> dict[str, Any]:
         "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "tools/solidworks_codex/swctl.ps1",
         "change-plan", "-Report", "tools/solidworks_codex/sandbox/report_after.json", "-Target", "adjust a critical mounting dimension and verify assembly, clearance, and manufacturing evidence", "-Out", plan_md, "-JsonOut", plan_json,
     ])
+    r3 = run([
+        "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "tools/solidworks_codex/swctl.ps1",
+        "workflow-plan", "-Target", "create a checked bracket part and insert it into an assembly for placement and interference validation", "-Action", "part_to_assembly", "-View", "fast", "-Out", workflow_md, "-JsonOut", workflow_json,
+    ])
     review_text = (ROOT / review_md).read_text(encoding="utf-8-sig") if (ROOT / review_md).exists() else ""
     plan_text = (ROOT / plan_md).read_text(encoding="utf-8-sig") if (ROOT / plan_md).exists() else ""
+    workflow_text = (ROOT / workflow_md).read_text(encoding="utf-8-sig") if (ROOT / workflow_md).exists() else ""
     expected = {
         "review_title": "Mechanical CAD Evidence Review" in review_text,
         "review_bearing": "support_bushing-1" in review_text,
         "plan_title": "Mechanical CAD Change Plan" in plan_text,
         "plan_dimension": "D1@Sketch1@plate.SLDPRT" in plan_text,
         "plan_snapshot": "session-snapshot" in plan_text,
+        "workflow_title": "Mechanical CAD Workflow Plan" in workflow_text,
+        "workflow_assembly": "assembly_self_check" in workflow_text,
+        "workflow_profile": "part_to_assembly" in workflow_text,
     }
-    return {"ok": r1["returncode"] == 0 and r2["returncode"] == 0 and all(expected.values()), "review_result": r1, "plan_result": r2, "expected_present": expected}
+    return {"ok": r1["returncode"] == 0 and r2["returncode"] == 0 and r3["returncode"] == 0 and all(expected.values()), "review_result": r1, "plan_result": r2, "workflow_result": r3, "expected_present": expected}
 
 def check_report_search() -> dict[str, Any]:
     out_md = "tools/solidworks_codex/reports/audit_report_search.md"

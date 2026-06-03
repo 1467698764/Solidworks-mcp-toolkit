@@ -50,6 +50,7 @@ WORKFLOW_BY_CLI = {
     "issue-report": "analysis",
     "design-review": "analysis",
     "change-plan": "analysis",
+    "workflow-plan": "analysis",
     "report-search": "analysis",
     "report-context": "analysis",
     "model-understand": "analysis",
@@ -76,7 +77,7 @@ SAFETY_BY_WORKFLOW = {
 }
 
 SOLIDWORKS_NOT_REQUIRED = {
-    "summary", "compare", "issue-report", "design-review", "change-plan", "report-search", "report-context", "model-understand",
+    "summary", "compare", "issue-report", "design-review", "change-plan", "workflow-plan", "report-search", "report-context", "model-understand",
     "worklog", "handoff-bundle", "tool-catalog", "offline-demo", "preflight", "audit", "finalize",
     "github-readiness", "repo-health", "release-tree", "public-copy-guard", "template-macro", "mate-macro",
     "mcp-tools", "session-snapshot", "capability-matrix", "backup", "backup-status", "restore-backup", "change-verify", "assembly-contract",
@@ -118,6 +119,10 @@ MCP_TO_CLI = {
     "solidworks_audit": "audit",
     "solidworks_finalize": "finalize",
     "solidworks_existing_mcp_tools": "mcp-tools",
+}
+
+CLI_ONLY_REQUIRED = {
+    "workflow-plan": ["Target"],
 }
 
 
@@ -165,13 +170,16 @@ def build_matrix() -> dict[str, Any]:
         mcp_tool = mcp_by_cli.get(cli)
         schema = (mcp_tool or {}).get("inputSchema") or {}
         props = sorted((schema.get("properties") or {}).keys()) if isinstance(schema, dict) else []
+        required = schema.get("required", []) if isinstance(schema, dict) else []
+        if not required:
+            required = CLI_ONLY_REQUIRED.get(cli, [])
         capabilities.append({
             "cli": cli,
             "mcp": (mcp_tool or {}).get("name"),
             "workflow": workflow,
             "safety": safety,
             "solidworks_required": cli not in SOLIDWORKS_NOT_REQUIRED,
-            "required": schema.get("required", []) if isinstance(schema, dict) else [],
+            "required": required,
             "properties": props,
             "description": (mcp_tool or {}).get("description", "CLI-only support command."),
         })

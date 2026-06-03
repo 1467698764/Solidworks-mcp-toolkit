@@ -18,6 +18,7 @@ class CurrentDocumentationTests(unittest.TestCase):
         )
         for needle in [
             "validation profiles",
+            "workflow-plan",
             "draft_part",
             "single_part",
             "assembly",

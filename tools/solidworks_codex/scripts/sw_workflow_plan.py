@@ -1,0 +1,300 @@
+#!/usr/bin/env python3
+"""Build an intent-scoped CAD workflow plan for part and assembly loops.
+
+This is one level above change-plan: it does not assume there is already one
+open model and one narrow edit. It helps a reasoning agent compose design,
+part modeling, self-check, feedback edits, assembly insertion, and assembly
+verification without forcing a shaper-specific or release-grade workflow.
+"""
+from __future__ import annotations
+
+import argparse
+import importlib.util
+import json
+import sys
+from datetime import datetime
+from pathlib import Path
+from typing import Any
+
+ROOT = Path(__file__).resolve().parents[3]
+
+KNOWN_INTENTS = {"single_part", "part_to_assembly", "assembly", "mechanism_assembly"}
+KNOWN_RUNTIME_BUDGETS = {"fast", "standard", "strict"}
+
+
+def resolve(path: str) -> Path:
+    p = Path(path)
+    return p if p.is_absolute() else ROOT / p
+
+
+def load_validation_profiles() -> Any:
+    path = Path(__file__).resolve().parent / "sw_validation_profiles.py"
+    spec = importlib.util.spec_from_file_location("sw_validation_profiles_for_workflow", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"could not load {path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def normalize_intent(intent: str) -> str:
+    value = (intent or "single_part").strip().lower().replace("-", "_")
+    aliases = {
+        "part": "single_part",
+        "single": "single_part",
+        "part_assembly": "part_to_assembly",
+        "part_to_asm": "part_to_assembly",
+        "assembly_design": "assembly",
+        "mechanism": "mechanism_assembly",
+    }
+    normalized = aliases.get(value, value)
+    if normalized not in KNOWN_INTENTS:
+        raise ValueError(f"unknown workflow intent: {intent}")
+    return normalized
+
+
+def normalize_budget(runtime_budget: str) -> str:
+    value = (runtime_budget or "standard").strip().lower().replace("-", "_")
+    if value not in KNOWN_RUNTIME_BUDGETS:
+        raise ValueError(f"unknown runtime budget: {runtime_budget}")
+    return value
+
+
+def profile_blocking(profile: Any) -> list[str]:
+    return [check.name for check in profile.checks if check.severity == "blocking"]
+
+
+def profile_warnings(profile: Any) -> list[str]:
+    return [check.name for check in profile.checks if check.severity == "warning"]
+
+
+def stage(
+    name: str,
+    purpose: str,
+    validation_profile: str,
+    required_evidence: list[str],
+    candidate_tools: list[str],
+    profile: Any,
+    exit_criteria: list[str],
+    optional: bool = False,
+) -> dict[str, Any]:
+    return {
+        "name": name,
+        "purpose": purpose,
+        "validation_profile": validation_profile,
+        "required_evidence": required_evidence,
+        "blocking_checks": profile_blocking(profile),
+        "warning_checks": profile_warnings(profile),
+        "candidate_tools": candidate_tools,
+        "exit_criteria": exit_criteria,
+        "optional": optional,
+    }
+
+
+def build_profiles(vp: Any, runtime_budget: str) -> dict[str, Any]:
+    return {
+        "draft_part": vp.validation_profile_for_intent("draft_part", runtime_budget=runtime_budget),
+        "single_part": vp.validation_profile_for_intent("single_part", runtime_budget=runtime_budget),
+        "assembly": vp.validation_profile_for_intent("assembly", runtime_budget=runtime_budget),
+        "mechanism_assembly": vp.validation_profile_for_intent("mechanism_assembly", runtime_budget=runtime_budget),
+    }
+
+
+def base_part_stages(goal: str, profiles: dict[str, Any]) -> list[dict[str, Any]]:
+    return [
+        stage(
+            "design_brief",
+            "Capture design intent, interfaces, target dimensions, and acceptance depth before creating geometry.",
+            "draft_part",
+            ["goal", "intended_units", "key_dimensions", "interfaces", "validation_profile"],
+            ["design-review", "change-plan", "model-understand"],
+            profiles["draft_part"],
+            ["The next modeling step has named features, rough dimensions, and known unknowns."],
+        ),
+        stage(
+            "part_model",
+            "Create or modify one part with named sketches/features and a bounded file scope.",
+            "draft_part",
+            ["native_sldprt", "feature_names", "dimension_handles", "backup_scope"],
+            ["template-macro", "safe-set-dimension", "rebuild", "inspect"],
+            profiles["draft_part"],
+            ["Native SLDPRT exists or the active part was modified in a backed-up scope."],
+        ),
+        stage(
+            "part_self_check",
+            "Verify the part before it is allowed into an assembly or another edit loop.",
+            "single_part",
+            ["part_geometry_readback", "rebuild_report", "feature_inventory", "mass_properties"],
+            ["inspect", "mass", "compare", "change-verify"],
+            profiles["single_part"],
+            ["Requested holes, slots, cuts, bosses, and semantic features are visible in evidence."],
+        ),
+        stage(
+            "part_feedback_edit",
+            "Apply one evidence-driven correction when part self-check or assembly fit exposes a gap.",
+            "single_part",
+            ["compare_delta", "allowed_change_contract", "backup_status"],
+            ["safe-set-dimension", "template-macro", "backup", "restore-backup", "change-verify"],
+            profiles["single_part"],
+            ["The delta is intentionally scoped and can be accepted, iterated, or restored."],
+        ),
+    ]
+
+
+def assembly_stages(intent: str, profiles: dict[str, Any]) -> list[dict[str, Any]]:
+    profile_name = "mechanism_assembly" if intent == "mechanism_assembly" else "assembly"
+    profile = profiles[profile_name]
+    stages = [
+        stage(
+            "assembly_insert",
+            "Insert checked parts into an assembly with explicit placement, grounding policy, and connection intent.",
+            "assembly",
+            ["native_sldasm", "component_list", "component_transforms", "grounding_policy"],
+            ["inspect", "component-state", "mate-macro", "assembly-contract"],
+            profiles["assembly"],
+            ["Components are present, intentionally fixed/floating, and traceable to native files."],
+        ),
+        stage(
+            "assembly_self_check",
+            "Verify placement, mate/readback evidence, static interference, and functional adjacency.",
+            profile_name,
+            ["assembly_component_placements", "mate_reference_components", "interference_report", "model_understanding"],
+            ["inspect", "interference", "assembly-contract", "model-understand", "report-context"],
+            profile,
+            ["Blocking assembly checks are satisfied or downgraded with explicit rationale."],
+        ),
+    ]
+    if intent == "mechanism_assembly":
+        stages.append(stage(
+            "motion_or_dof_check",
+            "Check mechanism freedom and path risk only when mechanism intent requires it.",
+            "mechanism_assembly",
+            ["constraint_dof_intent", "motion_sweep_collision", "clearance_tolerance_screen"],
+            ["model-understand", "interference", "selection-report", "assembly-contract"],
+            profiles["mechanism_assembly"],
+            ["Motion/DOF gaps are either verified, scoped as future work, or reported as blocking."],
+        ))
+    return stages
+
+
+def feedback_edges(intent: str) -> list[dict[str, str]]:
+    edges = [
+        {"from": "part_self_check", "to": "part_feedback_edit", "condition": "part evidence is missing, stale, or shape semantics fail"},
+        {"from": "part_feedback_edit", "to": "part_self_check", "condition": "one accepted edit was made"},
+    ]
+    if intent in {"part_to_assembly", "assembly", "mechanism_assembly"}:
+        edges.extend([
+            {"from": "part_self_check", "to": "assembly_insert", "condition": "part-level blocking checks pass"},
+            {"from": "assembly_insert", "to": "assembly_self_check", "condition": "native assembly exists and components are inserted"},
+            {"from": "assembly_self_check", "to": "part_feedback_edit", "condition": "assembly check exposes a part geometry/interface issue"},
+            {"from": "assembly_self_check", "to": "assembly_insert", "condition": "assembly issue is placement, mate, grounding, or component selection"},
+        ])
+    if intent == "mechanism_assembly":
+        edges.extend([
+            {"from": "assembly_self_check", "to": "motion_or_dof_check", "condition": "static assembly checks pass"},
+            {"from": "motion_or_dof_check", "to": "part_feedback_edit", "condition": "motion or clearance issue requires geometry change"},
+            {"from": "motion_or_dof_check", "to": "assembly_insert", "condition": "motion or clearance issue requires constraint/layout change"},
+        ])
+    edges.append({"from": "handoff_or_iterate", "to": "design_brief", "condition": "scope changes or the user asks for a new variant"})
+    return edges
+
+
+def candidate_actions(intent: str) -> list[dict[str, str]]:
+    actions = [
+        {"tool": "design-review", "why": "Review evidence and open questions before choosing a modeling path."},
+        {"tool": "template-macro", "why": "Generate common medium-difficulty part primitives when a template fits the intent."},
+        {"tool": "inspect", "why": "Read current native SolidWorks state after each create/edit step."},
+        {"tool": "change-verify", "why": "Reject unintended deltas after a guarded edit."},
+        {"tool": "model-understand", "why": "Build task-scoped reasoning context instead of using a fixed checklist."},
+    ]
+    if intent in {"part_to_assembly", "assembly", "mechanism_assembly"}:
+        actions.extend([
+            {"tool": "assembly-contract", "why": "Validate component placement, mate/readback, fixed state, and semantic pairs offline."},
+            {"tool": "interference", "why": "Use live SolidWorks for final static interference evidence."},
+            {"tool": "mate-macro", "why": "Create reviewable mate macros only after selection evidence is known."},
+        ])
+    return actions
+
+
+def build_plan(goal: str, intent: str, runtime_budget: str) -> dict[str, Any]:
+    normalized_intent = normalize_intent(intent)
+    budget = normalize_budget(runtime_budget)
+    vp = load_validation_profiles()
+    profiles = build_profiles(vp, budget)
+    stages = base_part_stages(goal, profiles)
+    if normalized_intent in {"part_to_assembly", "assembly", "mechanism_assembly"}:
+        stages.extend(assembly_stages(normalized_intent, profiles))
+    stages.append(stage(
+        "handoff_or_iterate",
+        "Record accepted evidence, unresolved risks, artifacts, and the next narrow loop.",
+        normalized_intent if normalized_intent != "part_to_assembly" else "assembly",
+        ["worklog", "handoff_bundle", "accepted_reports", "next_step"],
+        ["worklog", "handoff-bundle", "finalize"],
+        profiles["assembly"] if normalized_intent != "single_part" else profiles["single_part"],
+        ["A future agent can replay the state without trusting memory or stale reports."],
+    ))
+    return {
+        "timestamp": datetime.now().isoformat(timespec="seconds"),
+        "goal": goal,
+        "intent": normalized_intent,
+        "runtime_budget": budget,
+        "stage_graph": stages,
+        "feedback_edges": feedback_edges(normalized_intent),
+        "candidate_actions": candidate_actions(normalized_intent),
+        "principle": "Compose small evidence loops: design, model, inspect, adjust, assemble, inspect again.",
+    }
+
+
+def markdown(plan: dict[str, Any]) -> str:
+    lines = ["# Mechanical CAD Workflow Plan", ""]
+    lines.extend([
+        f"- Goal: {plan['goal']}",
+        f"- Intent: `{plan['intent']}`",
+        f"- Runtime budget: `{plan['runtime_budget']}`",
+        f"- Principle: {plan['principle']}",
+        "",
+        "## Stages",
+    ])
+    for index, item in enumerate(plan["stage_graph"], 1):
+        lines.extend([
+            f"### {index}. `{item['name']}`",
+            "",
+            f"- Purpose: {item['purpose']}",
+            f"- Validation profile: `{item['validation_profile']}`",
+            f"- Required evidence: {', '.join(f'`{x}`' for x in item['required_evidence'])}",
+            f"- Blocking checks: {', '.join(f'`{x}`' for x in item['blocking_checks']) or '`<none>`'}",
+            f"- Candidate tools: {', '.join(f'`{x}`' for x in item['candidate_tools'])}",
+            f"- Exit criteria: {'; '.join(item['exit_criteria'])}",
+            "",
+        ])
+    lines.extend(["## Feedback Edges", ""])
+    for edge in plan["feedback_edges"]:
+        lines.append(f"- `{edge['from']}` -> `{edge['to']}` when {edge['condition']}")
+    lines.extend(["", "## Candidate Actions", ""])
+    for action in plan["candidate_actions"]:
+        lines.append(f"- `{action['tool']}`: {action['why']}")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--goal", required=True)
+    parser.add_argument("--intent", default="single_part")
+    parser.add_argument("--runtime-budget", default="standard")
+    parser.add_argument("--out", default="tools/solidworks_codex/reports/workflow_plan.md")
+    parser.add_argument("--json-out", default="tools/solidworks_codex/reports/workflow_plan.json")
+    args = parser.parse_args()
+    plan = build_plan(args.goal, args.intent, args.runtime_budget)
+    out = resolve(args.out)
+    jout = resolve(args.json_out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    jout.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(markdown(plan), encoding="utf-8")
+    jout.write_text(json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(json.dumps({"ok": True, "out": str(out), "json_out": str(jout), "stages": len(plan["stage_graph"])}, ensure_ascii=False, indent=2))
+
+
+if __name__ == "__main__":
+    main()

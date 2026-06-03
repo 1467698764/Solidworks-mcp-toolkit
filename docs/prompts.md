@@ -87,13 +87,16 @@ Use when the user wants design reasoning rather than a single command.
 
 ```text
 Use the latest session-snapshot report for a mechanical CAD design review. Focus on the current assembly constraints, spatial relationships, editable dimensions, clearance risks, hole/manufacturing evidence, and unresolved information gaps.
-Generate model-understand, design-review, and change-plan outputs. Separate observations from proposed edits. For each proposed edit, state the evidence, risk, required backup files, verification command, and rollback path.
+Generate workflow-plan, model-understand, design-review, and change-plan outputs. Separate observations from proposed edits. For each proposed edit, state the evidence, risk, required backup files, verification command, and rollback path.
 Do not modify the model in this turn.
 ```
 
 Expected tool flow:
 
+`workflow-plan` uses `-Target` for the overall CAD goal, `-Action` for intent (`single_part`, `part_to_assembly`, `assembly`, `mechanism_assembly`), and `-View` for runtime budget (`fast`, `standard`, `strict`, or `auto`).
+
 ```powershell
+.\tools\solidworks_codex\swctl.ps1 workflow-plan -Target "<overall CAD goal>" -Action part_to_assembly -View fast -Out tools\solidworks_codex\reports\workflow_plan.md -JsonOut tools\solidworks_codex\reports\workflow_plan.json
 .\tools\solidworks_codex\swctl.ps1 model-understand -Report tools\solidworks_codex\reports\sessions\<timestamp>-first-look\inspect.json -View spatial-assembly -Target "current constraints, clearance, editable dimensions, and manufacturing evidence" -Out tools\solidworks_codex\reports\model_understanding.md -JsonOut tools\solidworks_codex\reports\model_understanding.json
 .\tools\solidworks_codex\swctl.ps1 design-review -Report tools\solidworks_codex\reports\sessions\<timestamp>-first-look\inspect.json -Target "locating interfaces, floating components, editable dimensions, and manufacturability evidence" -Out tools\solidworks_codex\reports\design_review.md -JsonOut tools\solidworks_codex\reports\design_review.json
 .\tools\solidworks_codex\swctl.ps1 change-plan -Report tools\solidworks_codex\reports\sessions\<timestamp>-first-look\inspect.json -Target "<desired design change>" -SessionName mechanical-change-plan -Out tools\solidworks_codex\reports\change_plan.md -JsonOut tools\solidworks_codex\reports\change_plan.json

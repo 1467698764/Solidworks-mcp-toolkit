@@ -120,7 +120,10 @@ Do not treat an old `complete_shaper_build.json` with `ok: true` as current trut
 
 ## Handoff workflow
 
+`workflow-plan` maps `-Target` to the overall CAD goal, `-Action` to intent (`single_part`, `part_to_assembly`, `assembly`, or `mechanism_assembly`), and `-View` to runtime budget (`fast`, `standard`, `strict`; `auto` uses `standard`).
+
 ```powershell
+.\tools\solidworks_codex\swctl.ps1 workflow-plan -Target "design a checked bracket part and insert it into an assembly for placement and interference validation" -Action part_to_assembly -View fast -Out tools\solidworks_codex\reports\workflow_plan.md -JsonOut tools\solidworks_codex\reports\workflow_plan.json
 .\tools\solidworks_codex\swctl.ps1 session-snapshot -SessionName assembly-baseline
 .\tools\solidworks_codex\swctl.ps1 worklog -SessionName mechanical-interface-update -Action decision -Message "Use report-context and report-search before any write operation" -Artifact tools\solidworks_codex\reports\context.md -Next "backup target files before safe-set-dimension"
 .\tools\solidworks_codex\swctl.ps1 handoff-bundle -Report tools\solidworks_codex\reports\assembly_before.json -FromReport tools\solidworks_codex\reports\worklog.jsonl -Target "current model evidence, constraints, clearance, and manufacturing gaps" -OutDir tools\solidworks_codex\reports\handoff\assembly-baseline
