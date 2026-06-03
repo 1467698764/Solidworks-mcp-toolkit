@@ -259,6 +259,10 @@ def build_shaper_assembly_contract() -> dict[str, Any]:
             }
             for name, expected in expected_shaper_mate_contract().items()
         },
+        "part_features": {
+            name: {"required": True, "required_names": list(required_names)}
+            for name, required_names in expected_live_feature_names().items()
+        },
     }
 
 

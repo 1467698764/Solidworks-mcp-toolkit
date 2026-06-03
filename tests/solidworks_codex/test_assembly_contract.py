@@ -22,6 +22,19 @@ def run_py(script: str, *args: str):
 class AssemblyContractTests(unittest.TestCase):
     def sample_report(self):
         return {
+            "part_feature_evidence": {
+                "base_plate": {
+                    "ok": True,
+                    "features": [
+                        {"name": "Base_Boss", "semantic": "boss"},
+                        {"name": "Mounting_Holes", "semantic": "through_hole", "count": 4},
+                    ],
+                },
+                "cover_plate": {
+                    "ok": True,
+                    "features": [{"name": "Cover_Window_Cut", "semantic": "window_cut"}],
+                },
+            },
             "active_document": {
                 "type": "assembly",
                 "component_count_sampled": 4,
@@ -51,6 +64,14 @@ class AssemblyContractTests(unittest.TestCase):
             "mates": {
                 "Base_Cover_Distance": {"type": "MateDistanceDim", "semantic_pair": ["base_plate", "cover_plate"]},
                 "Shaft_Bearing_Concentric": {"type": "MateConcentric", "semantic_pair": ["drive_shaft", "bearing_block"]},
+            },
+            "part_features": {
+                "base_plate": {
+                    "required": True,
+                    "required_names": ["Base_Boss", "Mounting_Holes"],
+                    "required_semantics": {"through_hole": {"min_count": 4}},
+                },
+                "cover_plate": {"required_names": ["Cover_Window_Cut"]},
             },
         }
 
@@ -86,6 +107,25 @@ class AssemblyContractTests(unittest.TestCase):
             kinds = {item["kind"] for item in data["failed"]}
             self.assertIn("component_origin", kinds)
             self.assertIn("mate_components", kinds)
+
+    def test_contract_rejects_missing_part_shape_features_and_semantics(self):
+        report = self.sample_report()
+        report["part_feature_evidence"]["base_plate"]["features"] = [{"name": "Base_Boss", "semantic": "boss"}]
+        result = __import__("runpy").run_path(str(ROOT / "tools/solidworks_codex/scripts/sw_assembly_contract.py"))["validate"](report, self.sample_contract())
+
+        self.assertFalse(result["ok"], result)
+        failed = {(item["kind"], item["key"]) for item in result["failed"]}
+        self.assertIn(("part_feature_name", "base_plate:Mounting_Holes"), failed)
+        self.assertIn(("part_feature_semantic", "base_plate:through_hole"), failed)
+
+    def test_contract_allows_warning_grade_shape_features(self):
+        report = self.sample_report()
+        contract = self.sample_contract()
+        contract["part_features"]["optional_guard"] = {"required": True, "required_names": ["Guard_Rib"], "severity": "warning"}
+        result = __import__("runpy").run_path(str(ROOT / "tools/solidworks_codex/scripts/sw_assembly_contract.py"))["validate"](report, contract)
+
+        self.assertTrue(result["ok"], result)
+        self.assertIn("part_feature_missing", {item["kind"] for item in result["warnings"]})
 
 
     def test_contract_rejects_required_mate_between_fixed_components(self):

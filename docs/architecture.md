@@ -26,14 +26,14 @@ Codex / MCP client
 1. Read-only commands produce JSON or Markdown evidence reports.
 2. Analysis commands consume inspect/session reports and generate context, search results, design reviews, change plans, model understanding, or handoff bundles.
 3. Write commands stay narrow: backup first, one dimension/component/feature workflow at a time, rebuild, inspect, compare, verify.
-4. Assembly contract commands convert user intent into reusable evidence gates: component existence, Transform/origin placement, semantic mate network, suppressed/fixed state, mate error/status when reported, and participation evidence. They support blocking/warning/not_applicable severities so contract evidence can stay profile-aware.
+4. Assembly contract commands convert user intent into reusable evidence gates: component existence, Transform/origin placement, part shape/feature semantics, semantic mate network, suppressed/fixed state, mate error/status when reported, and participation evidence. They support blocking/warning/not_applicable severities so contract evidence can stay profile-aware.
 5. Release commands validate the repository itself: GitHub readiness, repo health, public copy guard, release-tree, audit, capability matrix, and finalize.
 
 ## Validation architecture
 
 The project separates validation into four practical layers:
 
-- Geometry: native artifacts, part shape semantics, part_geometry_readback bbox/body/volume evidence, rebuild health, static interference, clearance tolerance.
+- Geometry: native artifacts, part shape semantics, required feature-name/semantic readback, part_geometry_readback bbox/body/volume evidence, rebuild health, static interference, clearance tolerance.
 - Assembly: mate semantics, component placements, fixed/suppressed state, functional adjacency, constraint/DOF intent, motion sweep collision.
 - Engineering: mass properties, DFM/DFA screens, BOM metadata, strength/stiffness screen, drawing/BOM readiness.
 - MCP quality: evidence completeness, traceability, model-understand usefulness, public-copy hygiene, release-tree cleanliness.
@@ -46,7 +46,7 @@ Live gate is where runtime truth outranks source assumptions. It validates Solid
 
 - `live_session_smoke` proves the minimal COM/session/mate/interference/cleanup path.
 - `live_capability_suite` proves feature creation and edit primitives: extrude, cut, revolve, revolved cut, sketch dimension read/modify/rebuild/save, assembly insert, concentric mate, distance mate, interference, mass, component placement readback, part_geometry_readback from reopened native parts, close/cleanup.
-- `complete_shaper_v5` uses a bullhead shaper as a stress test: 24 parts, 58 components, 19 MateLock layout stabilizers, native primary component placement via Transform2.ArrayData, attached detail-instance layout, final fixed-state policy, and interference evidence. The shaper report is accepted only when current source freshness, MateLock readback, placement, geometry, model-understanding, fixed-state, and cleanup gates all pass; it does not claim complete mechanism DOF or motion-sweep validation yet.
+- `complete_shaper_v5` uses a bullhead shaper as a stress test: 24 parts, 58 components, 19 MateLock layout stabilizers, native primary component placement via Transform2.ArrayData, required part feature readback, attached detail-instance layout, final fixed-state policy, and interference evidence. The shaper report is accepted only when current source freshness, MateLock readback, placement, geometry, model-understanding, fixed-state, and cleanup gates all pass; it does not claim complete mechanism DOF or motion-sweep validation yet.
 
 The bullhead shaper is not the product boundary; it is a deliberately hard fixture that forces the generic control layer to prove real assembly behavior.
 

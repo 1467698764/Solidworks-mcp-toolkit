@@ -19,7 +19,7 @@ The tools are designed for evidence-first mechanical CAD work:
 4. backup before any write;
 5. change one dimension, component state, or feature flow at a time;
 6. rebuild, inspect, compare, and verify;
-7. for assemblies, validate placement, suppressed/fixed state, mate error/status evidence when reported, and semantic mate network through `assembly-contract`;
+7. for assemblies, validate placement, part shape/feature semantics, suppressed/fixed state, mate error/status evidence when reported, and semantic mate network through `assembly-contract`;
 8. record worklog and create handoff bundles for later AI turns.
 
 The goal is not to force one CAD template or one output schema. The goal is to give a strong model enough SolidWorks evidence to reason flexibly and safely.
@@ -43,7 +43,7 @@ Offline tests prove syntax and report logic. Real CAD behavior is checked by the
 .\tools\solidworks_codex\swctl.ps1 live-gate -CleanupStale -Out tools\solidworks_codex\reports\live_validation_gate.json
 ```
 
-Live deliverables are native `.SLDASM/.SLDPRT`; STEP optional smoke is not the primary acceptance criterion. The live capability suite now checks `assembly_component_placements` component Transform2/origin placement readback and `part_geometry_readback` bbox/body/volume evidence from reopened native `.SLDPRT` files. SolidWorks AddMate `mate_error: 1` is treated as AddMate no-error, then verified with mate readback, component participation, and placement evidence. The current bullhead shaper stress fixture is `shaper_machine_v5`; it targets `24 parts`, `58 components`, `19 MateLock layout stabilizers`, native primary placement readback via `Transform2.ArrayData`, structural-reference fixed evidence only, attached detail instances, and `0 interference` when healthy. The current shaper is a stable fixture-level assembly; those MateLock constraints are not claimed as complete mechanism DOF or motion-sweep validation. Current shaper reports must be regenerated after validator changes; a stale `ok: true` report is not proof.
+Live deliverables are native `.SLDASM/.SLDPRT`; STEP optional smoke is not the primary acceptance criterion. The live capability suite now checks `assembly_component_placements` component Transform2/origin placement readback and `part_geometry_readback` bbox/body/volume evidence from reopened native `.SLDPRT` files. SolidWorks AddMate `mate_error: 1` is treated as AddMate no-error, then verified with mate readback, component participation, and placement evidence. `assembly-contract` can also require part feature names and semantic counts so a model is not accepted as a plain block stack. The current bullhead shaper stress fixture is `shaper_machine_v5`; it targets `24 parts`, `58 components`, `19 MateLock layout stabilizers`, required part feature readback, native primary placement readback via `Transform2.ArrayData`, structural-reference fixed evidence only, attached detail instances, and `0 interference` when healthy. The current shaper is a stable fixture-level assembly; those MateLock constraints are not claimed as complete mechanism DOF or motion-sweep validation. Current shaper reports must be regenerated after validator changes; a stale `ok: true` report is not proof.
 
 Required mates between two fixed components fail `assembly-contract` by default unless the manifest explicitly sets `allow_fixed_fixed: true` for a reference/documentation mate.
 
