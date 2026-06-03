@@ -1,6 +1,6 @@
 {
-  "timestamp": "2026-06-03T20:08:50",
-  "count": 54,
+  "timestamp": "2026-06-03T20:30:56",
+  "count": 56,
   "capabilities": [
     {
       "cli": "assembly-contract",
@@ -346,6 +346,22 @@
       "description": "Report mass properties for active or specified SolidWorks document."
     },
     {
+      "cli": "mate-group-macro",
+      "mcp": "solidworks_mate_group_macro",
+      "workflow": "macro_generation",
+      "safety": "generated_reviewable_artifact",
+      "solidworks_required": false,
+      "required": [
+        "mate_group_plan"
+      ],
+      "properties": [
+        "manifest",
+        "mate_group_plan",
+        "out_dir"
+      ],
+      "description": "Generate reviewable preselect VBA macro drafts from a mate group plan. Each macro still requires live entity preselection and review before running."
+    },
+    {
       "cli": "mate-group-plan",
       "mcp": "solidworks_mate_group_plan",
       "workflow": "analysis",
@@ -362,6 +378,21 @@
         "repair_plan"
       ],
       "description": "Build a read-only mate group plan from an assembly repair plan and interface index: grouped candidate mates, components, evidence, and per-group verification."
+    },
+    {
+      "cli": "mate-group-validate",
+      "mcp": "solidworks_mate_group_validate",
+      "workflow": "analysis",
+      "safety": "read_only",
+      "solidworks_required": false,
+      "required": [
+        "mate_group_plan"
+      ],
+      "properties": [
+        "mate_group_plan",
+        "out"
+      ],
+      "description": "Validate a read-only mate group plan before macro or live execution: component count, supported mate types, and required rebuild/mate-error verification."
     },
     {
       "cli": "mate-macro",
@@ -787,9 +818,9 @@
     }
   ],
   "coverage": {
-    "cli_commands": 54,
-    "mcp_tools": 40,
-    "mapped_mcp_tools": 40,
+    "cli_commands": 56,
+    "mcp_tools": 42,
+    "mapped_mcp_tools": 42,
     "has_cli_for_every_local_mcp": true,
     "has_safety_for_every_capability": true,
     "has_workflow_for_every_capability": true,

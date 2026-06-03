@@ -51,11 +51,13 @@ class AssemblyReviewPipelineTests(unittest.TestCase):
             manifest = json.loads((out_dir / "manifest.json").read_text(encoding="utf-8-sig"))
             self.assertEqual(manifest["mode"], "read_only_assembly_review_pipeline")
             self.assertEqual(manifest["document"]["title"], "pipeline_fixture.SLDASM")
-            for key in ["diagnosis", "interface_index", "repair_plan", "mate_group_plan", "mate_group_plan_md"]:
+            for key in ["diagnosis", "interface_index", "repair_plan", "mate_group_plan", "mate_group_plan_md", "mate_group_validation"]:
                 self.assertTrue((out_dir / manifest["artifacts"][key]).exists(), key)
             mate_groups = json.loads((out_dir / manifest["artifacts"]["mate_group_plan"]).read_text(encoding="utf-8-sig"))
+            validation = json.loads((out_dir / manifest["artifacts"]["mate_group_validation"]).read_text(encoding="utf-8-sig"))
             self.assertTrue(any(item["group_id"] == "standard_bolt_m6-1" for item in mate_groups["mate_groups"]))
             self.assertEqual(manifest["counts"]["mate_groups"], len(mate_groups["mate_groups"]))
+            self.assertEqual(manifest["validation"]["mate_group_plan_ok"], validation["ok"])
 
     def test_swctl_routes_assembly_review_pipeline(self):
         with tempfile.TemporaryDirectory() as d:

@@ -183,6 +183,11 @@ const toolSchemas = [
     name: 'solidworks_mate_macro',
     description: 'Generate reviewable VBA macro for adding a mate between two preselected entities.',
     inputSchema: { type: 'object', properties: { mate: { type: 'string', enum: ['coincident','concentric','distance','angle','parallel','perpendicular'] }, distance_mm: { type: 'number' }, angle_deg: { type: 'number' }, flip: { type: 'boolean' }, out: { type: 'string' }, manifest: { type: 'string' } }, required: ['mate'], additionalProperties: false }
+  },
+  {
+    name: 'solidworks_mate_group_macro',
+    description: 'Generate reviewable preselect VBA macro drafts from a mate group plan. Each macro still requires live entity preselection and review before running.',
+    inputSchema: { type: 'object', properties: { mate_group_plan: { type: 'string' }, out_dir: { type: 'string' }, manifest: { type: 'string' } }, required: ['mate_group_plan'], additionalProperties: false }
   },  {
     name: 'solidworks_selection_report',
     description: 'Report current SolidWorks selection set for safe preselected-entity mate workflows.',
@@ -246,6 +251,11 @@ const toolSchemas = [
     name: 'solidworks_mate_group_plan',
     description: 'Build a read-only mate group plan from an assembly repair plan and interface index: grouped candidate mates, components, evidence, and per-group verification.',
     inputSchema: { type: 'object', properties: { repair_plan: { type: 'string' }, interface_index: { type: 'string' }, out: { type: 'string' }, markdown_out: { type: 'string' } }, required: ['repair_plan', 'interface_index'], additionalProperties: false }
+  },
+  {
+    name: 'solidworks_mate_group_validate',
+    description: 'Validate a read-only mate group plan before macro or live execution: component count, supported mate types, and required rebuild/mate-error verification.',
+    inputSchema: { type: 'object', properties: { mate_group_plan: { type: 'string' }, out: { type: 'string' } }, required: ['mate_group_plan'], additionalProperties: false }
   },
   {
     name: 'solidworks_assembly_review_pipeline',
@@ -465,6 +475,11 @@ async function callTool(name, input) {
       if (input?.flip) args.push('-Flip');
       if (input?.out) args.push('-Out', input.out);
       if (input?.manifest) args.push('-Manifest', input.manifest);
+      break;
+    case 'solidworks_mate_group_macro':
+      args.push('mate-group-macro', '-Report', input.mate_group_plan);
+      if (input?.out_dir) args.push('-OutDir', input.out_dir);
+      if (input?.manifest) args.push('-Out', input.manifest);
       break;    case 'solidworks_selection_report':
       args.push(input?.start ? 'start-selection-report' : 'selection-report');
       if (input?.out) args.push('-Out', input.out);
@@ -530,6 +545,10 @@ async function callTool(name, input) {
       args.push('mate-group-plan', '-Report', input.repair_plan, '-FromReport', input.interface_index);
       if (input?.out) args.push('-Out', input.out);
       if (input?.markdown_out) args.push('-JsonOut', input.markdown_out);
+      break;
+    case 'solidworks_mate_group_validate':
+      args.push('mate-group-validate', '-Report', input.mate_group_plan);
+      if (input?.out) args.push('-Out', input.out);
       break;
     case 'solidworks_assembly_review_pipeline':
       args.push('assembly-review-pipeline', '-Report', input.report);

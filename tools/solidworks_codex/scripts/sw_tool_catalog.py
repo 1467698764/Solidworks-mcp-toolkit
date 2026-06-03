@@ -18,7 +18,7 @@ GROUP_RULES = {
     "export_verify": ["export", "interference", "compare", "preflight", "audit", "finalize"],
     "analysis": ["issue", "design_review", "change_plan", "report_search", "report_context", "model_understand", "diagnose"],
     "handoff": ["worklog", "handoff"],
-    "macro_generation": ["template_macro", "mate_macro"],
+    "macro_generation": ["template_macro", "mate_macro", "mate_group_macro"],
     "external_reference": ["existing_mcp"],
 }
 

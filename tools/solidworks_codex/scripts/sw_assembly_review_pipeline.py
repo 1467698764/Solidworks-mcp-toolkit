@@ -17,6 +17,7 @@ from sw_assembly_repair_plan import markdown as repair_markdown
 from sw_interface_index import build_index
 from sw_mate_group_plan import build_plan as build_mate_group_plan
 from sw_mate_group_plan import markdown as mate_group_markdown
+from sw_mate_group_validate import validate as validate_mate_group_plan
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -48,6 +49,7 @@ def build_pipeline(
     interface_index = build_index(report, near_tolerance_m=near_tolerance_m, standard_part_regex=standard_part_regex)
     repair_plan = build_repair_plan(diagnosis)
     mate_group_plan = build_mate_group_plan(repair_plan, interface_index)
+    mate_group_validation = validate_mate_group_plan(mate_group_plan)
 
     paths = {
         "diagnosis": out_dir / "assembly_diagnosis.json",
@@ -56,6 +58,7 @@ def build_pipeline(
         "repair_plan_md": out_dir / "assembly_repair_plan.md",
         "mate_group_plan": out_dir / "mate_group_plan.json",
         "mate_group_plan_md": out_dir / "mate_group_plan.md",
+        "mate_group_validation": out_dir / "mate_group_validation.json",
     }
     write_json(paths["diagnosis"], diagnosis)
     write_json(paths["interface_index"], interface_index)
@@ -63,6 +66,7 @@ def build_pipeline(
     write_text(paths["repair_plan_md"], repair_markdown(repair_plan))
     write_json(paths["mate_group_plan"], mate_group_plan)
     write_text(paths["mate_group_plan_md"], mate_group_markdown(mate_group_plan))
+    write_json(paths["mate_group_validation"], mate_group_validation)
 
     manifest = {
         "timestamp": datetime.now().isoformat(timespec="seconds"),
@@ -76,6 +80,10 @@ def build_pipeline(
             "repair_actions": len(repair_plan.get("actions", [])),
             "mate_groups": len(mate_group_plan.get("mate_groups", [])),
             "interface_candidates": len(interface_index.get("interfaces", [])),
+        },
+        "validation": {
+            "mate_group_plan_ok": mate_group_validation.get("ok"),
+            "mate_group_blockers": len(mate_group_validation.get("findings", {}).get("blocking", [])),
         },
         "operator_notes": [
             "read_only_artifacts",
