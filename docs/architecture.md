@@ -1,6 +1,6 @@
 # Architecture
 
-SolidWorks Codex MCP is a conservative control layer for multi-turn CAD work. It favors inspectable state, narrow edits, and reproducible handoff over a large unguarded API surface.
+SolidWorks Codex MCP is a conservative, evidence-first control layer for multi-turn CAD work. It favors inspectable state, narrow edits, live readback, and reproducible handoff over a large unguarded API surface.
 
 ## Layer map
 
@@ -10,22 +10,45 @@ Codex / MCP client
   -> tools/solidworks_codex/swctl.ps1
   -> tools/solidworks_codex/scripts/*.py
   -> SolidWorks COM automation or offline JSON fixtures
-  -> reports, handoff bundles, exports, or generated macros
+  -> reports, handoff bundles, exports, generated macros, or native .SLDASM/.SLDPRT artifacts
 ```
 
 ## Runtime boundaries
 
-- `server.cjs` exposes MCP tools and translates tool arguments into `swctl.ps1` commands.
+- `server.cjs` exposes 35 MCP tools and translates tool arguments into `swctl.ps1` commands.
 - `swctl.ps1` is the stable command router used by humans, tests, CI, and MCP.
-- Python scripts implement focused operations: inspect, summary, compare, worklog, handoff, release gates, and guarded write helpers.
+- Python scripts implement focused operations: inspect, summary, compare, model-understand, worklog, handoff, release gates, validation profiles, and guarded write helpers.
 - SolidWorks COM is only touched by commands that need live model state or model mutation. Offline gates use fixtures and generated reports.
+- Live validation is opt-in and serial. It avoids parallel SolidWorks sessions because COM automation, hidden windows, file locks, and memory pressure are part of the system boundary.
 
 ## Data flow
 
-1. Read-only commands produce JSON or Markdown reports.
-2. Analysis commands consume inspect/session reports and generate context, search results, design reviews, change plans, or handoff bundles.
-3. Write commands stay narrow: backup first, one dimension or component state at a time, rebuild, inspect, compare.
-4. Release commands validate the repository itself: GitHub readiness, repo health, public copy guard, release-tree, audit, and finalize.
+1. Read-only commands produce JSON or Markdown evidence reports.
+2. Analysis commands consume inspect/session reports and generate context, search results, design reviews, change plans, model understanding, or handoff bundles.
+3. Write commands stay narrow: backup first, one dimension/component/feature workflow at a time, rebuild, inspect, compare, verify.
+4. Assembly contract commands convert user intent into reusable evidence gates: component existence, Transform/origin placement, semantic mate network, suppressed state, and participation evidence.
+5. Release commands validate the repository itself: GitHub readiness, repo health, public copy guard, release-tree, audit, capability matrix, and finalize.
+
+## Validation architecture
+
+The project separates validation into four practical layers:
+
+- Geometry: native artifacts, part shape semantics, rebuild health, static interference, clearance tolerance.
+- Assembly: mate semantics, component placements, functional adjacency, constraint/DOF intent, motion sweep collision.
+- Engineering: mass properties, DFM/DFA screens, BOM metadata, strength/stiffness screen, drawing/BOM readiness.
+- MCP quality: evidence completeness, traceability, model-understand usefulness, public-copy hygiene, release-tree cleanliness.
+
+`validation profiles` keep this proportional to intent: `draft_part`, `single_part`, `assembly`, `mechanism_assembly`, and `engineering_release`. `runtime_budget` can downgrade expensive checks for fast feedback, and `extra_checks` lets a reasoning model add task-specific gates without making every heavy check globally mandatory.
+
+## Live gate architecture
+
+Live gate is where runtime truth outranks source assumptions. It validates SolidWorks-native behavior through three gates:
+
+- `live_session_smoke` proves the minimal COM/session/mate/interference/cleanup path.
+- `live_capability_suite` proves feature creation and edit primitives: extrude, cut, revolve, revolved cut, sketch dimension read/modify/rebuild/save, assembly insert, concentric mate, distance mate, interference, mass, close/cleanup.
+- `complete_shaper_v5` uses a bullhead shaper as a stress test: 24 parts, 58 components, 22 semantic mates, 21 restored/fixed primary components via Transform2.ArrayData, and 0 interference.
+
+The bullhead shaper is not the product boundary; it is a deliberately hard fixture that forces the generic control layer to prove real assembly behavior.
 
 ## Safety model
 
@@ -33,19 +56,21 @@ Codex / MCP client
 - Real CAD edits should be backed up, rebuilt, inspected, and compared before saving or committing.
 - Macro generation creates reviewable `.swp.vba` text; it does not run macros automatically.
 - `release-tree` checks that reports, backups, exports, generated macros, caches, logs, and personal config paths are not Git-visible.
-- Public copy guard prevents rank-boasting language in release-facing files.
+- `CleanupStale` is bounded to known generated stale fixture directories and must not delete unrelated workspace files.
+- Public copy guard prevents rank-boasting language, personal scenario leakage, and mojibake in release-facing files.
 
 ## Handoff model
 
-The project is designed for long-running work where a future Codex turn must understand current evidence. `report-context`, `worklog`, `handoff-bundle`, and `tool-catalog` preserve facts, decisions, and next-step options without forcing a fixed template workflow.
+Long-running CAD work needs durable context. `report-context`, `model-understand`, `worklog`, `handoff-bundle`, and `tool-catalog` preserve facts, decisions, failed attempts, verification evidence, and next-step options without forcing one fixed template workflow.
 
-## Offline evaluation
+## Offline and live evaluation
 
-The repository includes offline fixtures and a static demo bundle so CI and reviewers can exercise the reasoning, handoff, and release gates without SolidWorks installed. Live SolidWorks remains necessary for real COM inspection, rebuild, export, mass properties, and model mutation.
+Offline tests and fixtures keep CI fast and deterministic. Live SolidWorks remains necessary for COM inspection, rebuild, export, mass properties, model mutation, actual mate creation, interference callbacks, and file-lock cleanup. STEP optional smoke can supplement native validation, but `.SLDASM/.SLDPRT` remains the deliverable for assembly work.
 
 ## Extension points
 
 - Add new operations as focused Python scripts first.
 - Route them through `swctl.ps1` with explicit parameters.
 - Expose MCP tools only after there is a CLI path and test coverage.
+- Add validation-profile coverage when a feature changes acceptance semantics.
 - Add release/audit coverage for new public behavior.

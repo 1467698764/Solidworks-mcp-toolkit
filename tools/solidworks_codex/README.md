@@ -5,8 +5,8 @@ This directory contains the local control layer used by the MCP server and by di
 ## Responsibilities
 
 - `swctl.ps1` is the stable command router for humans, tests, CI, and MCP.
-- `mcp/server.cjs` exposes local commands such as `solidworks_tool_catalog`, `solidworks_handoff_bundle`, and `solidworks_worklog` as conservative MCP tools.
-- `scripts/*.py` implement focused operations: inspect, compare, model understanding, guarded edits, worklog, handoff, and release gates.
+- `mcp/server.cjs` exposes the 35 MCP tools and delegates to `swctl.ps1`, including MCP entries such as `solidworks_tool_catalog`, `solidworks_handoff_bundle`, and `solidworks_worklog`.
+- `scripts/*.py` implement focused operations: inspect, compare, model understanding, validation profiles, guarded edits, worklog, handoff, live gates, and release gates.
 - `sandbox/report_before.json` and `sandbox/report_after.json` are deterministic offline fixtures used by tests and demos.
 
 ## Workflow stance
@@ -15,10 +15,12 @@ The tools are designed for evidence-first mechanical CAD work:
 
 1. inspect or session-snapshot;
 2. model-understand / report-context / report-search;
-3. backup before any write;
-4. change one dimension or component state at a time;
-5. rebuild, inspect, compare, and verify;
-6. record worklog and create handoff bundles for later AI turns.
+3. choose validation profiles by intent (`draft_part`, `single_part`, `assembly`, `mechanism_assembly`, `engineering_release`);
+4. backup before any write;
+5. change one dimension, component state, or feature flow at a time;
+6. rebuild, inspect, compare, and verify;
+7. for assemblies, validate placement and semantic mate network through `assembly-contract`;
+8. record worklog and create handoff bundles for later AI turns.
 
 The goal is not to force one CAD template or one output schema. The goal is to give a strong model enough SolidWorks evidence to reason flexibly and safely.
 
@@ -29,8 +31,21 @@ cd <repo>
 .\tools\solidworks_codex\swctl.ps1 preflight -Out tools\solidworks_codex\reports\preflight_latest.json
 .\tools\solidworks_codex\swctl.ps1 inspect -Out tools\solidworks_codex\reports\assembly_before.json
 .\tools\solidworks_codex\swctl.ps1 model-understand -Report tools\solidworks_codex\reports\assembly_before.json -View spatial-assembly -Target "constraints, transforms, clearance, hole patterns, and manufacturing evidence"
+.\tools\solidworks_codex\swctl.ps1 assembly-contract -Report tools\solidworks_codex\reports\assembly_before.json -Manifest tools\solidworks_codex\reports\assembly_contract_manifest.json -Out tools\solidworks_codex\reports\assembly_contract.json
 .\tools\solidworks_codex\swctl.ps1 audit -Out tools\solidworks_codex\reports\audit_latest.json
 ```
+
+## Live SolidWorks validation
+
+Offline tests prove syntax and report logic. Real CAD behavior is checked by the opt-in live gate:
+
+```powershell
+.\tools\solidworks_codex\swctl.ps1 live-gate -CleanupStale -Out tools\solidworks_codex\reports\live_validation_gate.json
+```
+
+Live deliverables are native `.SLDASM/.SLDPRT`; STEP optional smoke is not the primary acceptance criterion. The current bullhead shaper stress fixture is `shaper_machine_v5` and records `24 parts`, `58 components`, `22 semantic mates`, `21 restored/fixed primary components`, `Transform2.ArrayData`, a verified mate network, and `0 interference` when healthy.
+
+`CleanupStale` is bounded to old generated shaper fixture directories. The gate runs serially, scans `~$` lock files, and avoids unnecessary SolidWorks windows where possible.
 
 ## MCP entry point
 
@@ -48,6 +63,7 @@ The following are generated and should normally stay out of Git:
 - `backups/`
 - `exports/`
 - generated `.swp.vba` macros
+- live fixture output unless explicitly promoted
 - logs and Python caches
 
-`release-tree` and `audit` check this before release.
+`release-tree`, `public-copy-guard`, and `audit` check this before release.
