@@ -18,6 +18,7 @@ class ValidationCheck:
     layer: str
     severity: str
     reason: str
+    evidence_scope: str = "standard"
 
 
 @dataclass(frozen=True)
@@ -27,8 +28,18 @@ class ValidationProfile:
     checks: tuple[ValidationCheck, ...]
 
 
-def C(name: str, layer: str, severity: str, reason: str) -> ValidationCheck:
-    return ValidationCheck(name=name, layer=layer, severity=severity, reason=reason)
+KNOWN_LAYERS = {"geometry", "assembly", "engineering", "mcp_quality"}
+KNOWN_SEVERITIES = {"blocking", "warning", "not_applicable"}
+KNOWN_RUNTIME_BUDGETS = {"fast", "standard", "strict"}
+EXPENSIVE_CHECKS = {"motion_sweep_collision"}
+
+
+def C(name: str, layer: str, severity: str, reason: str, evidence_scope: str = "standard") -> ValidationCheck:
+    if layer not in KNOWN_LAYERS:
+        raise ValueError(f"unknown validation layer: {layer}")
+    if severity not in KNOWN_SEVERITIES:
+        raise ValueError(f"unknown validation severity: {severity}")
+    return ValidationCheck(name=name, layer=layer, severity=severity, reason=reason, evidence_scope=evidence_scope)
 
 
 BASE_PART_CHECKS = (
@@ -84,8 +95,15 @@ def normalize_intent(intent: str | None) -> str:
     return aliases.get(value, value)
 
 
-def validation_profile_for_intent(intent: str | None, extra_checks: list[dict[str, Any]] | None = None) -> ValidationProfile:
+def validation_profile_for_intent(
+    intent: str | None,
+    extra_checks: list[dict[str, Any]] | None = None,
+    runtime_budget: str = "standard",
+) -> ValidationProfile:
     normalized = normalize_intent(intent)
+    budget = (runtime_budget or "standard").strip().lower().replace("-", "_")
+    if budget not in KNOWN_RUNTIME_BUDGETS:
+        raise ValueError(f"unknown validation runtime budget: {runtime_budget}")
     checks: list[ValidationCheck] = list(BASE_PART_CHECKS)
     if normalized in {"single_part", "draft_part"}:
         checks.extend(ASSEMBLY_OPTIONAL_FOR_SINGLE_PART)
@@ -97,12 +115,19 @@ def validation_profile_for_intent(intent: str | None, extra_checks: list[dict[st
         checks.extend(ENGINEERING_WARNINGS)
     else:
         checks.extend(tuple(c for c in ENGINEERING_WARNINGS if c.severity != "not_applicable"))
+    if budget == "fast":
+        checks = [
+            C(check.name, check.layer, "warning", check.reason, check.evidence_scope)
+            if check.name in EXPENSIVE_CHECKS and check.severity == "blocking" else check
+            for check in checks
+        ]
     for item in extra_checks or []:
         checks.append(C(
             str(item["name"]),
             str(item.get("layer", "mcp_quality")),
             str(item.get("severity", "warning")),
             str(item.get("reason", "task-specific reasoning-model check")),
+            str(item.get("evidence_scope", "task_specific")),
         ))
     return ValidationProfile(name=normalized, intent=normalized, checks=tuple(checks))
 
@@ -125,3 +150,29 @@ def not_applicable_check_names(profile: ValidationProfile) -> tuple[str, ...]:
 
 def profile_to_dict(profile: ValidationProfile) -> dict[str, Any]:
     return asdict(profile)
+
+
+def profile_decision_report(profile: ValidationProfile) -> dict[str, Any]:
+    """Summarize why a profile blocks some checks and downgrades others.
+
+    This report is meant for MCP callers and reasoning agents: it makes the
+    acceptance contract explicit without pretending every possible engineering
+    check is globally mandatory.
+    """
+    layers: dict[str, dict[str, list[str]]] = {}
+    for check in profile.checks:
+        layer = layers.setdefault(check.layer, {"blocking": [], "warning": [], "not_applicable": []})
+        layer[check.severity].append(check.name)
+    return {
+        "profile": profile.name,
+        "intent": profile.intent,
+        "blocking": list(blocking_check_names(profile)),
+        "warning": list(warning_check_names(profile)),
+        "not_applicable": list(not_applicable_check_names(profile)),
+        "layers": layers,
+        "policy": (
+            "Validation is intent-scoped, not global: lightweight work keeps only "
+            "native artifacts, rebuild health, and requested shape semantics blocking; "
+            "mechanism and release checks are enabled by profile or task-specific extra checks."
+        ),
+    }

@@ -46,6 +46,13 @@ def sample_part_feature_evidence(module):
     }
 
 
+def sample_design_layout_fixed_components(module):
+    return [
+        {"component": f"{name}-1", "ok": True, "api_result": None}
+        for name in module.solved_primary_origins_for_shaper()
+    ]
+
+
 class CompleteShaperSpecTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -169,6 +176,7 @@ class CompleteShaperSpecTests(unittest.TestCase):
         self.assertIn("part_feature_evidence", validation["failed"])
 
         base["part_feature_evidence"] = sample_part_feature_evidence(self.module)
+        base["design_layout_fixed_components"] = sample_design_layout_fixed_components(self.module)
         self.assertTrue(self.module.validate_live_result(base)["ok"])
 
         bad = dict(base)
@@ -316,6 +324,7 @@ class CompleteShaperSpecTests(unittest.TestCase):
             "inspect": self.module.sample_expected_shaper_inspect_evidence(),
             "model_understanding": self.module.sample_expected_shaper_understanding_evidence(),
             "part_feature_evidence": sample_part_feature_evidence(self.module),
+            "design_layout_fixed_components": sample_design_layout_fixed_components(self.module),
         }
         self.assertTrue(self.module.validate_live_result(base)["ok"])
 
@@ -389,6 +398,7 @@ class CompleteShaperSpecTests(unittest.TestCase):
         inspected["inspect"] = self.module.sample_expected_shaper_inspect_evidence()
         inspected["model_understanding"] = self.module.sample_expected_shaper_understanding_evidence()
         inspected["part_feature_evidence"] = sample_part_feature_evidence(self.module)
+        inspected["design_layout_fixed_components"] = sample_design_layout_fixed_components(self.module)
         self.assertTrue(self.module.validate_live_result(inspected)["ok"])
 
         bad = dict(inspected)
@@ -483,6 +493,19 @@ class CompleteShaperSpecTests(unittest.TestCase):
 
 
 
+    def test_distance_mate_uses_closest_parallel_face_pair_not_first_arbitrary_faces(self):
+        source = SCRIPT.read_text(encoding="utf-8")
+        self.assertIn("best_parallel_planar_face_pair", source)
+        self.assertIn("face_plane_offset", source)
+        self.assertIn("abs(actual_distance - distance)", source)
+        self.assertNotIn('if result["ok"]:\n                            return result', source)
+
+    def test_primary_layout_fix_is_not_used_to_mask_unsolved_mates(self):
+        source = SCRIPT.read_text(encoding="utf-8")
+        self.assertIn("fix_primary_design_layout_components", source)
+        self.assertLess(source.index("add_shaper_mate_network(asm, component_objs)"), source.index("fix_primary_design_layout_components(asm, component_objs)"))
+        self.assertIn("validate_design_layout_fixed_components", source)
+
     def test_live_script_writes_shaper_assembly_contract_artifact(self):
         source = SCRIPT.read_text(encoding="utf-8")
         self.assertIn("complete_shaper_assembly_contract.json", source)
@@ -516,6 +539,7 @@ class CompleteShaperSpecTests(unittest.TestCase):
             "inspect": self.module.sample_expected_shaper_inspect_evidence(),
             "model_understanding": self.module.sample_expected_shaper_understanding_evidence(),
             "part_feature_evidence": sample_part_feature_evidence(self.module),
+            "design_layout_fixed_components": sample_design_layout_fixed_components(self.module),
         }
         self.assertTrue(self.module.validate_live_result(base)["ok"])
 

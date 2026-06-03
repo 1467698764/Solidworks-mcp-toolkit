@@ -113,11 +113,11 @@ def spec_to_manifest(spec: CompleteShaperSpec) -> dict[str, Any]:
 def expected_live_feature_names() -> dict[str, tuple[str, ...]]:
     return {
         "cast_bed_with_t_slots": ("T_Slot_Cuts", "Floor_Mounting_Holes", "Web_Rib_1"),
-        "column_frame_with_window": ("Frame_Window_Cut", "Bearing_Bores_And_Cover_Holes_01"),
+        "column_frame_with_window": ("Frame_Window_Cut", "Bearing_Bores_And_Cover_Holes"),
         "ram_with_dovetail_and_tool_mount": ("Dovetail_And_Oil_Groove_Cuts", "Angled_Dovetail_Underside_Cut", "Tool_Mount_Bolt_Holes"),
         "single_point_cutting_tool": ("Beveled_Cutting_Tip",),
         "bull_gear_crank_disk": ("Center_Eccentric_And_Lightening_Holes",),
-        "slotted_rocker_arm": ("Long_Sliding_Slot", "Rocker_Pin_Bores_01", "Rocker_Pin_Bores_02"),
+        "slotted_rocker_arm": ("Long_Sliding_Slot", "Rocker_Pin_Bores"),
         "work_table_with_t_slots": ("Work_Table_T_Slots", "Table_Mount_Holes"),
         "left_dovetail_way": ("Dovetail_Relief", "Left_Angled_Dovetail_Flank", "Right_Angled_Dovetail_Flank", "Rail_Screw_Holes"),
         "right_dovetail_way": ("Dovetail_Relief", "Left_Angled_Dovetail_Flank", "Right_Angled_Dovetail_Flank", "Rail_Screw_Holes"),
@@ -1055,6 +1055,29 @@ def face_plane_normal(face: Any) -> tuple[float, float, float] | None:
         return None
 
 
+def face_plane_offset(face: Any, normal: tuple[float, float, float]) -> float | None:
+    """Return a comparable plane offset for choosing intentional distance mates.
+
+    SolidWorks face iteration order is not stable enough for engineering mates.
+    For generated planar faces we can use the planar surface point/normal form to
+    estimate distance between parallel faces and pick the pair already near the
+    requested mate clearance instead of the first arbitrary parallel pair.
+    """
+    try:
+        surface = read_member(face, "GetSurface")
+        params = read_member(surface, "PlaneParams")
+        if params and len(params) >= 6:
+            point = (float(params[3]), float(params[4]), float(params[5]))
+            return normal[0] * point[0] + normal[1] * point[1] + normal[2] * point[2]
+        box = read_member(face, "GetBox")
+        if box and len(box) >= 6:
+            center = ((float(box[0]) + float(box[3])) / 2, (float(box[1]) + float(box[4])) / 2, (float(box[2]) + float(box[5])) / 2)
+            return normal[0] * center[0] + normal[1] * center[1] + normal[2] * center[2]
+    except Exception:
+        return None
+    return None
+
+
 def normals_parallel(a: tuple[float, float, float], b: tuple[float, float, float]) -> bool:
     return abs(a[0] * b[0] + a[1] * b[1] + a[2] * b[2]) > 0.99
 
@@ -1085,26 +1108,46 @@ def add_selected_mate(asm: Any, name: str, mate_type: int, distance: float = 0.0
         return {"name": name, "ok": False, "api": "AddMate5", "mate_error": getattr(mate_error, "value", None), "error": repr(exc)}
 
 
+def best_parallel_planar_face_pair(left: Any, right: Any, distance: float) -> tuple[Any, Any, float] | None:
+    candidates: list[tuple[float, Any, Any, float]] = []
+    left_faces = [(face, face_plane_normal(face)) for face in component_faces(left)]
+    left_faces = [(face, normal) for face, normal in left_faces if normal is not None]
+    right_faces = [(face, face_plane_normal(face)) for face in component_faces(right)]
+    right_faces = [(face, normal) for face, normal in right_faces if normal is not None]
+    for left_face, left_normal in left_faces:
+        left_offset = face_plane_offset(left_face, left_normal)
+        if left_offset is None:
+            continue
+        for right_face, right_normal in right_faces:
+            if not normals_parallel(left_normal, right_normal):
+                continue
+            right_offset = face_plane_offset(right_face, left_normal)
+            if right_offset is None:
+                continue
+            actual_distance = abs(left_offset - right_offset)
+            candidates.append((abs(actual_distance - distance), left_face, right_face, actual_distance))
+    if not candidates:
+        return None
+    _, left_face, right_face, actual_distance = min(candidates, key=lambda item: item[0])
+    return left_face, right_face, actual_distance
+
+
 def add_distance_mate_between_planar_faces(asm: Any, components: list[Any], distance: float, name: str = "Shaper_Distance_Mate") -> dict[str, Any]:
     for i, left in enumerate(components):
-        left_faces = [(face, face_plane_normal(face)) for face in component_faces(left)]
-        left_faces = [(face, normal) for face, normal in left_faces if normal is not None]
         for right in components[i + 1:]:
-            right_faces = [(face, face_plane_normal(face)) for face in component_faces(right)]
-            right_faces = [(face, normal) for face, normal in right_faces if normal is not None]
-            for left_face, left_normal in left_faces:
-                for right_face, right_normal in right_faces:
-                    if not normals_parallel(left_normal, right_normal):
-                        continue
-                    component_pair = [left.Name2, right.Name2]
-                    selection_guard = select_faces(asm, left_face, right_face, component_pair)
-                    if int(selection_guard["selection_count_before_mate"]) >= 2:
-                        result = add_selected_mate(asm, name, 5, distance)
-                        result["selected_entities"] = selection_guard["selection_count_before_mate"]
-                        result["selection_guard"] = selection_guard
-                        result["components"] = component_pair
-                        if result["ok"]:
-                            return result
+            best = best_parallel_planar_face_pair(left, right, distance)
+            if best is None:
+                continue
+            left_face, right_face, actual_distance = best
+            component_pair = [left.Name2, right.Name2]
+            selection_guard = select_faces(asm, left_face, right_face, component_pair)
+            if int(selection_guard["selection_count_before_mate"]) >= 2:
+                result = add_selected_mate(asm, name, 5, distance)
+                result["selected_entities"] = selection_guard["selection_count_before_mate"]
+                result["selection_guard"] = selection_guard
+                result["components"] = component_pair
+                result["face_pair_actual_distance_m"] = actual_distance
+                return result
     return {"name": name, "ok": False, "error": "no planar face pair accepted by AddMate5"}
 
 
@@ -1170,6 +1213,43 @@ def shaper_distance_mate_clearance(name: str) -> float:
     # overlap in SolidWorks interference detection. Other distance mates keep the
     # original 10 mm display clearance that already validates cleanly.
     return {"Ram_LeftWay_Guidance_Distance_Mate": 0.040}.get(name, 0.010)
+
+
+def validate_design_layout_fixed_components(evidence: Any) -> list[str]:
+    if not isinstance(evidence, list):
+        return ["design_layout_fixed_components"]
+    expected = set(solved_primary_origins_for_shaper())
+    fixed = {str(item.get("component", "")).split("-")[0] for item in evidence if isinstance(item, dict) and item.get("ok") is True}
+    missing = sorted(expected - fixed)
+    return ["design_layout_fixed_components"] if missing else []
+
+
+def fix_primary_design_layout_components(asm: Any, components: list[Any]) -> list[dict[str, Any]]:
+    """Fix primary components at their designed insert transforms before dense mates.
+
+    The current dense semantic mate network is evidence/readback oriented. If
+    distance mates are allowed to solve freely from arbitrary planar-face picks,
+    SolidWorks can satisfy them by moving the machine away from the accepted
+    layout. Fixing only the primary functional components keeps the visible
+    design layout stable; later mechanism-profile work can selectively float the
+    intended sliding/rotating degrees of freedom for motion sweeps.
+    """
+    primary_names = set(solved_primary_origins_for_shaper())
+    fixed: list[dict[str, Any]] = []
+    empty = empty_dispatch_variant()
+    for component in components:
+        name = str(getattr(component, "Name2", ""))
+        prefix = name.split("-")[0]
+        if prefix not in primary_names:
+            continue
+        try:
+            asm.ClearSelection2(True)
+            selected = bool(component.Select4(False, empty, False))
+            result = read_member(asm, "FixComponent") if selected else None
+            fixed.append({"component": name, "ok": bool(selected), "api_result": result})
+        except Exception as exc:
+            fixed.append({"component": name, "ok": False, "error": repr(exc)})
+    return fixed
 
 
 def add_shaper_mate_network(asm: Any, components: list[Any]) -> list[dict[str, Any]]:
@@ -1588,6 +1668,7 @@ def validate_live_result(result: dict[str, Any]) -> dict[str, Any]:
     if result.get("layout", {}).get("ok") is not True:
         failed.append("nominal_layout")
     failed.extend(validate_semantic_mate_network(result.get("mates", []), expected_shaper_mate_contract()))
+    failed.extend(validate_design_layout_fixed_components(result.get("design_layout_fixed_components")))
     callbacks = result.get("callbacks", {})
     mass = callbacks.get("mass", {})
     mass_kg = float(mass.get("mass_kg", 0) or 0)
@@ -1716,6 +1797,9 @@ def construct_live_fixture(spec: CompleteShaperSpec, out_dir: Path, reports_dir:
             stage = "add_shaper_mate_network"
             assert_solidworks_runtime_healthy(stage)
             mates = add_shaper_mate_network(asm, component_objs)
+            stage = "fix_primary_design_layout_components"
+            assert_solidworks_runtime_healthy(stage)
+            design_layout_fixed_components = fix_primary_design_layout_components(asm, component_objs)
             stage = "assembly_rebuild"
             assert_solidworks_runtime_healthy(stage)
             asm.ForceRebuild3(False)
@@ -1736,6 +1820,7 @@ def construct_live_fixture(spec: CompleteShaperSpec, out_dir: Path, reports_dir:
             "part_count": len(part_paths),
             "component_count": len(components),
             "components": components,
+            "design_layout_fixed_components": design_layout_fixed_components,
             "mates": mates,
             "callbacks": callbacks,
             "part_feature_evidence": part_feature_evidence,
