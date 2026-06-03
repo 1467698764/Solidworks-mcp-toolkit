@@ -134,7 +134,7 @@ Status values:
 | Named cylindrical interfaces | partial | Shaft axis, hole axis, pin bore, bearing bore, screw hole. | Axis candidates scored by radius, role, location, direction, source feature. |
 | Slot/path interfaces | missing | Slider slot, cam path, rail path, path endpoints. | Path can drive slot/path/cam mate or validation. |
 | Coordinate systems/datums | missing/partial | Part origin role, assembly origin, principal axes, local frames. | Downstream drawing/CAM/assembly checks know orientation. |
-| Interface confidence scoring | missing | Score and reason for selected face/axis. | Low confidence blocks or asks for alternative, not silent mate creation. |
+| Interface confidence scoring | partial | Bbox/nearest-neighbor and role-hint evidence is indexed; live face/axis confidence is still pending. | Low confidence blocks or asks for alternative, not silent mate creation. |
 | Interface persistence | missing | Store stable references when possible and fallback selectors when not. | Reopen/repair can find the same interface. |
 
 ### 6.4 Assembly Planning And Mates
@@ -151,17 +151,17 @@ Status values:
 | Width/symmetry | missing | Slider centered between guide faces, symmetric jaws, centered plates. | Remaining DOF matches intent. |
 | Limit distance/angle | missing | Travel stops, hinge limits, slider stroke. | Mechanism samples endpoints and midpoints. |
 | Slot/path/cam/gear mates | missing/defer | Mechanism-specific, use when SolidWorks API support is reliable. | Optional until standard mechanism_lite is stable. |
-| Mate groups | missing | A joint is a group of constraints with expected remaining DOF. | Every functional connection has group id and DOF expectation. |
-| Standard part attachment | missing/partial | Bolt, washer, nut, pin, bearing, key, retaining ring, oil cup. | No accepted standard/detail component is isolated or hostless. |
+| Mate groups | partial/offline-ready | Read-only mate group plans, validation gates, and reviewable preselect macro drafts exist; live application/readback is still pending. | Every functional connection has group id and DOF expectation. |
+| Standard part attachment | partial/offline-ready | Hostless standard parts are detected and grouped into candidate concentric/coincident attachment plans; live entity selection is still required. | No accepted standard/detail component is isolated or hostless. |
 
 ### 6.5 Incremental Repair
 
 | Capability | Status | Detail required | Acceptance |
 | --- | --- | --- | --- |
 | Open/current-document handoff | partial | Continue from active SolidWorks window or specified native file. | Diagnosis does not require regeneration. |
-| Local fault localization | missing | Map failure to part feature, component, mate group, or standard part. | Repair plan names the affected subgraph. |
+| Local fault localization | partial/offline-ready | Assembly diagnosis, repair plan, interface index, and mate group plan localize bad mates, hostless standard parts, and isolated components. | Repair plan names the affected subgraph. |
 | Rollback copies | missing/partial | Preserve original native files before mutation. | Report lists rollback paths. |
-| Selective mate repair | missing | Delete/add/update only failed mate group. | Untouched components keep file timestamps/transforms unless affected. |
+| Selective mate repair | partial/offline-ready | Reviewable mate group macro drafts can be generated per actionable group; automated live deletion/add/readback is still pending. | Untouched components keep file timestamps/transforms unless affected. |
 | Selective part repair | missing | Edit only affected feature/sketch; rebuild dependent assembly. | Report lists changed feature and downstream checks. |
 | Full rebuild justification | missing | Record reason: stale base, invalid topology, missing interface, cheaper regeneration. | Full rebuild is a deliberate decision, not default behavior. |
 
@@ -219,10 +219,10 @@ This order matters because later work depends on earlier evidence.
 
 | Phase | Build | Why first | Exit criteria |
 | --- | --- | --- | --- |
-| 1 | Existing assembly diagnosis | Enables local repair and stops blind rebuilds. | Given a `.SLDASM`, report inventory, mate graph, isolated nodes, fixed/floating, interference, gaps, locks. |
-| 2 | Interface index extraction | Real mates and edits need stable targets. | Primary part interfaces can be extracted and scored after reopen. |
-| 3 | Repair planning | Gives the model an engineering action plan before mutation. | Report says reused files, edited files, mate groups, rollback, rebuild reason. |
-| 4 | Mate group executor | Replaces single decorative mates with physical joint groups. | Static assemblies pass with grouped constraints and no isolated functional components. |
+| 1 | Existing assembly diagnosis | Implemented offline. | Given an inspect report, report inventory, mate graph, isolated nodes, fixed/floating, bad mates, bbox gaps, standard-part host gaps, and locks. |
+| 2 | Interface index extraction | Implemented offline heuristic. | Component bbox, nearest-neighbor, contact candidates, fixed-root hints, and standard-part hints are indexed; live face/axis identity is pending. |
+| 3 | Repair planning | Implemented offline. | Diagnosis turns into ordered repair actions and read-only assembly review pipeline artifacts. |
+| 4 | Mate group executor | Partial/offline-ready. | Mate group plans, validation gates, and reviewable macro drafts exist; live group application, readback, and interference checks remain next. |
 | 5 | Visual validation gate | Catches failures humans see immediately. | SolidWorks window screenshot is part of blocking evidence for assemblies. |
 | 6 | Mechanism_lite | Makes simple machines credible. | Slider-crank/quick-return samples limits and collisions. |
 | 7 | Engineering_lite | Moves from usable CAD to practical review. | BOM/material/mass/fit/DFM/DFA warnings are available when requested. |
