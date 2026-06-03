@@ -63,7 +63,9 @@ Allowing the command to launch SolidWorks is explicit:
 
 ## Assembly contract and model understanding
 
-`assembly-contract` is a reusable offline gate for inspect reports. It checks document type, minimum component count, required component prefixes, Transform/origin tolerance, semantic mate type, mate suppression state, and expected participating components. Contract entries may set severity to `blocking`, `warning`, or `not_applicable`; warnings are reported without failing the command, while unknown severities fail so contracts stay reviewable. Component matching removes only SolidWorks instance suffixes such as `-1`, so hyphenated part names remain precise and substring pair matches are rejected.
+`assembly-contract` is a reusable offline gate for inspect reports. It checks document type, minimum component count, required component prefixes, required component suppression, Transform/origin tolerance, semantic mate type, mate suppression state, mate error/status when reported, fixed-fixed mate risk, and expected participating components. Contract entries may set severity to `blocking`, `warning`, or `not_applicable`; warnings are reported without failing the command, while unknown severities fail so contracts stay reviewable. Component matching removes only SolidWorks instance suffixes such as `-1`, so hyphenated part names remain precise and substring pair matches are rejected. A required mate between two fixed components is blocking by default because it cannot prove an active constraint; use `allow_fixed_fixed: true` only for explicit reference/documentation mates.
+
+SolidWorks AddMate error values follow the SolidWorks API enum; `mate_error: 1` means the AddMate call reported no error. It is not enough by itself: solved placement, mate feature readback, suppressed/fixed state, and component participation still need separate evidence.
 
 ```powershell
 .\tools\solidworks_codex\swctl.ps1 assembly-contract `
@@ -87,21 +89,29 @@ The underlying script flag is `--cleanup-stale`; `CleanupStale` is the PowerShel
 Live gate layers:
 
 - `live_session_smoke`: minimal COM/session/mate/interference/cleanup path.
-- `live_capability_suite`: extrude, cut, revolve, revolved cut, sketch dimension read/modify/rebuild/save, assembly insertion, concentric mate, distance mate, interference callback, mass callback, close/cleanup, and selection-isolation evidence, and `assembly_component_placements` component Transform2/origin placement readback for the inserted assembly components.
+- `live_capability_suite`: extrude, cut, revolve, revolved cut, sketch dimension read/modify/rebuild/save, assembly insertion, concentric mate, distance mate, interference callback, mass callback, close/cleanup, selection-isolation evidence, `assembly_component_placements` component Transform2/origin placement readback, and `part_geometry_readback` bbox/body/volume evidence from reopened native `.SLDPRT` files.
 - `complete_shaper_v5`: bullhead shaper stress test at `tools/solidworks_codex/live_fixture/shaper_machine_v5/bullhead_shaper_complete.SLDASM` with report `tools/solidworks_codex/reports/shaper_machine_v5/complete_shaper_build.json`.
 
-Current shaper evidence:
+Current live capability suite evidence:
+
+- validation `ok: true`
+- `part_geometry_readback` present for `extrude_cut_plate`, `revolve_boss_part`, `revolve_cut_part`, and `editable_dimension_plate`
+- mate API readback reports `mate_error: 1`, which is SolidWorks AddMate no-error
+- `assembly_component_placements` solved origins match the accepted native assembly layout
+- post cleanup has no `~$` lock files
+
+Bullhead shaper target evidence:
 
 - `24 parts`
 - `58 components`
 - `22 semantic mates`
-- `21 restored/fixed primary components`
+- primary components placed/restored from native Transform2 readback
 - primary component restore API: `Transform2.ArrayData`
 - verified mate network
-- mass callback available, assembly mass about `15.13 kg`
-- interference callback available, `0 interference`
-- empty validation failed list
-- post cleanup has no `~$` lock files
+- interference callback expected to report `0 interference`
+- post cleanup must have no `~$` lock files
+
+Do not treat an old `complete_shaper_build.json` with `ok: true` as current truth. The gate checks report freshness and recomputes strict evidence from the current scripts; stale shaper reports or assemblies with fixed/floating/mate contradictions must be regenerated and revalidated.
 
 `-CleanupStale` is bounded to old generated directories: `shaper_machine`, `shaper_machine_v2`, `shaper_machine_v3`, and `shaper_machine_v4`. It must not touch `shaper_machine_v5`, `live_capability_suite`, user models, or unrelated workspace files.
 

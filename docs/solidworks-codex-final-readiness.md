@@ -14,27 +14,42 @@
 
 ## Latest live SolidWorks evidence
 
-Latest verified shaper stress fixture:
+Latest verified live capability suite:
+
+```text
+tools/solidworks_codex/live_fixture/live_capability_suite/capability_suite.SLDASM
+tools/solidworks_codex/reports/live_capability_suite/live_capability_suite.json
+```
+
+Evidence summary:
+
+- `ok: true`
+- validation failed list empty
+- `part_geometry_readback` present for four reopened native `.SLDPRT` files
+- body count, bbox size, volume, and semantic solid-effect evidence checked for boss/cut/revolve/revolved cut operations
+- `assembly_component_placements` solved origins match the accepted layout
+- `mate_error: 1` on AddMate calls, which is SolidWorks AddMate no-error
+- post-cleanup lock files empty
+
+Bullhead shaper stress fixture target:
 
 ```text
 tools/solidworks_codex/live_fixture/shaper_machine_v5/bullhead_shaper_complete.SLDASM
 tools/solidworks_codex/reports/shaper_machine_v5/complete_shaper_build.json
 ```
 
-Evidence summary:
+Target evidence:
 
-- `ok: true`
 - `24 parts`
 - `58 components`
 - `22 semantic mates`
-- `21 restored/fixed primary components`
 - placement restore API: `Transform2.ArrayData`
-- mass callback available, assembly mass about `15.13 kg`
 - interference callback available, `0 interference`
-- validation failed list empty
-- post-cleanup lock files empty
+- strict gate must pass current freshness, placement, mate, geometry, model-understanding, and cleanup checks
 
 This bullhead shaper is a stress test, not the boundary of the project. Its value is that it exercises real SolidWorks features that previously failed or were untrusted: cuts, sketch selection isolation, revolved features, reopen/modify/rebuild persistence, mate creation/readback, component transforms, interference callbacks, and cleanup behavior.
+
+Old shaper JSON should not be treated as proof after validator changes. The current gate rejects stale reports and re-evaluates strict checks from current source.
 
 ## Recommended real-model workflow
 
@@ -46,7 +61,7 @@ This bullhead shaper is a stress test, not the boundary of the project. Its valu
 6. Back up any file that may be modified.
 7. Make one narrow change at a time.
 8. Rebuild, inspect, compare, and use `change-verify`.
-9. For assemblies, use `assembly-contract` to verify component placement and semantic mate network.
+9. For assemblies, use `assembly-contract` to verify component placement, suppressed/fixed state, mate status/error evidence when reported, and semantic mate network.
 10. For mechanisms or release-like work, run the appropriate live checks and profile-specific blocking checks.
 11. Record decisions and evidence with `worklog` / `handoff-bundle`.
 12. Run tests, public-copy guard, release-tree, and audit before commit.
@@ -57,7 +72,7 @@ These are intentionally not claimed as solved globally:
 
 - Full general DOF solver and motion sweep validation are profile-scoped targets, not universal default checks.
 - DFM/DFA and strength/stiffness screens are currently lightweight evidence gates unless the task explicitly requests deeper engineering validation.
-- The shaper fixture proves a broad live path, but the goal remains generalized CAD reliability for many model types.
+- The live capability suite now proves a broad native feature/mate/geometry path. The shaper fixture remains the next hard mechanism stress test, and the goal remains generalized CAD reliability for many model types.
 
 ## Key files
 

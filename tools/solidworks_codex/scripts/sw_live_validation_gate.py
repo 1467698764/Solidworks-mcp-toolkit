@@ -128,6 +128,7 @@ def capability_suite_strict_checks() -> tuple[str, ...]:
         "native_solidworks_artifacts",
         "assembly_mates_persisted",
         "assembly_component_placements",
+        "part_geometry_readback",
         "open_existing_modify_reopen",
         "operation_context_guards",
         "interference_callback",
@@ -365,6 +366,10 @@ def _strict_check_failed(data: dict[str, Any], check: str) -> bool:
         inspect = data.get("assembly_inspect", {})
         doc = inspect.get("active_document", {}) if isinstance(inspect, dict) else {}
         return doc.get("type") != "assembly" or not _capability_component_placements_ok(doc)
+    if check == "part_geometry_readback":
+        suite = _load_capability_suite_module()
+        validation = suite.validate_part_geometry_readback(data.get("part_geometry_evidence"))
+        return validation.get("ok") is not True
     if check == "assembly_mates_persisted":
         names = {str(item.get("name", "")) for item in data.get("assembly_features", []) if isinstance(item, dict)}
         if not {"Concentric_Mate", "Distance_Mate"}.issubset(names):
@@ -457,6 +462,8 @@ def _strict_check_failed(data: dict[str, Any], check: str) -> bool:
         for name, (kind, pair) in required.items():
             mate = by_name.get(name)
             if not mate or not mate.get("ok") or mate.get("kind") != kind or mate.get("semantic_pair") != pair:
+                return True
+            if mate.get("mate_error") not in (1, None):
                 return True
             if not mate_selection_ok(mate):
                 return True

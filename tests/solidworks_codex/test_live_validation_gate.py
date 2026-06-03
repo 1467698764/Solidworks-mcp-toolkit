@@ -106,6 +106,7 @@ def shaper_mates():
             "semantic_pair": pair,
             "components": components,
             "selected_entities": 2,
+            "mate_error": 1,
             "selection_guard": {"cleared_selection_count": 0, "selection_count_before_mate": 2, "component_pair": components},
             "ok": True,
         })
@@ -139,6 +140,28 @@ def shaper_part_feature_evidence():
         part_name: {"ok": True, "features": [{"name": name, "type": "Feature"} for name in feature_names]}
         for part_name, feature_names in load_shaper_builder().expected_live_feature_names().items()
     }
+
+
+def capability_part_geometry_evidence():
+    suite = load_module()._load_capability_suite_module()
+    parts = {}
+    for name, contract in suite.expected_live_contract()["part_geometry_readback"]["parts"].items():
+        parts[name] = {
+            "body_count": 1,
+            "bbox_size_m": list(contract["bbox_size_m"]),
+            "mass_properties": {"volume_m3": contract["volume_range_m3"][0] * 2, "surface_area_m2": 0.01},
+            "features": {
+                feature_name: {
+                    "semantic": feature_contract["semantic"],
+                    "solid_effect": {
+                        "volume_delta_sign": feature_contract["volume_delta_sign"],
+                        **({"outer_bbox_expected_unchanged": True} if feature_contract.get("outer_bbox_expected_unchanged") else {}),
+                    },
+                }
+                for feature_name, feature_contract in contract["required_semantics"].items()
+            },
+        }
+    return {"schema_version": 1, "source": "reopened_native_sldprt", "parts": parts}
 
 
 class LiveValidationGateSpecTests(unittest.TestCase):
@@ -291,6 +314,7 @@ class LiveValidationGateSpecTests(unittest.TestCase):
         self.assertIn("open_existing_modify_reopen", expectations["live_capability_suite"].strict_checks)
         self.assertIn("operation_context_guards", expectations["live_capability_suite"].strict_checks)
         self.assertIn("assembly_component_placements", expectations["live_capability_suite"].strict_checks)
+        self.assertIn("part_geometry_readback", expectations["live_capability_suite"].strict_checks)
         self.assertIn("part_count", expectations["complete_shaper_v5"].strict_checks)
         self.assertIn("component_count", expectations["complete_shaper_v5"].strict_checks)
         self.assertIn("mate_semantics", expectations["complete_shaper_v5"].strict_checks)
@@ -331,6 +355,7 @@ class LiveValidationGateSpecTests(unittest.TestCase):
                         "Edited_Sketch_Dimension": {"sketch": "Sketch2", "profile": "circle", "geometry": {"lines": 0, "circles": 1, "centerlines": 0}, "feature_type": "ICE", "api": "FeatureCut3", "dimension": "D1@Edited_Sketch_Dimension"},
                     }},
                 }),
+                "part_geometry_evidence": capability_part_geometry_evidence(),
                 "callbacks": {"interference": {"available": True, "count": 0}, "mass": {"available": True, "mass_kg": 0.2}},
                 "post_cleanup": {"locked_files": []},
                 "validation": {"ok": True, "failed_capabilities": []},
@@ -381,6 +406,13 @@ class LiveValidationGateSpecTests(unittest.TestCase):
         ]
         self.assertTrue(self.module._strict_check_failed(report, "mate_semantics"))
 
+    def test_shaper_gate_rejects_unsolved_mate_error(self):
+        report = {"mates": shaper_mates()}
+        self.assertFalse(self.module._strict_check_failed(report, "mate_semantics"))
+
+        report["mates"][0]["mate_error"] = 4
+        self.assertTrue(self.module._strict_check_failed(report, "mate_semantics"))
+
     def test_capability_gate_rejects_mates_without_selection_and_component_evidence(self):
         report = {
             "assembly_features": [{"name": "Concentric_Mate"}, {"name": "Distance_Mate"}],
@@ -411,6 +443,13 @@ class LiveValidationGateSpecTests(unittest.TestCase):
         report = {"assembly_inspect": capability_assembly_inspect()}
         report["assembly_inspect"]["active_document"]["components"][2]["transform"]["origin_m"] = [9.0, 9.0, 9.0]
         self.assertTrue(self.module._strict_check_failed(report, "assembly_component_placements"))
+
+    def test_capability_gate_requires_part_geometry_readback(self):
+        report = {"part_geometry_evidence": capability_part_geometry_evidence()}
+        self.assertFalse(self.module._strict_check_failed(report, "part_geometry_readback"))
+
+        del report["part_geometry_evidence"]["parts"]["extrude_cut_plate"]["features"]["Round_Through_Hole"]
+        self.assertTrue(self.module._strict_check_failed(report, "part_geometry_readback"))
 
     def test_shaper_strict_inspect_rejects_same_named_mates_without_details(self):
         report = {

@@ -46,6 +46,7 @@ def sample_mates():
             "ok": True,
             "components": ["revolve_boss_part-1", "revolve_cut_part-1"],
             "selected_entities": 2,
+            "mate_error": 1,
             "selection_guard": {
                 "cleared_selection_count": 0,
                 "selection_count_before_mate": 2,
@@ -57,6 +58,7 @@ def sample_mates():
             "ok": True,
             "components": ["extrude_cut_plate-1", "editable_dimension_plate-1"],
             "selected_entities": 2,
+            "mate_error": 1,
             "selection_guard": {
                 "cleared_selection_count": 0,
                 "selection_count_before_mate": 2,
@@ -82,6 +84,49 @@ def sample_assembly_inspect():
                 {"name": "Distance_Mate", "type": "MateDistanceDim", "components": ["extrude_cut_plate-1", "editable_dimension_plate-1"], "suppressed": False},
             ],
         }
+    }
+
+
+def sample_part_geometry_evidence():
+    return {
+        "schema_version": 1,
+        "source": "reopened_native_sldprt",
+        "parts": {
+            "extrude_cut_plate": {
+                "body_count": 1,
+                "bbox_size_m": [0.100, 0.070, 0.012],
+                "mass_properties": {"volume_m3": 0.00007, "surface_area_m2": 0.01},
+                "features": {
+                    "Body_Plate": {"semantic": "boss", "solid_effect": {"volume_delta_sign": "positive"}},
+                    "Round_Through_Hole": {"semantic": "through_hole", "solid_effect": {"volume_delta_sign": "negative", "outer_bbox_expected_unchanged": True}},
+                    "Rectangular_Window_Cut": {"semantic": "window_cut", "solid_effect": {"volume_delta_sign": "negative", "outer_bbox_expected_unchanged": True}},
+                },
+            },
+            "revolve_boss_part": {
+                "body_count": 1,
+                "bbox_size_m": [0.016, 0.050, 0.016],
+                "mass_properties": {"volume_m3": 0.00005, "surface_area_m2": 0.01},
+                "features": {"Revolve_Boss_Profile": {"semantic": "revolve_boss", "solid_effect": {"volume_delta_sign": "positive"}}},
+            },
+            "revolve_cut_part": {
+                "body_count": 1,
+                "bbox_size_m": [0.052, 0.052, 0.060],
+                "mass_properties": {"volume_m3": 0.00004, "surface_area_m2": 0.01},
+                "features": {
+                    "Revolve_Boss_Profile": {"semantic": "revolve_boss", "solid_effect": {"volume_delta_sign": "positive"}},
+                    "Revolve_Cut_Bore": {"semantic": "revolve_cut", "solid_effect": {"volume_delta_sign": "negative"}},
+                },
+            },
+            "editable_dimension_plate": {
+                "body_count": 1,
+                "bbox_size_m": [0.080, 0.050, 0.010],
+                "mass_properties": {"volume_m3": 0.000035, "surface_area_m2": 0.01},
+                "features": {
+                    "Body_Editable_Plate": {"semantic": "boss", "solid_effect": {"volume_delta_sign": "positive"}},
+                    "Edited_Sketch_Dimension": {"semantic": "through_hole", "solid_effect": {"volume_delta_sign": "negative", "outer_bbox_expected_unchanged": True}},
+                },
+            },
+        },
     }
 
 
@@ -208,6 +253,60 @@ class LiveCapabilitySuiteSpecTests(unittest.TestCase):
         self.assertEqual(placements["editable_dimension_plate"]["origin_m"], (0.00, 0.10, 0.026))
         self.assertLessEqual(placements["extrude_cut_plate"]["tolerance_m"], 0.003)
 
+    def test_expected_contract_requires_part_geometry_readback(self):
+        contract = self.module.expected_live_contract()
+        geometry = contract["part_geometry_readback"]
+
+        self.assertIn("extrude_cut_plate", geometry["parts"])
+        self.assertIn("Round_Through_Hole", geometry["parts"]["extrude_cut_plate"]["required_semantics"])
+        self.assertEqual(geometry["parts"]["extrude_cut_plate"]["required_semantics"]["Round_Through_Hole"]["volume_delta_sign"], "negative")
+        self.assertEqual(geometry["parts"]["revolve_cut_part"]["required_semantics"]["Revolve_Cut_Bore"]["semantic"], "revolve_cut")
+
+    def test_validate_part_geometry_readback_rejects_wrong_solid_effects(self):
+        evidence = sample_part_geometry_evidence()
+        validation = self.module.validate_part_geometry_readback(evidence)
+        self.assertTrue(validation["ok"], validation)
+
+        bad = sample_part_geometry_evidence()
+        bad["parts"]["extrude_cut_plate"]["features"]["Round_Through_Hole"]["solid_effect"]["volume_delta_sign"] = "positive"
+        validation = self.module.validate_part_geometry_readback(bad)
+        self.assertFalse(validation["ok"])
+        self.assertIn("extrude_cut_plate:Round_Through_Hole:volume_delta_sign", validation["failed"])
+
+        bad = sample_part_geometry_evidence()
+        bad["parts"]["revolve_boss_part"]["bbox_size_m"] = [9.0, 9.0, 9.0]
+        validation = self.module.validate_part_geometry_readback(bad)
+        self.assertFalse(validation["ok"])
+        self.assertIn("revolve_boss_part:bbox_size_m", validation["failed"])
+
+    def test_validate_live_result_requires_part_geometry_readback(self):
+        result = {
+            "features": {
+                "extrude": [{"name": "Body_Plate"}, {"name": "Round_Through_Hole"}, {"name": "Rectangular_Window_Cut"}],
+                "revolve": [{"name": "Revolve_Boss_Profile"}],
+                "revolve_cut": [{"name": "Revolve_Boss_Profile"}, {"name": "Revolve_Cut_Bore"}],
+                "editable": [{"name": "Body_Editable_Plate"}, {"name": "Edited_Sketch_Dimension"}],
+            },
+            "dimension_edit": {"dimension": "D1@Edited_Sketch_Dimension", "before_m": 0.02, "after_m": 0.024},
+            "reopen_modify": {"dimension": "D1@Edited_Sketch_Dimension", "before_m": 0.024, "target_m": 0.028, "after_reopen_m": 0.028, "persisted": True, "save": {"ok": True, "errors": 0, "warnings": 0}},
+            "assembly_result": {"component_count": 4, "mates": sample_mates()},
+            "assembly_features": [{"name": "Concentric_Mate"}, {"name": "Distance_Mate"}],
+            "assembly_inspect": sample_assembly_inspect(),
+            "callbacks": {"mass": {"available": True, "mass_kg": 1.0}, "interference": {"available": True, "count": 0}},
+            "native_artifacts": {"assembly_exists": True, "part_count": 4, "part_files": ["a.SLDPRT", "b.SLDPRT", "c.SLDPRT", "d.SLDPRT"]},
+            "cleanup": {"locked_files": []},
+            "post_cleanup": {"locked_files": []},
+            "operation_context": sample_operation_context(self.module),
+        }
+
+        validation = self.module.validate_live_result(result)
+        self.assertFalse(validation["ok"])
+        self.assertIn("part_geometry_readback", validation["failed_capabilities"])
+
+        result["part_geometry_evidence"] = sample_part_geometry_evidence()
+        validation = self.module.validate_live_result(result)
+        self.assertTrue(validation["ok"], validation)
+
     def test_validate_live_result_rejects_missing_or_far_component_placement_readback(self):
         result = {
             "features": {
@@ -226,6 +325,7 @@ class LiveCapabilitySuiteSpecTests(unittest.TestCase):
             "cleanup": {"locked_files": []},
             "post_cleanup": {"locked_files": []},
             "operation_context": sample_operation_context(self.module),
+            "part_geometry_evidence": sample_part_geometry_evidence(),
         }
         validation = self.module.validate_live_result(result)
         self.assertTrue(validation["ok"], validation)
@@ -448,6 +548,7 @@ class LiveCapabilitySuiteSpecTests(unittest.TestCase):
             "native_artifacts": {"assembly_exists": True, "part_count": 4, "part_files": ["a.SLDPRT", "b.SLDPRT", "c.SLDPRT", "d.SLDPRT"]},
             "cleanup": {"locked_files": []},
             "post_cleanup": {"locked_files": []},
+            "part_geometry_evidence": sample_part_geometry_evidence(),
         }
         validation = self.module.validate_live_result(good)
         self.assertFalse(validation["ok"])
@@ -542,6 +643,7 @@ class LiveCapabilitySuiteSpecTests(unittest.TestCase):
             "cleanup": {"locked_files": []},
             "post_cleanup": {"locked_files": []},
             "operation_context": sample_operation_context(self.module),
+            "part_geometry_evidence": sample_part_geometry_evidence(),
         }
         validation = self.module.validate_live_result(result)
         self.assertTrue(validation["ok"], validation)
@@ -562,6 +664,12 @@ class LiveCapabilitySuiteSpecTests(unittest.TestCase):
         validation = self.module.validate_live_result(result)
         self.assertFalse(validation["ok"])
         self.assertIn("mate_selection:Distance_Mate", validation["failed_capabilities"])
+
+        result["assembly_result"]["mates"] = sample_mates()
+        result["assembly_result"]["mates"][1]["mate_error"] = 4
+        validation = self.module.validate_live_result(result)
+        self.assertFalse(validation["ok"])
+        self.assertIn("mate_error:Distance_Mate", validation["failed_capabilities"])
 
 
     def test_validate_live_result_rejects_mates_that_do_not_match_declared_contract_pairs(self):
@@ -597,6 +705,7 @@ class LiveCapabilitySuiteSpecTests(unittest.TestCase):
             "cleanup": {"locked_files": []},
             "post_cleanup": {"locked_files": []},
             "operation_context": sample_operation_context(self.module),
+            "part_geometry_evidence": sample_part_geometry_evidence(),
         }
 
         validation = self.module.validate_live_result(result)
@@ -621,6 +730,7 @@ class LiveCapabilitySuiteSpecTests(unittest.TestCase):
             "cleanup": {"locked_files": []},
             "post_cleanup": {"locked_files": []},
             "operation_context": sample_operation_context(self.module),
+            "part_geometry_evidence": sample_part_geometry_evidence(),
         }
         validation = self.module.validate_live_result(result)
         self.assertFalse(validation["ok"])
@@ -705,6 +815,7 @@ class LiveCapabilitySuiteSpecTests(unittest.TestCase):
 
         result["native_artifacts"]["assembly_exists"] = True
         result["operation_context"] = sample_operation_context(self.module)
+        result["part_geometry_evidence"] = sample_part_geometry_evidence()
         validation = self.module.validate_live_result(result)
         self.assertTrue(validation["ok"], validation)
 

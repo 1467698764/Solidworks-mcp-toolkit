@@ -19,7 +19,7 @@ The tools are designed for evidence-first mechanical CAD work:
 4. backup before any write;
 5. change one dimension, component state, or feature flow at a time;
 6. rebuild, inspect, compare, and verify;
-7. for assemblies, validate placement and semantic mate network through `assembly-contract`;
+7. for assemblies, validate placement, suppressed/fixed state, mate error/status evidence when reported, and semantic mate network through `assembly-contract`;
 8. record worklog and create handoff bundles for later AI turns.
 
 The goal is not to force one CAD template or one output schema. The goal is to give a strong model enough SolidWorks evidence to reason flexibly and safely.
@@ -43,7 +43,9 @@ Offline tests prove syntax and report logic. Real CAD behavior is checked by the
 .\tools\solidworks_codex\swctl.ps1 live-gate -CleanupStale -Out tools\solidworks_codex\reports\live_validation_gate.json
 ```
 
-Live deliverables are native `.SLDASM/.SLDPRT`; STEP optional smoke is not the primary acceptance criterion. The live capability suite now checks `assembly_component_placements` component Transform2/origin placement readback for its inserted assembly components. The current bullhead shaper stress fixture is `shaper_machine_v5` and records `24 parts`, `58 components`, `22 semantic mates`, `21 restored/fixed primary components`, `Transform2.ArrayData`, a verified mate network, and `0 interference` when healthy.
+Live deliverables are native `.SLDASM/.SLDPRT`; STEP optional smoke is not the primary acceptance criterion. The live capability suite now checks `assembly_component_placements` component Transform2/origin placement readback and `part_geometry_readback` bbox/body/volume evidence from reopened native `.SLDPRT` files. SolidWorks AddMate `mate_error: 1` is treated as AddMate no-error, then verified with mate readback, component participation, and placement evidence. The current bullhead shaper stress fixture is `shaper_machine_v5`; it targets `24 parts`, `58 components`, `22 semantic mates`, primary placement via `Transform2.ArrayData`, a verified mate network, and `0 interference` when healthy.
+
+Required mates between two fixed components fail `assembly-contract` by default unless the manifest explicitly sets `allow_fixed_fixed: true` for a reference/documentation mate.
 
 `CleanupStale` is bounded to old generated shaper fixture directories. The gate runs serially, scans `~$` lock files, and avoids unnecessary SolidWorks windows where possible.
 

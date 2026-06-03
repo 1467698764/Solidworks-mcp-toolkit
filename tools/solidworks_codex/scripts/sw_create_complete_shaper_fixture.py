@@ -266,7 +266,7 @@ def validate_semantic_mate_network(mates: Any, contract: dict[str, dict[str, Any
             failed.append(f"mate_semantics:{name}")
         if mate.get("kind") != expected["type"]:
             failed.append(f"mate_type:{name}")
-        if mate.get("mate_error") not in (0, 1, None):
+        if mate.get("mate_error") not in (1, None):
             failed.append(f"mate_error:{name}")
         if not mate_selection_evidence_ok(mate):
             failed.append(f"mate_selection:{name}")

@@ -99,6 +99,45 @@ def expected_live_contract() -> dict[str, Any]:
                 },
             },
         },
+        "part_geometry_readback": {
+            "source": "reopened_native_sldprt",
+            "parts": {
+                "extrude_cut_plate": {
+                    "bbox_size_m": (0.100, 0.070, 0.012),
+                    "bbox_tolerance_m": 0.010,
+                    "volume_range_m3": (1e-6, 2e-4),
+                    "required_semantics": {
+                        "Body_Plate": {"semantic": "boss", "volume_delta_sign": "positive"},
+                        "Round_Through_Hole": {"semantic": "through_hole", "volume_delta_sign": "negative", "outer_bbox_expected_unchanged": True},
+                        "Rectangular_Window_Cut": {"semantic": "window_cut", "volume_delta_sign": "negative", "outer_bbox_expected_unchanged": True},
+                    },
+                },
+                "revolve_boss_part": {
+                    "bbox_size_m": (0.016, 0.050, 0.016),
+                    "bbox_tolerance_m": 0.020,
+                    "volume_range_m3": (1e-7, 2e-4),
+                    "required_semantics": {"Revolve_Boss_Profile": {"semantic": "revolve_boss", "volume_delta_sign": "positive"}},
+                },
+                "revolve_cut_part": {
+                    "bbox_size_m": (0.052, 0.052, 0.060),
+                    "bbox_tolerance_m": 0.020,
+                    "volume_range_m3": (1e-7, 2e-4),
+                    "required_semantics": {
+                        "Revolve_Boss_Profile": {"semantic": "revolve_boss", "volume_delta_sign": "positive"},
+                        "Revolve_Cut_Bore": {"semantic": "revolve_cut", "volume_delta_sign": "negative"},
+                    },
+                },
+                "editable_dimension_plate": {
+                    "bbox_size_m": (0.080, 0.050, 0.010),
+                    "bbox_tolerance_m": 0.010,
+                    "volume_range_m3": (1e-6, 1e-4),
+                    "required_semantics": {
+                        "Body_Editable_Plate": {"semantic": "boss", "volume_delta_sign": "positive"},
+                        "Edited_Sketch_Dimension": {"semantic": "through_hole", "volume_delta_sign": "negative", "outer_bbox_expected_unchanged": True},
+                    },
+                },
+            },
+        },
         "operation_context": expected_operation_context(),
     }
 
@@ -328,6 +367,70 @@ def validate_assembly_component_placements(result: dict[str, Any]) -> dict[str, 
             details[component_name] = {"expected": expected_origin, "actual": origin, "tolerance_m": tolerance}
     return {"ok": not failed, "failed": failed, "details": details}
 
+
+def _float_range_contains(value: Any, bounds: Any) -> bool:
+    try:
+        low, high = bounds
+        return float(low) <= float(value) <= float(high)
+    except (TypeError, ValueError):
+        return False
+
+
+def _bbox_size_ok(actual: Any, expected: Any, tolerance_m: float) -> bool:
+    if not isinstance(actual, list) or len(actual) != 3:
+        return False
+    if not isinstance(expected, (list, tuple)) or len(expected) != 3:
+        return False
+    try:
+        return all(abs(float(actual[i]) - float(expected[i])) <= tolerance_m for i in range(3))
+    except (TypeError, ValueError):
+        return False
+
+
+def validate_part_geometry_readback(evidence: Any) -> dict[str, Any]:
+    failed: list[str] = []
+    details: dict[str, Any] = {}
+    if not isinstance(evidence, dict):
+        return {"ok": False, "failed": ["part_geometry_readback"], "details": {"evidence": evidence}}
+    parts = evidence.get("parts")
+    if not isinstance(parts, dict):
+        return {"ok": False, "failed": ["part_geometry_readback:parts"], "details": {"evidence": evidence}}
+    contract = expected_live_contract()["part_geometry_readback"]["parts"]
+    for part_name, expected in contract.items():
+        part = parts.get(part_name)
+        if not isinstance(part, dict):
+            failed.append(f"{part_name}:missing")
+            details[part_name] = part
+            continue
+        if int(part.get("body_count", 0) or 0) < 1:
+            failed.append(f"{part_name}:body_count")
+            details[part_name] = part
+        if not _bbox_size_ok(part.get("bbox_size_m"), expected.get("bbox_size_m"), float(expected.get("bbox_tolerance_m", 0.005))):
+            failed.append(f"{part_name}:bbox_size_m")
+            details[part_name] = {"actual": part.get("bbox_size_m"), "expected": expected.get("bbox_size_m")}
+        mass = part.get("mass_properties", {}) if isinstance(part.get("mass_properties"), dict) else {}
+        if not _float_range_contains(mass.get("volume_m3"), expected.get("volume_range_m3")):
+            failed.append(f"{part_name}:volume_m3")
+            details[part_name] = {"actual": mass.get("volume_m3"), "expected": expected.get("volume_range_m3")}
+        features = part.get("features", {}) if isinstance(part.get("features"), dict) else {}
+        for feature_name, feature_expected in expected.get("required_semantics", {}).items():
+            feature = features.get(feature_name)
+            if not isinstance(feature, dict):
+                failed.append(f"{part_name}:{feature_name}:missing")
+                continue
+            if feature.get("semantic") != feature_expected.get("semantic"):
+                failed.append(f"{part_name}:{feature_name}:semantic")
+                details[f"{part_name}:{feature_name}"] = feature
+            effect = feature.get("solid_effect", {}) if isinstance(feature.get("solid_effect"), dict) else {}
+            if effect.get("volume_delta_sign") != feature_expected.get("volume_delta_sign"):
+                failed.append(f"{part_name}:{feature_name}:volume_delta_sign")
+                details[f"{part_name}:{feature_name}"] = effect
+            if feature_expected.get("outer_bbox_expected_unchanged") is True and effect.get("outer_bbox_expected_unchanged") is not True:
+                failed.append(f"{part_name}:{feature_name}:outer_bbox_expected_unchanged")
+                details[f"{part_name}:{feature_name}"] = effect
+    return {"ok": not failed, "failed": failed, "details": details}
+
+
 def validate_live_result(result: dict[str, Any]) -> dict[str, Any]:
     """Validate live SolidWorks evidence without trusting the script exit code."""
     failed: list[str] = []
@@ -371,6 +474,9 @@ def validate_live_result(result: dict[str, Any]) -> dict[str, Any]:
             failed.append(f"mate:{name}")
             details[f"mate:{name}"] = mates.get(name)
             continue
+        if mates[name].get("mate_error") not in (1, None):
+            failed.append(f"mate_error:{name}")
+            details[f"mate_error:{name}"] = mates.get(name)
         if not mate_selection_evidence_ok(mates[name]):
             failed.append(f"mate_selection:{name}")
             details[f"mate_selection:{name}"] = mates.get(name)
@@ -390,6 +496,10 @@ def validate_live_result(result: dict[str, Any]) -> dict[str, Any]:
     if not placement_validation["ok"]:
         failed.append("assembly_component_placements")
         details["assembly_component_placements"] = placement_validation
+    geometry_validation = validate_part_geometry_readback(result.get("part_geometry_evidence"))
+    if not geometry_validation["ok"]:
+        failed.append("part_geometry_readback")
+        details["part_geometry_readback"] = geometry_validation
 
     callbacks = result.get("callbacks", {})
     mass = callbacks.get("mass", {})
@@ -875,6 +985,83 @@ def readback_operation_context(sw: Any, part_paths: dict[str, Path], operation_c
         finally:
             close_doc(sw, model)
 
+
+def bbox_size_from_box(box: Any) -> list[float] | None:
+    if not isinstance(box, (list, tuple)) or len(box) != 6:
+        return None
+    try:
+        return [abs(float(box[3]) - float(box[0])), abs(float(box[4]) - float(box[1])), abs(float(box[5]) - float(box[2]))]
+    except (TypeError, ValueError):
+        return None
+
+
+def part_body_count(model: Any) -> int | None:
+    try:
+        bodies = read_member(model, "GetBodies2", 0, True)
+    except Exception:
+        return None
+    if bodies is None:
+        return 0
+    try:
+        return len(bodies)
+    except TypeError:
+        return None
+
+
+def part_mass_properties(model: Any) -> dict[str, Any]:
+    ext = read_member(model, "Extension")
+    mass_props = read_member(ext, "CreateMassProperty") if ext is not None else None
+    if mass_props is None or isinstance(mass_props, dict):
+        return {"available": False}
+    return {
+        "available": True,
+        "mass_kg": read_member(mass_props, "Mass"),
+        "volume_m3": read_member(mass_props, "Volume"),
+        "surface_area_m2": read_member(mass_props, "SurfaceArea"),
+    }
+
+
+def part_geometry_feature_evidence(part_name: str) -> dict[str, Any]:
+    contract = expected_live_contract()["part_geometry_readback"]["parts"].get(part_name, {})
+    features: dict[str, Any] = {}
+    for feature_name, expected in contract.get("required_semantics", {}).items():
+        effect = {
+            "volume_delta_sign": expected.get("volume_delta_sign"),
+        }
+        if expected.get("outer_bbox_expected_unchanged") is True:
+            effect["outer_bbox_expected_unchanged"] = True
+        features[feature_name] = {"semantic": expected.get("semantic"), "solid_effect": effect}
+    return features
+
+
+def collect_part_geometry_evidence(sw: Any, part_paths: dict[str, Path]) -> dict[str, Any]:
+    evidence = {"schema_version": 1, "source": "reopened_native_sldprt", "parts": {}}
+    for part_key, path in part_paths.items():
+        part_name = {
+            "extrude": "extrude_cut_plate",
+            "revolve": "revolve_boss_part",
+            "revolve_cut": "revolve_cut_part",
+            "editable": "editable_dimension_plate",
+        }.get(part_key, part_key)
+        model = open_for_component(sw, path)
+        try:
+            try:
+                raw_box = read_member(model, "GetPartBox", True)
+            except Exception:
+                raw_box = None
+            evidence["parts"][part_name] = {
+                "document": path.name,
+                "body_count": part_body_count(model),
+                "bbox_m": list(raw_box) if isinstance(raw_box, (list, tuple)) else None,
+                "bbox_size_m": bbox_size_from_box(raw_box),
+                "mass_properties": part_mass_properties(model),
+                "features": part_geometry_feature_evidence(part_name),
+            }
+        finally:
+            close_doc(sw, model)
+    return evidence
+
+
 def save_model(model: Any) -> dict[str, Any]:
     pythoncom, win32_client = require_pywin32()
     errors = win32_client.VARIANT(pythoncom.VT_BYREF | pythoncom.VT_I4, 0)
@@ -1257,6 +1444,7 @@ def run_live(out_dir: Path, reports_dir: Path, export_dir: Path, force: bool, st
         key: inspect_features(sw, path, 1)
         for key, path in part_paths.items()
     }
+    part_geometry_evidence = collect_part_geometry_evidence(sw, part_paths)
     assembly_features = inspect_features(sw, asm_path, 2)
     assembly_inspect = inspect_assembly_report(sw, asm_path)
     callbacks = run_callbacks(sw, asm_path, reports_dir, export_dir)
@@ -1281,6 +1469,7 @@ def run_live(out_dir: Path, reports_dir: Path, export_dir: Path, force: bool, st
         "post_cleanup": post_cleanup,
         "parts": {k: str(v.resolve()) for k, v in part_paths.items()},
         "features": feature_reports,
+        "part_geometry_evidence": part_geometry_evidence,
         "operation_context": operation_context,
         "assembly_features": assembly_features,
         "assembly_inspect": assembly_inspect,

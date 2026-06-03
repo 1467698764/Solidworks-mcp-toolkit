@@ -67,6 +67,29 @@ def pair_matches(component_names: Any, semantic_pair: list[str]) -> bool:
     return all(str(name).casefold() in actual_keys for name in semantic_pair)
 
 
+def matched_components(component_names: Any, by_key: dict[str, list[dict[str, Any]]]) -> list[dict[str, Any]]:
+    if not isinstance(component_names, list):
+        return []
+    matches: list[dict[str, Any]] = []
+    for name in component_names:
+        candidates = by_key.get(component_key(str(name)), [])
+        if candidates:
+            matches.append(candidates[0])
+    return matches
+
+
+def all_components_fixed(component_names: Any, by_key: dict[str, list[dict[str, Any]]]) -> bool:
+    matches = matched_components(component_names, by_key)
+    return len(matches) >= 2 and all(component.get("fixed") is True for component in matches[:2])
+
+
+def mate_status_unsolved(mate: dict[str, Any]) -> bool:
+    status = mate.get("status", mate.get("solver_status"))
+    if status is None:
+        return False
+    return str(status).strip().casefold() not in {"ok", "solved", "satisfied", "active", "0"}
+
+
 def add_decision(items: list[dict[str, Any]], kind: str, key: str, detail: Any, reason: str, severity: str = "blocking") -> None:
     items.append({"kind": kind, "key": key, "detail": detail, "reason": reason, "severity": severity})
 
@@ -124,6 +147,8 @@ def validate(report: dict[str, Any], contract: dict[str, Any]) -> dict[str, Any]
             continue
         if matches:
             add_decision(accepted, "component_present", str(name), {"matches": [m.get("name2") for m in matches]}, "component prefix present")
+            if required and any(match.get("suppressed") is True for match in matches):
+                add_decision(decision_bucket(severity, accepted, warnings, not_applicable, failed), "component_suppressed", str(name), {"matches": [m.get("name2") for m in matches]}, "required component is suppressed", severity)
         if "origin_m" in spec:
             origin = component_origin(matches[0]) if matches else None
             expected = spec.get("origin_m")
@@ -155,11 +180,17 @@ def validate(report: dict[str, Any], contract: dict[str, Any]) -> dict[str, Any]
             add_decision(target, "mate_type", str(name), {"actual": mate.get("type"), "expected": expected_type}, "mate type matched" if ok else "mate type mismatch", "blocking" if ok else severity)
         if mate.get("suppressed") is True:
             add_decision(decision_bucket(severity, accepted, warnings, not_applicable, failed), "mate_suppressed", str(name), mate, "mate is suppressed", severity)
+        if mate.get("mate_error") not in (1, None):
+            add_decision(decision_bucket(severity, accepted, warnings, not_applicable, failed), "mate_error", str(name), {"mate_error": mate.get("mate_error")}, "mate reports a non-success solver/API error", severity)
+        if mate_status_unsolved(mate):
+            add_decision(decision_bucket(severity, accepted, warnings, not_applicable, failed), "mate_status", str(name), {"status": mate.get("status", mate.get("solver_status"))}, "mate status is not solved/satisfied", severity)
         semantic_pair = spec.get("semantic_pair") or []
         if semantic_pair:
             ok = pair_matches(mate.get("components"), [str(x) for x in semantic_pair])
             target = accepted if ok else decision_bucket(severity, accepted, warnings, not_applicable, failed)
             add_decision(target, "mate_components", str(name), {"actual": mate.get("components"), "expected_semantic_pair": semantic_pair}, "mate references expected components" if ok else "mate component references do not match semantic pair", "blocking" if ok else severity)
+        if not spec.get("allow_fixed_fixed") and all_components_fixed(mate.get("components"), by_key):
+            add_decision(decision_bucket(severity, accepted, warnings, not_applicable, failed), "mate_between_fixed_components", str(name), {"components": mate.get("components")}, "mate references only fixed components and cannot prove an active assembly constraint", severity)
 
     return {
         "timestamp": datetime.now().isoformat(timespec="seconds"),

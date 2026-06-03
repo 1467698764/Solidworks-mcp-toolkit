@@ -88,6 +88,45 @@ class AssemblyContractTests(unittest.TestCase):
             self.assertIn("mate_components", kinds)
 
 
+    def test_contract_rejects_required_mate_between_fixed_components(self):
+        report = self.sample_report()
+        for component in report["active_document"]["components"][:2]:
+            component["fixed"] = True
+        contract = self.sample_contract()
+        result = __import__("runpy").run_path(str(ROOT / "tools/solidworks_codex/scripts/sw_assembly_contract.py"))["validate"](report, contract)
+
+        self.assertFalse(result["ok"], result)
+        self.assertIn("mate_between_fixed_components", {item["kind"] for item in result["failed"]})
+
+    def test_contract_can_explicitly_allow_fixed_component_reference_mate(self):
+        report = self.sample_report()
+        for component in report["active_document"]["components"][:2]:
+            component["fixed"] = True
+        contract = self.sample_contract()
+        contract["mates"]["Base_Cover_Distance"]["allow_fixed_fixed"] = True
+        result = __import__("runpy").run_path(str(ROOT / "tools/solidworks_codex/scripts/sw_assembly_contract.py"))["validate"](report, contract)
+
+        self.assertTrue(result["ok"], result)
+
+    def test_contract_rejects_suppressed_required_component(self):
+        report = self.sample_report()
+        report["active_document"]["components"][0]["suppressed"] = True
+        result = __import__("runpy").run_path(str(ROOT / "tools/solidworks_codex/scripts/sw_assembly_contract.py"))["validate"](report, self.sample_contract())
+
+        self.assertFalse(result["ok"], result)
+        self.assertIn("component_suppressed", {item["kind"] for item in result["failed"]})
+
+    def test_contract_rejects_unsolved_mate_status_when_reported(self):
+        report = self.sample_report()
+        report["active_document"]["mate_like_features"][0]["mate_error"] = 4
+        report["active_document"]["mate_like_features"][1]["status"] = "unsolved"
+        result = __import__("runpy").run_path(str(ROOT / "tools/solidworks_codex/scripts/sw_assembly_contract.py"))["validate"](report, self.sample_contract())
+
+        kinds = {item["kind"] for item in result["failed"]}
+        self.assertFalse(result["ok"], result)
+        self.assertIn("mate_error", kinds)
+        self.assertIn("mate_status", kinds)
+
 
     def test_contract_matches_solidworks_instance_suffix_without_breaking_hyphenated_names(self):
         report = self.sample_report()

@@ -241,6 +241,25 @@ class CompleteShaperSpecTests(unittest.TestCase):
         broken[1] = dict(broken[1], components=["wrong-1", "bearing_block-1"])
         self.assertIn("mate_components:Shaft_Bearing_Concentric", self.module.validate_semantic_mate_network(broken, contract))
 
+    def test_semantic_mate_network_rejects_unsolved_mate_error(self):
+        contract = {
+            "Base_Cover_Distance": {"type": "distance", "semantic_pair": ["base_plate", "cover_plate"]},
+        }
+        mate = {
+            "name": "Base_Cover_Distance",
+            "ok": True,
+            "kind": "distance",
+            "mate_error": 4,
+            "semantic_pair": ["base_plate", "cover_plate"],
+            "components": ["base_plate-1", "cover_plate-1"],
+            "selected_entities": 2,
+            "selection_guard": {"cleared_selection_count": 0, "selection_count_before_mate": 2, "component_pair": ["base_plate-1", "cover_plate-1"]},
+        }
+
+        failed = self.module.validate_semantic_mate_network([mate], contract)
+
+        self.assertIn("mate_error:Base_Cover_Distance", failed)
+
 
     def test_shaper_exports_generic_assembly_contract_for_reusable_validation(self):
         contract = self.module.build_shaper_assembly_contract()
