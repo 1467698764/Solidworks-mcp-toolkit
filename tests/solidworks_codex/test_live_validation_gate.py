@@ -399,9 +399,9 @@ class LiveValidationGateSpecTests(unittest.TestCase):
         report["mates"] = [
             mate for mate in shaper_mates()
             if mate["name"] not in {
-                "Ram_LeftWay_Guidance_Distance_Mate",
-                "ToolHead_Ram_Distance_Mate",
-                "Table_CrossSlide_Distance_Mate",
+                "LayoutLock_ram_with_dovetail_and_tool_mount_To_column_frame_with_window",
+                "LayoutLock_clapper_tool_head_To_ram_with_dovetail_and_tool_mount",
+                "LayoutLock_work_table_with_t_slots_To_table_cross_slide",
             }
         ]
         self.assertTrue(self.module._strict_check_failed(report, "mate_semantics"))

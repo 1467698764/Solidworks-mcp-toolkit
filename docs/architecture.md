@@ -46,7 +46,7 @@ Live gate is where runtime truth outranks source assumptions. It validates Solid
 
 - `live_session_smoke` proves the minimal COM/session/mate/interference/cleanup path.
 - `live_capability_suite` proves feature creation and edit primitives: extrude, cut, revolve, revolved cut, sketch dimension read/modify/rebuild/save, assembly insert, concentric mate, distance mate, interference, mass, component placement readback, part_geometry_readback from reopened native parts, close/cleanup.
-- `complete_shaper_v5` uses a bullhead shaper as a stress test: 24 parts, 58 components, 22 semantic mates, primary component placement via Transform2.ArrayData, and interference evidence. The shaper report is accepted only when current source freshness, mate semantics, placement, geometry, model-understanding, and cleanup gates all pass.
+- `complete_shaper_v5` uses a bullhead shaper as a stress test: 24 parts, 58 components, 19 MateLock layout stabilizers, native primary component placement via Transform2.ArrayData, attached detail-instance layout, final fixed-state policy, and interference evidence. The shaper report is accepted only when current source freshness, MateLock readback, placement, geometry, model-understanding, fixed-state, and cleanup gates all pass; it does not claim complete mechanism DOF or motion-sweep validation yet.
 
 The bullhead shaper is not the product boundary; it is a deliberately hard fixture that forces the generic control layer to prove real assembly behavior.
 

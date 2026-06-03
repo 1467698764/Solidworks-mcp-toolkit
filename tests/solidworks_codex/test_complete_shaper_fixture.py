@@ -49,7 +49,7 @@ def sample_part_feature_evidence(module):
 def sample_design_layout_fixed_components(module):
     return [
         {"component": f"{name}-1", "ok": True, "api_result": None}
-        for name in module.solved_primary_origins_for_shaper()
+        for name in module.structural_reference_parts_for_shaper()
     ]
 
 
@@ -130,7 +130,7 @@ class CompleteShaperSpecTests(unittest.TestCase):
         self.assertIn("FeatureExtrusion2 returned None", source)
         self.assertIn("select_new_cut_sketch", source)
 
-    def test_live_builder_places_visible_exploded_detail_instances(self):
+    def test_live_builder_places_visible_attached_detail_instances(self):
         detail_placements = self.module.detail_instance_placements()
         self.assertGreaterEqual(len(detail_placements["fastener_set_m6"]), 18)
         self.assertGreaterEqual(len(detail_placements["washer_set"]), 12)
@@ -261,6 +261,27 @@ class CompleteShaperSpecTests(unittest.TestCase):
         self.assertIn("mate_error:Base_Cover_Distance", failed)
 
 
+    def test_complete_shaper_has_layout_stabilizer_lock_mates_without_fixing_motion_parts(self):
+        expected = self.module.expected_shaper_mate_contract()
+        lock_mates = {name: mate for name, mate in expected.items() if mate.get("type") == "lock"}
+
+        self.assertGreaterEqual(len(lock_mates), 10)
+        self.assertIn("LayoutLock_ram_with_dovetail_and_tool_mount_To_column_frame_with_window", lock_mates)
+        self.assertEqual("layout_stabilizer", lock_mates["LayoutLock_ram_with_dovetail_and_tool_mount_To_column_frame_with_window"]["functional_group"])
+        self.assertEqual("MateLock", self.module.expected_inspect_mate_type("lock"))
+        source = SCRIPT.read_text(encoding="utf-8")
+        self.assertIn("GetSelectedObjectCount2(-1)", source)
+        self.assertNotIn("selection_count(asm)", source)
+        construct = source[source.index("def construct_live_fixture"):]
+        self.assertLess(
+            construct.index("design_layout_restored_components = restore_primary_design_layout_components(sw, component_objs)"),
+            construct.index("mates = add_shaper_layout_stabilizers(asm, component_objs)"),
+        )
+        self.assertLess(
+            construct.index("mates = add_shaper_layout_stabilizers(asm, component_objs)"),
+            construct.index("design_layout_fixed_components = fix_primary_design_layout_components(sw, asm, component_objs)"),
+        )
+
     def test_shaper_exports_generic_assembly_contract_for_reusable_validation(self):
         contract = self.module.build_shaper_assembly_contract()
 
@@ -268,39 +289,32 @@ class CompleteShaperSpecTests(unittest.TestCase):
         self.assertEqual(self.module.expected_assembly_component_minimum(), contract["minimum_component_count"])
         self.assertIn("cast_bed_with_t_slots", contract["components"])
         self.assertIn("origin_m", contract["components"]["cast_bed_with_t_slots"])
-        self.assertIn("Bed_Column_Distance_Mate", contract["mates"])
-        self.assertEqual("MateDistanceDim", contract["mates"]["Bed_Column_Distance_Mate"]["type"])
-        self.assertEqual(["cast_bed_with_t_slots", "column_frame_with_window"], contract["mates"]["Bed_Column_Distance_Mate"]["semantic_pair"])
+        self.assertIn("LayoutLock_ram_with_dovetail_and_tool_mount_To_column_frame_with_window", contract["mates"])
+        self.assertEqual("MateLock", contract["mates"]["LayoutLock_ram_with_dovetail_and_tool_mount_To_column_frame_with_window"]["type"])
+        self.assertEqual(["ram_with_dovetail_and_tool_mount", "column_frame_with_window"], contract["mates"]["LayoutLock_ram_with_dovetail_and_tool_mount_To_column_frame_with_window"]["semantic_pair"])
         self.assertEqual(set(self.module.expected_shaper_mate_contract()), set(contract["mates"]))
 
     def test_complete_shaper_requires_semantic_mate_network_not_single_distance_mate(self):
         expected = self.module.expected_shaper_mate_contract()
         self.assertGreaterEqual(len(expected), 18)
-        self.assertIn("Bed_Column_Distance_Mate", expected)
-        self.assertIn("Ram_LeftWay_Guidance_Distance_Mate", expected)
-        self.assertIn("ToolHead_Ram_Distance_Mate", expected)
-        self.assertIn("Table_CrossSlide_Distance_Mate", expected)
-        self.assertIn("BullGear_CrankShaft_Concentric_Mate", expected)
-        self.assertIn("Crank_Link_Concentric_Mate", expected)
-        self.assertIn("Rocker_Pivot_Concentric_Mate", expected)
         for required_mate in (
-            "Column_LeftWay_Distance_Mate",
-            "Column_RightWay_Distance_Mate",
-            "Ram_RightWay_Guidance_Distance_Mate",
-            "Ram_FrontGib_Distance_Mate",
-            "Ram_RearGib_Distance_Mate",
-            "ToolBit_ToolHead_Distance_Mate",
-            "CrossSlide_Bed_Distance_Mate",
-            "FixedJaw_Table_Distance_Mate",
-            "MovableJaw_Table_Distance_Mate",
-            "CrankDisk_EccentricPin_Concentric_Mate",
-            "SlidingDie_RockerSlot_Distance_Mate",
-            "SlidingDie_CrankPin_Concentric_Mate",
-            "Link_SlidingDie_Concentric_Mate",
-            "RockerShaft_Bracket_Concentric_Mate",
-            "RockerBracket_Column_Distance_Mate",
+            "LayoutLock_left_dovetail_way_To_column_frame_with_window",
+            "LayoutLock_right_dovetail_way_To_column_frame_with_window",
+            "LayoutLock_ram_with_dovetail_and_tool_mount_To_column_frame_with_window",
+            "LayoutLock_clapper_tool_head_To_ram_with_dovetail_and_tool_mount",
+            "LayoutLock_single_point_cutting_tool_To_clapper_tool_head",
+            "LayoutLock_table_cross_slide_To_cast_bed_with_t_slots",
+            "LayoutLock_work_table_with_t_slots_To_table_cross_slide",
+            "LayoutLock_vise_jaw_fixed_To_work_table_with_t_slots",
+            "LayoutLock_vise_jaw_movable_To_work_table_with_t_slots",
+            "LayoutLock_bull_gear_crank_disk_To_column_frame_with_window",
+            "LayoutLock_eccentric_crank_pin_To_bull_gear_crank_disk",
+            "LayoutLock_slotted_rocker_arm_To_rocker_pivot_bracket",
+            "LayoutLock_rocker_pivot_shaft_To_rocker_pivot_bracket",
+            "LayoutLock_ram_drive_link_To_ram_with_dovetail_and_tool_mount",
         ):
             self.assertIn(required_mate, expected)
+        self.assertTrue(all(mate["type"] == "lock" for mate in expected.values()))
 
         spatial = self.module.expected_shaper_spatial_contract()
         self.assertIn("structural_stack", spatial)
@@ -310,10 +324,6 @@ class CompleteShaperSpecTests(unittest.TestCase):
         self.assertIn("ram_with_dovetail_and_tool_mount", spatial["ram_guidance"])
         self.assertIn("single_point_cutting_tool", spatial["tool_head"])
 
-        self.assertEqual(expected["Ram_LeftWay_Guidance_Distance_Mate"]["semantic_pair"], ["ram_with_dovetail_and_tool_mount", "left_dovetail_way"])
-        self.assertEqual(expected["ToolHead_Ram_Distance_Mate"]["semantic_pair"], ["clapper_tool_head", "ram_with_dovetail_and_tool_mount"])
-        self.assertEqual(expected["Table_CrossSlide_Distance_Mate"]["semantic_pair"], ["work_table_with_t_slots", "table_cross_slide"])
-
         only_one = {
             "ok": True,
             "part_count": 24,
@@ -322,14 +332,16 @@ class CompleteShaperSpecTests(unittest.TestCase):
             "mates": [{"name": "Shaper_Distance_Mate", "ok": True, "mate_error": 1, "semantic_pair": ["cast_bed_with_t_slots", "column_frame_with_window"]}],
             "callbacks": {"mass": {"available": True, "mass_kg": 14.81}, "interference": {"available": True, "count": 0}},
             "post_cleanup": {"locked_files": [], "lock_files": []},
+            "inspect": self.module.sample_expected_shaper_inspect_evidence(),
+            "model_understanding": self.module.sample_expected_shaper_understanding_evidence(),
+            "part_feature_evidence": sample_part_feature_evidence(self.module),
+            "design_layout_fixed_components": sample_design_layout_fixed_components(self.module),
         }
+
         validation = self.module.validate_live_result(only_one)
+
         self.assertFalse(validation["ok"])
         self.assertIn("mate_network", validation["failed"])
-
-
-
-
 
     def test_complete_shaper_rejects_missing_guidance_toolhead_and_table_mates(self):
         base = {
@@ -351,14 +363,44 @@ class CompleteShaperSpecTests(unittest.TestCase):
         missing["mates"] = [
             mate for mate in sample_shaper_mates(self.module)
             if mate["name"] not in {
-                "Ram_LeftWay_Guidance_Distance_Mate",
-                "ToolHead_Ram_Distance_Mate",
-                "Table_CrossSlide_Distance_Mate",
+                "LayoutLock_ram_with_dovetail_and_tool_mount_To_column_frame_with_window",
+                "LayoutLock_clapper_tool_head_To_ram_with_dovetail_and_tool_mount",
+                "LayoutLock_work_table_with_t_slots_To_table_cross_slide",
             }
         ]
         validation = self.module.validate_live_result(missing)
         self.assertFalse(validation["ok"])
         self.assertIn("mate_network", validation["failed"])
+
+
+    def test_complete_shaper_rejects_fixed_functional_parts_as_mechanism_solution(self):
+        base = {
+            "ok": True,
+            "part_count": 24,
+            "component_count": self.module.expected_assembly_component_minimum(),
+            "layout": {"ok": True},
+            "mates": sample_shaper_mates(self.module),
+            "callbacks": {"mass": {"available": True, "mass_kg": 14.81}, "interference": {"available": True, "count": 0}},
+            "post_cleanup": {"locked_files": [], "lock_files": []},
+            "inspect": self.module.sample_expected_shaper_inspect_evidence(),
+            "model_understanding": self.module.sample_expected_shaper_understanding_evidence(),
+            "part_feature_evidence": sample_part_feature_evidence(self.module),
+            "design_layout_fixed_components": [
+                {"component": f"{name}-1", "ok": True, "api_result": None}
+                for name in self.module.solved_primary_origins_for_shaper()
+            ],
+        }
+
+        validation = self.module.validate_live_result(base)
+
+        self.assertFalse(validation["ok"])
+        self.assertIn("functional_components_fixed", validation["failed"])
+
+    def test_detail_instances_must_be_attached_to_machine_not_exploded_display_strip(self):
+        validation = self.module.validate_detail_instance_layout(self.module.build_complete_shaper_spec())
+
+        self.assertTrue(validation["ok"], validation)
+        self.assertEqual([], validation["detached_instances"])
 
     def test_live_inspect_reuses_current_assembly_and_cleanup_after_exit(self):
         source = SCRIPT.read_text(encoding="utf-8")
@@ -534,6 +576,24 @@ class CompleteShaperSpecTests(unittest.TestCase):
         self.assertIn("CreateTransform", source)
         self.assertIn("restored_origin_m", source)
 
+    def test_live_builder_restores_all_primary_layout_after_mates_without_fixing_motion_parts(self):
+        source = SCRIPT.read_text(encoding="utf-8")
+        construct = source[source.index("def construct_live_fixture"):]
+        self.assertIn("restore_primary_design_layout_components", source)
+        self.assertIn("design_layout_restored_components", source)
+        self.assertLess(
+            construct.index("asm.ForceRebuild3(False)"),
+            construct.index("design_layout_restored_components = restore_primary_design_layout_components(sw, component_objs)"),
+        )
+        self.assertLess(
+            construct.index("design_layout_restored_components = restore_primary_design_layout_components(sw, component_objs)"),
+            construct.index("mates = add_shaper_layout_stabilizers(asm, component_objs)"),
+        )
+        self.assertLess(
+            construct.index("mates = add_shaper_layout_stabilizers(asm, component_objs)"),
+            construct.index("inspect_live_assembly_model(asm, sw, reports_dir)"),
+        )
+
     def test_placement_contract_targets_restored_design_layout_not_bad_solver_positions(self):
         origins = self.module.solved_primary_origins_for_shaper()
         self.assertEqual((-0.22, 0.095, 0.035), origins["column_frame_with_window"])
@@ -547,10 +607,30 @@ class CompleteShaperSpecTests(unittest.TestCase):
         self.assertIn("abs(actual_distance - distance)", source)
         self.assertNotIn('if result["ok"]:\n                            return result', source)
 
+
+
+    def test_concentric_mate_uses_best_cylindrical_axis_pair_not_first_cylinder(self):
+        source = SCRIPT.read_text(encoding="utf-8")
+        self.assertIn("best_cylindrical_face_pair", source)
+        self.assertIn("face_cylinder_axis", source)
+        self.assertIn("axis_distance", source)
+        self.assertIn("face_pair_axis_distance_m", source)
+        self.assertNotIn('left_face = first_face(left, "IsCylinder")', source)
+        self.assertNotIn('right_face = first_face(right, "IsCylinder")', source)
+
+    def test_distance_mate_preserves_current_layout_distance_instead_of_forcing_display_clearance(self):
+        source = SCRIPT.read_text(encoding="utf-8")
+        self.assertIn("mate_distance = actual_distance", source)
+        self.assertIn("requested_selector_distance_m", source)
+        self.assertIn("preserved_layout_distance_m", source)
+        self.assertNotIn("add_selected_mate(asm, name, 5, distance)", source)
+
+
     def test_primary_layout_fix_is_not_used_to_mask_unsolved_mates(self):
         source = SCRIPT.read_text(encoding="utf-8")
+        construct = source[source.index("def construct_live_fixture"):]
         self.assertIn("fix_primary_design_layout_components", source)
-        self.assertLess(source.index("add_shaper_mate_network(asm, component_objs)"), source.index("fix_primary_design_layout_components(sw, asm, component_objs)"))
+        self.assertLess(construct.index("add_shaper_layout_stabilizers(asm, component_objs)"), construct.index("design_layout_fixed_components = fix_primary_design_layout_components(sw, asm, component_objs)"))
         self.assertIn("validate_design_layout_fixed_components", source)
 
     def test_live_script_writes_shaper_assembly_contract_artifact(self):

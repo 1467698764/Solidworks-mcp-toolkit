@@ -104,14 +104,17 @@ Bullhead shaper target evidence:
 
 - `24 parts`
 - `58 components`
-- `22 semantic mates`
+- `19 MateLock layout stabilizers`
 - primary components placed/restored from native Transform2 readback
 - primary component restore API: `Transform2.ArrayData`
-- verified mate network
+- final fixed-state policy: structural references may be fixed; moving functional parts must not be accepted as fixed-layout evidence
+- attached detail-instance layout; screws/washers/oil cups must not be parked on a detached display strip
+- verified MateLock layout-stabilizer network with selection and component-pair evidence
+- fixture-level MateLock constraints stabilize the authored layout; they are not a claim of complete mechanism DOF or motion-sweep validation
 - interference callback expected to report `0 interference`
 - post cleanup must have no `~$` lock files
 
-Do not treat an old `complete_shaper_build.json` with `ok: true` as current truth. The gate checks report freshness and recomputes strict evidence from the current scripts; stale shaper reports or assemblies with fixed/floating/mate contradictions must be regenerated and revalidated.
+Do not treat an old `complete_shaper_build.json` with `ok: true` as current truth. The gate checks report freshness and recomputes strict evidence from the current scripts; stale shaper reports or assemblies with fixed/floating/mate contradictions, detached detail strips, MateLock errors, placement drift, or nonzero interference must be regenerated and revalidated.
 
 `-CleanupStale` is bounded to old generated directories: `shaper_machine`, `shaper_machine_v2`, `shaper_machine_v3`, and `shaper_machine_v4`. It must not touch `shaper_machine_v5`, `live_capability_suite`, user models, or unrelated workspace files.
 

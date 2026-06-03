@@ -159,7 +159,7 @@ Then run live checks serially:
 
 ## Live shaper status looks stale
 
-The current stress fixture is `shaper_machine_v5`. Expected evidence in `tools/solidworks_codex/reports/shaper_machine_v5/complete_shaper_build.json` includes `24 parts`, `58 components`, `22 semantic mates`, `21 restored/fixed primary components`, `Transform2.ArrayData`, and `0 interference`. If any number regresses, treat the fixture as a failing test, not a cosmetic display issue.
+The current stress fixture is `shaper_machine_v5`. Expected evidence in `tools/solidworks_codex/reports/shaper_machine_v5/complete_shaper_build.json` includes `24 parts`, `58 components`, `19 MateLock layout stabilizers`, structural-reference fixed evidence only, attached detail-instance layout, `Transform2.ArrayData` placement readback, and `0 interference` when healthy. Treat MateLock as fixture-layout stabilization evidence, not as proof of complete mechanism DOF or motion sweep. If the report shows functional components fixed, stale display-strip detail instances, mate errors, placement drift, or interference, treat the fixture as a failing test rather than a cosmetic display issue.
 
 ## Public copy guard or repo-health fails
 

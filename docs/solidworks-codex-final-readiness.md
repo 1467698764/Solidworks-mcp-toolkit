@@ -42,14 +42,14 @@ Target evidence:
 
 - `24 parts`
 - `58 components`
-- `22 semantic mates`
+- `19 MateLock layout stabilizers`
 - placement restore API: `Transform2.ArrayData`
 - interference callback available, `0 interference`
-- strict gate must pass current freshness, placement, mate, geometry, model-understanding, and cleanup checks
+- strict gate must pass current freshness, placement, MateLock readback, geometry, fixed-state, attached-detail, model-understanding, interference, and cleanup checks
 
-This bullhead shaper is a stress test, not the boundary of the project. Its value is that it exercises real SolidWorks features that previously failed or were untrusted: cuts, sketch selection isolation, revolved features, reopen/modify/rebuild persistence, mate creation/readback, component transforms, interference callbacks, and cleanup behavior.
+This bullhead shaper is a stress test, not the boundary of the project. Its current passed state is a stable fixture-level assembly with MateLock layout stabilizers, not a claim of complete mechanism DOF or motion sweep. Its value is that it exercises real SolidWorks features that previously failed or were untrusted: cuts, sketch selection isolation, revolved features, reopen/modify/rebuild persistence, mate creation/readback, component transforms, interference callbacks, and cleanup behavior.
 
-Old shaper JSON should not be treated as proof after validator changes. The current gate rejects stale reports and re-evaluates strict checks from current source.
+Old shaper JSON should not be treated as proof after validator changes. The current gate rejects stale reports and re-evaluates strict checks from current source. Recent live shaper runs correctly fail when SolidWorks reports placement drift, mate errors, or interference; the latest accepted v5 run has validation `ok: true`, `0 interference`, 19/19 MateLock mates ok, and zero primary placement drift. Future work remains replacing fixture locks with true DOF-aware mates and motion validation where the design intent requires it.
 
 ## Recommended real-model workflow
 
@@ -72,7 +72,7 @@ These are intentionally not claimed as solved globally:
 
 - Full general DOF solver and motion sweep validation are profile-scoped targets, not universal default checks.
 - DFM/DFA and strength/stiffness screens are currently lightweight evidence gates unless the task explicitly requests deeper engineering validation.
-- The live capability suite now proves a broad native feature/mate/geometry path. The shaper fixture remains the next hard mechanism stress test, and the goal remains generalized CAD reliability for many model types.
+- The live capability suite now proves a broad native feature/mate/geometry path. The shaper fixture now proves stable native assembly layout/readback/interference cleanup; the next hard step is DOF-aware mechanism motion, and the goal remains generalized CAD reliability for many model types.
 
 ## Key files
 

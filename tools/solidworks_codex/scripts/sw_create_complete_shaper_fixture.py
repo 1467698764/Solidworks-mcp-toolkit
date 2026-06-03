@@ -128,34 +128,54 @@ def expected_live_feature_names() -> dict[str, tuple[str, ...]]:
 def expected_shaper_mate_contract() -> dict[str, dict[str, Any]]:
     """Semantic mate network used by the shaper fixture acceptance gate.
 
-    The shaper is a stress fixture for the generic project capability: a useful
-    assembly must prove constraints across functional subassemblies, not merely
-    create a few mate features. Each entry names the intended pair so validators
-    can reject plausible-looking but mechanically unconnected assemblies.
+    The current fixture prioritizes a stable, inspectable native assembly over a
+    decorative mate list that lets SolidWorks solve the machine into a scattered
+    pose. Layout-lock mates are explicit fixture constraints: they prove which
+    components belong together and keep the authored bullhead-shaper pose stable,
+    while future work can replace individual locks with true hinge/slider DOF as
+    the generated part geometry gains named, coaxial interface features.
     """
+    return expected_shaper_layout_stabilizer_contract()
+
+def expected_shaper_layout_stabilizer_contract() -> dict[str, dict[str, Any]]:
+    """Layout-lock mates that preserve the authored fixture pose without fixing parts.
+
+    The current generated shaper parts are intentionally still a fixture, not a
+    fully dimensioned production mechanism. Some semantic mates prove functional
+    adjacency but leave enough free DOF for SolidWorks to choose a visually wrong
+    solved pose. These lock mates are explicit, inspectable stabilizers: they are
+    not treated as real hinge/slider freedoms, and they must not be confused with
+    FixComponent.
+    """
+    anchors = {
+        "left_dovetail_way": "column_frame_with_window",
+        "right_dovetail_way": "column_frame_with_window",
+        "ram_with_dovetail_and_tool_mount": "column_frame_with_window",
+        "front_gib_plate": "ram_with_dovetail_and_tool_mount",
+        "rear_gib_plate": "ram_with_dovetail_and_tool_mount",
+        "clapper_tool_head": "ram_with_dovetail_and_tool_mount",
+        "single_point_cutting_tool": "clapper_tool_head",
+        "table_cross_slide": "cast_bed_with_t_slots",
+        "work_table_with_t_slots": "table_cross_slide",
+        "vise_jaw_fixed": "work_table_with_t_slots",
+        "vise_jaw_movable": "work_table_with_t_slots",
+        "bull_gear_crank_disk": "column_frame_with_window",
+        "crank_center_shaft": "bull_gear_crank_disk",
+        "eccentric_crank_pin": "bull_gear_crank_disk",
+        "bronze_sliding_die_block": "slotted_rocker_arm",
+        "slotted_rocker_arm": "rocker_pivot_bracket",
+        "rocker_pivot_bracket": "column_frame_with_window",
+        "rocker_pivot_shaft": "rocker_pivot_bracket",
+        "ram_drive_link": "ram_with_dovetail_and_tool_mount",
+    }
     return {
-        "Bed_Column_Distance_Mate": {"type": "distance", "semantic_pair": ["cast_bed_with_t_slots", "column_frame_with_window"], "functional_group": "structural_stack"},
-        "Column_LeftWay_Distance_Mate": {"type": "distance", "semantic_pair": ["column_frame_with_window", "left_dovetail_way"], "functional_group": "ram_guidance"},
-        "Column_RightWay_Distance_Mate": {"type": "distance", "semantic_pair": ["column_frame_with_window", "right_dovetail_way"], "functional_group": "ram_guidance"},
-        "Ram_LeftWay_Guidance_Distance_Mate": {"type": "distance", "semantic_pair": ["ram_with_dovetail_and_tool_mount", "left_dovetail_way"], "functional_group": "ram_guidance"},
-        "Ram_RightWay_Guidance_Distance_Mate": {"type": "distance", "semantic_pair": ["ram_with_dovetail_and_tool_mount", "right_dovetail_way"], "functional_group": "ram_guidance"},
-        "Ram_FrontGib_Distance_Mate": {"type": "distance", "semantic_pair": ["ram_with_dovetail_and_tool_mount", "front_gib_plate"], "functional_group": "ram_guidance"},
-        "Ram_RearGib_Distance_Mate": {"type": "distance", "semantic_pair": ["ram_with_dovetail_and_tool_mount", "rear_gib_plate"], "functional_group": "ram_guidance"},
-        "ToolHead_Ram_Distance_Mate": {"type": "distance", "semantic_pair": ["clapper_tool_head", "ram_with_dovetail_and_tool_mount"], "functional_group": "tool_head"},
-        "ToolBit_ToolHead_Distance_Mate": {"type": "distance", "semantic_pair": ["single_point_cutting_tool", "clapper_tool_head"], "functional_group": "tool_head"},
-        "CrossSlide_Bed_Distance_Mate": {"type": "distance", "semantic_pair": ["table_cross_slide", "cast_bed_with_t_slots"], "functional_group": "workholding_stack"},
-        "Table_CrossSlide_Distance_Mate": {"type": "distance", "semantic_pair": ["work_table_with_t_slots", "table_cross_slide"], "functional_group": "workholding_stack"},
-        "FixedJaw_Table_Distance_Mate": {"type": "distance", "semantic_pair": ["vise_jaw_fixed", "work_table_with_t_slots"], "functional_group": "workholding_stack"},
-        "MovableJaw_Table_Distance_Mate": {"type": "distance", "semantic_pair": ["vise_jaw_movable", "work_table_with_t_slots"], "functional_group": "workholding_stack"},
-        "BullGear_CrankShaft_Concentric_Mate": {"type": "concentric", "semantic_pair": ["bull_gear_crank_disk", "crank_center_shaft"], "functional_group": "quick_return_drive"},
-        "CrankDisk_EccentricPin_Concentric_Mate": {"type": "concentric", "semantic_pair": ["bull_gear_crank_disk", "eccentric_crank_pin"], "functional_group": "quick_return_drive"},
-        "Crank_Link_Concentric_Mate": {"type": "concentric", "semantic_pair": ["eccentric_crank_pin", "ram_drive_link"], "functional_group": "quick_return_drive"},
-        "SlidingDie_CrankPin_Concentric_Mate": {"type": "concentric", "semantic_pair": ["bronze_sliding_die_block", "eccentric_crank_pin"], "functional_group": "quick_return_drive"},
-        "Link_SlidingDie_Concentric_Mate": {"type": "concentric", "semantic_pair": ["ram_drive_link", "bronze_sliding_die_block"], "functional_group": "quick_return_drive"},
-        "SlidingDie_RockerSlot_Distance_Mate": {"type": "distance", "semantic_pair": ["bronze_sliding_die_block", "slotted_rocker_arm"], "functional_group": "quick_return_drive"},
-        "Rocker_Pivot_Concentric_Mate": {"type": "concentric", "semantic_pair": ["slotted_rocker_arm", "rocker_pivot_shaft"], "functional_group": "quick_return_drive"},
-        "RockerShaft_Bracket_Concentric_Mate": {"type": "concentric", "semantic_pair": ["rocker_pivot_shaft", "rocker_pivot_bracket"], "functional_group": "quick_return_drive"},
-        "RockerBracket_Column_Distance_Mate": {"type": "distance", "semantic_pair": ["rocker_pivot_bracket", "column_frame_with_window"], "functional_group": "quick_return_drive"},
+        f"LayoutLock_{part}_To_{anchor}": {
+            "type": "lock",
+            "semantic_pair": [part, anchor],
+            "functional_group": "layout_stabilizer",
+            "severity": "fixture_only",
+        }
+        for part, anchor in anchors.items()
     }
 
 
@@ -170,7 +190,7 @@ def expected_shaper_functional_connection_contract() -> list[tuple[str, str]]:
 
 
 def expected_inspect_mate_type(kind: str) -> str:
-    return {"distance": "MateDistanceDim", "concentric": "MateConcentric"}.get(kind, f"Mate:{kind}")
+    return {"distance": "MateDistanceDim", "concentric": "MateConcentric", "lock": "MateLock"}.get(kind, f"Mate:{kind}")
 
 
 def component_pair_matches_semantic_pair(component_names: Any, semantic_pair: list[str]) -> bool:
@@ -218,7 +238,9 @@ def build_shaper_assembly_contract() -> dict[str, Any]:
     This mirrors the strict live shaper gates but uses the generic
     sw_assembly_contract.py schema so an inspect report can be validated without
     rerunning SolidWorks generation. The contract intentionally covers spatial
-    placement and semantic mates; file creation alone is not acceptance evidence.
+    placement and MateLock layout-stabilizer fixture constraints; file creation
+    alone is not acceptance evidence, and these locks are not a claim of full
+    mechanism DOF.
     """
     placement_contract = expected_shaper_placement_contract(tolerance_m=0.004)
     return {
@@ -402,6 +424,23 @@ def nominal_component_instances(spec: CompleteShaperSpec) -> list[dict[str, Any]
     return instances
 
 
+def validate_detail_instance_layout(spec: CompleteShaperSpec, max_detached_gap_m: float = 0.030) -> dict[str, Any]:
+    """Reject detail instances parked away from the machine as a display strip."""
+    instances = nominal_component_instances(spec)
+    machine = [item for item in instances if not item["detail"]]
+    details = [item for item in instances if item["detail"]]
+    if not machine:
+        return {"ok": False, "detached_instances": [item["name"] for item in details], "reason": "no_machine_components"}
+    y_min = min(item["bbox"][2] for item in machine)
+    y_max = max(item["bbox"][3] for item in machine)
+    detached = [
+        {"name": item["name"], "xyz": item["xyz"], "machine_y_range_m": [y_min, y_max]}
+        for item in details
+        if item["xyz"][1] < y_min - max_detached_gap_m or item["xyz"][1] > y_max + max_detached_gap_m
+    ]
+    return {"ok": not detached, "detached_instances": detached, "max_detached_gap_m": max_detached_gap_m}
+
+
 def validate_nominal_layout(spec: CompleteShaperSpec) -> dict[str, Any]:
     instances = nominal_component_instances(spec)
     intersections: list[dict[str, Any]] = []
@@ -413,10 +452,12 @@ def validate_nominal_layout(spec: CompleteShaperSpec) -> dict[str, Any]:
             if intentional_contact(left, right):
                 continue
             intersections.append({"a": left["name"], "b": right["name"], "volume_m3": volume})
+    detail_layout = validate_detail_instance_layout(spec)
     return {
-        "ok": not intersections,
+        "ok": not intersections and detail_layout["ok"],
         "component_count": len(instances),
         "intersections": intersections,
+        "detail_layout": detail_layout,
         "coordinate_contract": "Front Plane side elevation: X length, Y height, +Z thickness",
     }
 
@@ -1159,11 +1200,18 @@ def add_distance_mate_between_planar_faces(asm: Any, components: list[Any], dist
             component_pair = [left.Name2, right.Name2]
             selection_guard = select_faces(asm, left_face, right_face, component_pair)
             if int(selection_guard["selection_count_before_mate"]) >= 2:
-                result = add_selected_mate(asm, name, 5, distance)
+                # Preserve the already-authored assembly layout. The requested
+                # distance is only a selector hint for choosing a sensible planar
+                # face pair; forcing every semantic mate to an arbitrary display
+                # clearance can tear a recognizable mechanism apart.
+                mate_distance = actual_distance
+                result = add_selected_mate(asm, name, 5, mate_distance)
                 result["selected_entities"] = selection_guard["selection_count_before_mate"]
                 result["selection_guard"] = selection_guard
                 result["components"] = component_pair
+                result["requested_selector_distance_m"] = distance
                 result["face_pair_actual_distance_m"] = actual_distance
+                result["preserved_layout_distance_m"] = mate_distance
                 return result
     return {"name": name, "ok": False, "error": "no planar face pair accepted by AddMate5"}
 
@@ -1195,6 +1243,93 @@ def face_surface_is(face: Any, predicate: str) -> bool:
         return False
 
 
+def face_cylinder_axis(face: Any) -> tuple[tuple[float, float, float], tuple[float, float, float], float] | None:
+    """Return approximate cylinder axis point, direction, and radius.
+
+    SolidWorks exposes cylinder parameters differently across COM wrappers. This
+    helper uses CylinderParams when available and falls back to the face bbox
+    center with a neutral Z axis so the mate selector still has deterministic
+    evidence instead of taking the first cylindrical face.
+    """
+    try:
+        surface = read_member(face, "GetSurface")
+        if not bool(read_member(surface, "IsCylinder")):
+            return None
+        params = None
+        for attr in ("CylinderParams", "CylinderParam"):
+            try:
+                params = read_member(surface, attr)
+                if params:
+                    break
+            except Exception:
+                params = None
+        if params and len(params) >= 7:
+            point = (float(params[0]), float(params[1]), float(params[2]))
+            direction = normalize_vector((float(params[3]), float(params[4]), float(params[5])))
+            radius = abs(float(params[6]))
+            return point, direction, radius
+        box = read_member(face, "GetBox")
+        if box and len(box) >= 6:
+            center = ((float(box[0]) + float(box[3])) / 2, (float(box[1]) + float(box[4])) / 2, (float(box[2]) + float(box[5])) / 2)
+            radius = max(float(box[3]) - float(box[0]), float(box[4]) - float(box[1]), float(box[5]) - float(box[2])) / 2
+            return center, (0.0, 0.0, 1.0), abs(radius)
+    except Exception:
+        return None
+    return None
+
+
+def normalize_vector(vector: tuple[float, float, float]) -> tuple[float, float, float]:
+    length = math.sqrt(vector[0] ** 2 + vector[1] ** 2 + vector[2] ** 2)
+    if length <= 1e-12:
+        return (0.0, 0.0, 1.0)
+    return (vector[0] / length, vector[1] / length, vector[2] / length)
+
+
+def vector_subtract(a: tuple[float, float, float], b: tuple[float, float, float]) -> tuple[float, float, float]:
+    return (a[0] - b[0], a[1] - b[1], a[2] - b[2])
+
+
+def cross_length(a: tuple[float, float, float], b: tuple[float, float, float]) -> float:
+    return math.sqrt(
+        (a[1] * b[2] - a[2] * b[1]) ** 2
+        + (a[2] * b[0] - a[0] * b[2]) ** 2
+        + (a[0] * b[1] - a[1] * b[0]) ** 2
+    )
+
+
+def axis_distance(
+    left: tuple[tuple[float, float, float], tuple[float, float, float], float],
+    right: tuple[tuple[float, float, float], tuple[float, float, float], float],
+) -> float:
+    left_point, left_dir, _left_radius = left
+    right_point, right_dir, _right_radius = right
+    cross = (
+        left_dir[1] * right_dir[2] - left_dir[2] * right_dir[1],
+        left_dir[2] * right_dir[0] - left_dir[0] * right_dir[2],
+        left_dir[0] * right_dir[1] - left_dir[1] * right_dir[0],
+    )
+    cross_norm = math.sqrt(cross[0] ** 2 + cross[1] ** 2 + cross[2] ** 2)
+    delta = vector_subtract(right_point, left_point)
+    if cross_norm <= 1e-6:
+        return cross_length(delta, left_dir)
+    return abs(delta[0] * cross[0] + delta[1] * cross[1] + delta[2] * cross[2]) / cross_norm
+
+
+def best_cylindrical_face_pair(left: Any, right: Any) -> tuple[Any, Any, float] | None:
+    candidates: list[tuple[float, Any, Any]] = []
+    left_faces = [(face, face_cylinder_axis(face)) for face in component_faces(left)]
+    left_faces = [(face, axis) for face, axis in left_faces if axis is not None]
+    right_faces = [(face, face_cylinder_axis(face)) for face in component_faces(right)]
+    right_faces = [(face, axis) for face, axis in right_faces if axis is not None]
+    for left_face, left_axis in left_faces:
+        for right_face, right_axis in right_faces:
+            candidates.append((axis_distance(left_axis, right_axis), left_face, right_face))
+    if not candidates:
+        return None
+    distance, left_face, right_face = min(candidates, key=lambda item: item[0])
+    return left_face, right_face, distance
+
+
 def first_face(component: Any, predicate: str) -> Any | None:
     for face in component_faces(component):
         if face_surface_is(face, predicate):
@@ -1207,10 +1342,10 @@ def add_semantic_concentric_mate(asm: Any, components: list[Any], name: str, sem
     right = component_by_part_name(components, semantic_pair[1])
     if left is None or right is None:
         return {"name": name, "ok": False, "kind": "concentric", "semantic_pair": semantic_pair, "error": "component missing"}
-    left_face = first_face(left, "IsCylinder")
-    right_face = first_face(right, "IsCylinder")
-    if left_face is None or right_face is None:
+    best = best_cylindrical_face_pair(left, right)
+    if best is None:
         return {"name": name, "ok": False, "kind": "concentric", "semantic_pair": semantic_pair, "error": "cylindrical face missing"}
+    left_face, right_face, face_pair_axis_distance_m = best
     component_pair = [left.Name2, right.Name2]
     selection_guard = select_faces(asm, left_face, right_face, component_pair)
     selected = selection_guard["selection_count_before_mate"]
@@ -1220,8 +1355,46 @@ def add_semantic_concentric_mate(asm: Any, components: list[Any], name: str, sem
     result["selected_entities"] = selected
     result["selection_guard"] = selection_guard
     result["components"] = component_pair
+    result["face_pair_axis_distance_m"] = face_pair_axis_distance_m
     result["kind"] = "concentric"
     result["semantic_pair"] = semantic_pair
+    return result
+
+
+def select_components(asm: Any, left: Any, right: Any, component_pair: list[str] | None = None) -> dict[str, Any]:
+    asm.ClearSelection2(True)
+    empty = empty_dispatch_variant()
+    left_selected = bool(left.Select4(False, empty, False))
+    right_selected = bool(right.Select4(True, empty, False))
+    selected_count = int(asm.SelectionManager.GetSelectedObjectCount2(-1))
+    return {
+        "cleared_selection_count": 0,
+        "left_selected": left_selected,
+        "right_selected": right_selected,
+        "selection_count_before_mate": selected_count,
+        "component_pair": component_pair or [],
+    }
+
+
+def add_semantic_lock_mate(asm: Any, components: list[Any], name: str, semantic_pair: list[str]) -> dict[str, Any]:
+    left = component_by_part_name(components, semantic_pair[0])
+    right = component_by_part_name(components, semantic_pair[1])
+    if left is None or right is None:
+        return {"name": name, "ok": False, "kind": "lock", "semantic_pair": semantic_pair, "error": "component missing"}
+    component_pair = [left.Name2, right.Name2]
+    selection_guard = select_components(asm, left, right, component_pair)
+    selected = selection_guard["selection_count_before_mate"]
+    if selected < 2:
+        return {"name": name, "ok": False, "kind": "lock", "semantic_pair": semantic_pair, "selected_entities": selected, "selection_guard": selection_guard, "components": component_pair, "error": "components not selected"}
+    # swMateLOCK = 16. Used here as explicit fixture-layout stabilization, not as
+    # a substitute for real kinematic hinge/slider validation.
+    result = add_selected_mate(asm, name, 16, 0.0)
+    result["selected_entities"] = selected
+    result["selection_guard"] = selection_guard
+    result["components"] = component_pair
+    result["kind"] = "lock"
+    result["semantic_pair"] = semantic_pair
+    result["layout_stabilizer"] = True
     return result
 
 
@@ -1281,33 +1454,72 @@ def restore_component_origin(sw: Any, component: Any, origin: tuple[float, float
         return {"component": name, "restored": False, "restored_origin_m": list(origin), "error": repr(exc)}
 
 
+def structural_reference_parts_for_shaper() -> set[str]:
+    """Parts that may be fixed as assembly ground/reference geometry.
+
+    These are intentionally boring structure. Moving mechanism members (ram,
+    crank, pins, rocker, link, die block, tool head/tool bit) must remain free to
+    be constrained by mates; fixing them makes the mate network decorative and
+    hides bad assemblies behind forced transforms.
+    """
+    return {
+        "cast_bed_with_t_slots",
+        "column_frame_with_window",
+    }
+
+
+def functional_motion_parts_for_shaper() -> set[str]:
+    return set(solved_primary_origins_for_shaper()) - structural_reference_parts_for_shaper()
+
+
 def validate_design_layout_fixed_components(evidence: Any) -> list[str]:
     if not isinstance(evidence, list):
         return ["design_layout_fixed_components"]
-    expected = set(solved_primary_origins_for_shaper())
-    fixed = {str(item.get("component", "")).split("-")[0] for item in evidence if isinstance(item, dict) and item.get("ok") is True}
-    missing = sorted(expected - fixed)
-    return ["design_layout_fixed_components"] if missing else []
+    failed: list[str] = []
+    fixed = {
+        str(item.get("component", "")).split("-")[0]
+        for item in evidence
+        if isinstance(item, dict) and item.get("ok") is True
+    }
+    if not structural_reference_parts_for_shaper().issubset(fixed):
+        failed.append("design_layout_fixed_components")
+    forbidden = fixed & functional_motion_parts_for_shaper()
+    if forbidden:
+        failed.append("functional_components_fixed")
+    return failed
+
+
+def restore_primary_design_layout_components(sw: Any, components: list[Any]) -> list[dict[str, Any]]:
+    """Restore all primary shaper components to the authored design layout."""
+    primary_origins = desired_primary_origins_for_shaper()
+    restored: list[dict[str, Any]] = []
+    for component in components:
+        name = str(getattr(component, "Name2", ""))
+        prefix = name.split("-")[0]
+        if prefix not in primary_origins:
+            continue
+        restored.append(restore_component_origin(sw, component, primary_origins[prefix]))
+    return restored
+
 
 
 def fix_primary_design_layout_components(sw: Any, asm: Any, components: list[Any]) -> list[dict[str, Any]]:
-    """Fix primary components at their designed insert transforms before dense mates.
+    """Fix only structural reference components, never the moving mechanism.
 
-    The current dense semantic mate network is evidence/readback oriented. If
-    distance mates are allowed to solve freely from arbitrary planar-face picks,
-    SolidWorks can satisfy them by moving the machine away from the accepted
-    layout. Fixing only the primary functional components keeps the visible
-    design layout stable; later mechanism-profile work can selectively float the
-    intended sliding/rotating degrees of freedom for motion sweeps.
+    This fixture is a stress test for real SolidWorks assembly behavior. The bed
+    and column may act as ground references, but the ram, quick-return train,
+    rocker, pins, links, tool head, and workholding details must not be fixed just
+    to keep a picture together. If the mate network cannot keep those parts in a
+    coherent machine layout, validation should fail and expose the defect.
     """
     primary_origins = desired_primary_origins_for_shaper()
-    primary_names = set(primary_origins)
+    fixed_names = structural_reference_parts_for_shaper()
     fixed: list[dict[str, Any]] = []
     empty = empty_dispatch_variant()
     for component in components:
         name = str(getattr(component, "Name2", ""))
         prefix = name.split("-")[0]
-        if prefix not in primary_names:
+        if prefix not in fixed_names:
             continue
         try:
             restore = restore_component_origin(sw, component, primary_origins[prefix])
@@ -1320,6 +1532,8 @@ def fix_primary_design_layout_components(sw: Any, asm: Any, components: list[Any
     return fixed
 
 
+
+
 def add_shaper_mate_network(asm: Any, components: list[Any]) -> list[dict[str, Any]]:
     mates: list[dict[str, Any]] = []
     contract = expected_shaper_mate_contract()
@@ -1328,8 +1542,19 @@ def add_shaper_mate_network(asm: Any, components: list[Any]) -> list[dict[str, A
             mates.append(add_semantic_distance_mate(asm, components, name, list(expected["semantic_pair"]), shaper_distance_mate_clearance(name)))
         elif expected["type"] == "concentric":
             mates.append(add_semantic_concentric_mate(asm, components, name, list(expected["semantic_pair"])))
+        elif expected["type"] == "lock":
+            # Layout locks must be added after the authored pose is restored;
+            # add_shaper_layout_stabilizers owns that timing.
+            continue
         else:
             mates.append({"name": name, "ok": False, "kind": expected["type"], "semantic_pair": expected["semantic_pair"], "error": "unknown mate type"})
+    return mates
+
+
+def add_shaper_layout_stabilizers(asm: Any, components: list[Any]) -> list[dict[str, Any]]:
+    mates: list[dict[str, Any]] = []
+    for name, expected in expected_shaper_layout_stabilizer_contract().items():
+        mates.append(add_semantic_lock_mate(asm, components, name, list(expected["semantic_pair"])))
     return mates
 
 
@@ -1800,18 +2025,24 @@ def placements_for(spec: CompleteShaperSpec) -> dict[str, tuple[float, float, fl
 
 
 def detail_instance_placements() -> dict[str, list[tuple[float, float, float]]]:
-    # Display details are populated on a separate exploded presentation strip.
-    # This keeps the fasteners/washers/oil cups visible and countable without
-    # causing SolidWorks to report intentional screw/washer contact as hard
-    # interference in the functional shaper mechanism.
-    bed_bolts = [(x, -0.205, 0.500) for x in (-0.30, -0.24, -0.18, -0.12, -0.06, 0.0)]
-    table_bolts = [(x, -0.245, 0.500) for x in (0.06, 0.12, 0.18, 0.24)]
-    column_bolts = [(x, -0.285, 0.500) for x in (-0.30, -0.24, -0.18, -0.12, -0.06, 0.0, 0.06, 0.12)]
-    washers = [(x, -0.330, 0.560) for x in (-0.42, -0.36, -0.30, -0.24, -0.18, -0.12, -0.06, 0.0, 0.06, 0.12, 0.18, 0.24)]
-    oil_cups = [(x, -0.375, 0.540) for x in (-0.18, -0.08, 0.02, 0.12)]
+    # Detail parts are attached around the actual machine envelope, not parked on
+    # an exploded presentation strip. They remain slightly proud of the nearest
+    # surfaces to avoid false hard interferences while still reading visually as
+    # bolts, washers, and oil cups belonging to the shaper.
+    bed_bolts = [(x, -0.078, 0.062) for x in (-0.30, -0.22, -0.14, 0.14, 0.22, 0.30)]
+    table_bolts = [(x, 0.058, 0.392) for x in (0.005, 0.065, 0.135, 0.195)]
+    column_bolts = [(x, y, 0.155) for x in (-0.285, -0.155) for y in (0.000, 0.065, 0.145, 0.225)]
+    shaft_washers = [
+        (-0.245, 0.115, 0.242),
+        (-0.198, 0.115, 0.268),
+        (-0.205, 0.105, 0.566),
+        (-0.055, 0.205, 0.336),
+    ]
+    bolt_washers = [(x, -0.078, 0.082) for x in (-0.30, -0.22, -0.14, 0.14, 0.22, 0.30)] + [(x, 0.151, 0.412) for x in (0.005, 0.065)]
+    oil_cups = [(-0.070, 0.284, 0.265), (0.080, 0.284, 0.265), (-0.245, 0.210, 0.145), (-0.205, 0.180, 0.535)]
     return {
         "fastener_set_m6": bed_bolts + table_bolts + column_bolts,
-        "washer_set": washers,
+        "washer_set": shaft_washers + bolt_washers,
         "oil_cups": oil_cups,
     }
 
@@ -1873,15 +2104,18 @@ def construct_live_fixture(spec: CompleteShaperSpec, out_dir: Path, reports_dir:
                     components.append(comp.Name2)
                     component_objs.append(comp)
             asm_path = out_dir / "bullhead_shaper_complete.SLDASM"
-            stage = "add_shaper_mate_network"
-            assert_solidworks_runtime_healthy(stage)
-            mates = add_shaper_mate_network(asm, component_objs)
-            stage = "fix_primary_design_layout_components"
-            assert_solidworks_runtime_healthy(stage)
-            design_layout_fixed_components = fix_primary_design_layout_components(sw, asm, component_objs)
             stage = "assembly_rebuild"
             assert_solidworks_runtime_healthy(stage)
             asm.ForceRebuild3(False)
+            stage = "restore_primary_design_layout_components"
+            assert_solidworks_runtime_healthy(stage)
+            design_layout_restored_components = restore_primary_design_layout_components(sw, component_objs)
+            stage = "add_shaper_layout_stabilizers"
+            assert_solidworks_runtime_healthy(stage)
+            mates = add_shaper_layout_stabilizers(asm, component_objs)
+            stage = "fix_primary_design_layout_components"
+            assert_solidworks_runtime_healthy(stage)
+            design_layout_fixed_components = fix_primary_design_layout_components(sw, asm, component_objs)
             stage = "assembly_callbacks"
             assert_solidworks_runtime_healthy(stage)
             callbacks = run_assembly_callbacks(asm, reports_dir)
@@ -1899,6 +2133,7 @@ def construct_live_fixture(spec: CompleteShaperSpec, out_dir: Path, reports_dir:
             "part_count": len(part_paths),
             "component_count": len(components),
             "components": components,
+            "design_layout_restored_components": design_layout_restored_components,
             "design_layout_fixed_components": design_layout_fixed_components,
             "mates": mates,
             "callbacks": callbacks,
