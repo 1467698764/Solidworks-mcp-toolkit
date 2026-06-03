@@ -501,11 +501,16 @@ def _strict_check_failed(data: dict[str, Any], check: str) -> bool:
         spatial = (((understanding.get("cad_evidence_graph") or {}).get("spatial_evidence") or {}) if isinstance(understanding, dict) else {})
         if int(inv.get("component_count", 0) or 0) < expected_component_count:
             return True
+        missing = spatial.get("missing_spatial_evidence")
+        spatial_model = understanding.get("spatial_model", {}) if isinstance(understanding, dict) else {}
+        spatial_model_missing = spatial_model.get("missing_spatial_evidence") if isinstance(spatial_model, dict) else None
+        if missing or spatial_model_missing:
+            return True
         relations = spatial.get("near_or_overlap_pairs") or []
-        relation_texts = [f"{r.get('a')} {r.get('b')}" for r in relations if isinstance(r, dict)]
-        for left, right in _functional_connection_pairs():
-            if not any(left in text and right in text for text in relation_texts):
-                return True
+        coaxial = spatial.get("coaxial_candidates") or []
+        containment = spatial.get("containment_relations") or []
+        if not relations and not coaxial and not containment:
+            return True
         return False
     return True
 

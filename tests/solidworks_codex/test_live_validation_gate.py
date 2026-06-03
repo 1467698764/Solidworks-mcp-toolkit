@@ -496,6 +496,29 @@ class LiveValidationGateSpecTests(unittest.TestCase):
         report["inspect"]["active_document"]["components"][4]["transform"]["origin_m"] = [4.0, 4.0, 4.0]
         self.assertTrue(self.module._strict_check_failed(report, "inspect_model_understand"))
 
+    def test_shaper_strict_inspect_accepts_compact_spatial_summary_when_mates_cover_functional_pairs(self):
+        understanding = shaper_understanding_evidence()
+        spatial = understanding["cad_evidence_graph"]["spatial_evidence"]
+        spatial["near_or_overlap_pairs"] = spatial["near_or_overlap_pairs"][:3]
+        spatial["missing_spatial_evidence"] = []
+        understanding["spatial_model"] = {"missing_spatial_evidence": []}
+        report = {
+            "ok": True,
+            "part_count": 24,
+            "component_count": load_shaper_builder().expected_assembly_component_minimum(),
+            "mates": shaper_mates(),
+            "callbacks": {"interference": {"available": True, "count": 0}, "mass": {"available": True, "mass_kg": 15.0}},
+            "inspect": shaper_inspect_evidence(),
+            "model_understanding": understanding,
+            "post_cleanup": {"locked_files": [], "lock_files": []},
+            "validation": {"ok": True, "failed": []},
+        }
+
+        self.assertFalse(self.module._strict_check_failed(report, "inspect_model_understand"))
+
+        report["model_understanding"]["cad_evidence_graph"]["spatial_evidence"]["missing_spatial_evidence"] = ["ram link"]
+        self.assertTrue(self.module._strict_check_failed(report, "inspect_model_understand"))
+
     def test_validate_gate_rejects_reopen_persistence_when_save3_failed(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -547,6 +570,7 @@ class LiveValidationGateSpecTests(unittest.TestCase):
         original_rmtree = self.module.shutil.rmtree
         try:
             stale = ROOT / "tools" / "solidworks_codex" / "live_fixture" / "shaper_machine_v4"
+            stale.mkdir(parents=True, exist_ok=True)
             self.module.default_stale_fixture_dirs = lambda: (stale,)
             def fake_rmtree(path):
                 calls.append(path)

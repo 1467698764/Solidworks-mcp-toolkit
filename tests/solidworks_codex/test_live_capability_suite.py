@@ -468,6 +468,54 @@ class LiveCapabilitySuiteSpecTests(unittest.TestCase):
 
         self.assertEqual([{"name": "Distance_Mate", "type": "MateDistanceDim", "depth": "0"}], features)
 
+    def test_add_component_reactivates_assembly_without_rereading_stale_title(self):
+        class FakeVariantFactory:
+            VT_BYREF = 0
+            VT_I4 = 0
+            def VARIANT(self, _flags, value):
+                return type("Variant", (), {"value": value})()
+
+        class StaleAssemblyProxy:
+            pass
+
+        class ActiveAssembly:
+            def __init__(self):
+                self.added = []
+            def AddComponent5(self, path, *_args):
+                self.added.append(path)
+                return type("Component", (), {"Name2": "inserted-1"})()
+
+        class FakeSw:
+            def __init__(self):
+                self.active = ActiveAssembly()
+                self.activated = []
+                self.closed = []
+            def ActivateDoc3(self, title, *_args):
+                self.activated.append(title)
+                return self.active
+            def CloseDoc(self, title):
+                self.closed.append(title)
+
+        original_open = self.module.open_for_component
+        original_close = self.module.close_doc
+        original_pywin32 = self.module.require_pywin32
+        try:
+            self.module.open_for_component = lambda _sw, path: "opened-part-title"
+            self.module.close_doc = lambda sw, title: sw.CloseDoc(str(title))
+            self.module.require_pywin32 = lambda: (FakeVariantFactory(), FakeVariantFactory())
+            sw = FakeSw()
+
+            component = self.module.add_component(sw, StaleAssemblyProxy(), ROOT / "fixture_part.SLDPRT", (0, 0, 0), "capability_suite.SLDASM")
+        finally:
+            self.module.open_for_component = original_open
+            self.module.close_doc = original_close
+            self.module.require_pywin32 = original_pywin32
+
+        self.assertEqual("inserted-1", component.Name2)
+        self.assertEqual(["capability_suite.SLDASM"], sw.activated)
+        self.assertTrue(sw.active.added[0].endswith("fixture_part.SLDPRT"))
+        self.assertIn("opened-part-title", sw.closed)
+
     def test_cleanup_policy_is_explicit_and_keeps_generated_outputs_separate(self):
         matrix = self.module.build_capability_matrix()
         self.assertIn("live_capability_suite", matrix.output_dir)

@@ -1140,14 +1140,22 @@ def inspect_assembly_report(sw: Any, path: Path) -> dict[str, Any]:
         close_doc(sw, model)
 
 
-def add_component(sw: Any, asm: Any, path: Path, xyz: tuple[float, float, float]) -> Any:
+def add_component(sw: Any, asm: Any, path: Path, xyz: tuple[float, float, float], assembly_title: str = "") -> Any:
     opened = open_for_component(sw, path)
-    title = read_member(asm, "GetTitle")
+    target_asm = asm
+    title = assembly_title
+    if not title:
+        try:
+            title = read_member(asm, "GetTitle")
+        except Exception:
+            title = ""
     if title:
         pythoncom, win32_client = require_pywin32()
         errors = win32_client.VARIANT(pythoncom.VT_BYREF | pythoncom.VT_I4, 0)
-        sw.ActivateDoc3(title, False, 0, errors)
-    comp = asm.AddComponent5(str(path.resolve()), 0, "", False, "", xyz[0], xyz[1], xyz[2])
+        activated = sw.ActivateDoc3(title, False, 0, errors)
+        if activated is not None:
+            target_asm = activated
+    comp = target_asm.AddComponent5(str(path.resolve()), 0, "", False, "", xyz[0], xyz[1], xyz[2])
     close_doc(sw, opened)
     if comp is None:
         raise RuntimeError(f"AddComponent5 failed for {path}")
@@ -1276,11 +1284,12 @@ def add_concentric_mate_between_cylinders(asm: Any, components: list[Any]) -> di
 
 def create_assembly(sw: Any, out_dir: Path, part_paths: dict[str, Path]) -> tuple[Path, dict[str, Any]]:
     asm = new_assembly(sw)
+    asm_title = active_title(asm)
     component_objs = [
-        add_component(sw, asm, part_paths["extrude"], (0.00, 0.00, 0.00)),
-        add_component(sw, asm, part_paths["revolve"], (0.12, 0.00, 0.00)),
-        add_component(sw, asm, part_paths["revolve_cut"], (0.20, 0.075, 0.00)),
-        add_component(sw, asm, part_paths["editable"], (0.00, 0.10, 0.00)),
+        add_component(sw, asm, part_paths["extrude"], (0.00, 0.00, 0.00), asm_title),
+        add_component(sw, asm, part_paths["revolve"], (0.12, 0.00, 0.00), asm_title),
+        add_component(sw, asm, part_paths["revolve_cut"], (0.20, 0.075, 0.00), asm_title),
+        add_component(sw, asm, part_paths["editable"], (0.00, 0.10, 0.00), asm_title),
     ]
     components = [comp.Name2 for comp in component_objs]
     extrude_comp, revolve_comp, revolve_cut_comp, editable_comp = component_objs
