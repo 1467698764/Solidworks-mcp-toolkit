@@ -92,6 +92,7 @@ class MateGroupLiveProtocolTests(unittest.TestCase):
                 "backup_native_files",
                 "capture_before_snapshot",
                 "select_live_entities_for_macro",
+                "mate_selection_check",
                 "run_reviewed_macro",
                 "rebuild",
                 "inspect_after_group",

@@ -84,6 +84,14 @@ def build_group_steps(group_id: str, items: list[dict[str, Any]], model: str) ->
             "blocking_if": ["wrong_document", "selection_component_mismatch", "selection_entity_type_mismatch"],
         },
         {
+            "action": "mate_selection_check",
+            "tool": "solidworks_mate_selection_check",
+            "reason": "block wrong-count, wrong-component, or component-level selections before running any reviewed mate macro",
+            "expected_components": components_for(items),
+            "expected_mates": names,
+            "blocking_if": ["selection_count", "unsupported_selection_type", "selection_component_mismatch"],
+        },
+        {
             "action": "run_reviewed_macro",
             "tool": "SolidWorks macro runner/manual reviewed macro",
             "reason": "apply exactly one reviewed mate macro at a time, preserving the expected mate name",
