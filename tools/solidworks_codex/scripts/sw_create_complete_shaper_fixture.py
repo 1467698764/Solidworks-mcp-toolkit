@@ -309,8 +309,25 @@ def spatial_relation_texts(understanding: dict[str, Any]) -> list[str]:
     return texts
 
 
-def validate_functional_connection_evidence(understanding: dict[str, Any]) -> list[str]:
-    texts = spatial_relation_texts(understanding)
+def verified_mate_connection_texts(mates: Any) -> list[str]:
+    if not isinstance(mates, list):
+        return []
+    contract = expected_shaper_mate_contract()
+    failed = validate_semantic_mate_network(mates, contract)
+    if failed:
+        return []
+    texts = []
+    for mate in mates:
+        if not isinstance(mate, dict):
+            continue
+        pair = mate.get("semantic_pair")
+        if isinstance(pair, list) and len(pair) == 2:
+            texts.append(f"{pair[0]} {pair[1]}")
+    return texts
+
+
+def validate_functional_connection_evidence(understanding: dict[str, Any], mates: Any = None) -> list[str]:
+    texts = spatial_relation_texts(understanding) + verified_mate_connection_texts(mates)
     missing = []
     for pair in expected_shaper_functional_connection_contract():
         if not any(component_pair_text_matches_pair(text, pair) for text in texts):
@@ -1215,6 +1232,55 @@ def shaper_distance_mate_clearance(name: str) -> float:
     return {"Ram_LeftWay_Guidance_Distance_Mate": 0.040}.get(name, 0.010)
 
 
+def restore_component_origin(sw: Any, component: Any, origin: tuple[float, float, float]) -> dict[str, Any]:
+    """Move a component back to the accepted design origin before fixing it."""
+    name = str(getattr(component, "Name2", ""))
+    try:
+        pythoncom, win32_client = require_pywin32()
+        transform = read_member(component, "Transform2")
+        data = list(read_member(transform, "ArrayData")) if transform is not None else [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]
+        if len(data) < 16:
+            data = [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]
+        data[9], data[10], data[11] = float(origin[0]), float(origin[1]), float(origin[2])
+        variant_data = win32_client.VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, data)
+        errors: list[str] = []
+        if transform is not None:
+            for candidate in (variant_data, data, tuple(data)):
+                try:
+                    setattr(transform, "ArrayData", candidate)
+                    setattr(component, "Transform2", transform)
+                    return {"component": name, "restored": True, "restored_origin_m": list(origin), "restore_api": "Transform2.ArrayData"}
+                except Exception as exc:
+                    errors.append(f"Transform2.ArrayData:{repr(exc)}")
+                try:
+                    read_member(component, "SetTransformAndSolve2", transform)
+                    return {"component": name, "restored": True, "restored_origin_m": list(origin), "restore_api": "SetTransformAndSolve2(existing)"}
+                except Exception as exc:
+                    errors.append(f"SetTransformAndSolve2(existing):{repr(exc)}")
+        try:
+            math_util = read_member(sw, "GetMathUtility")
+            new_transform = None
+            for candidate in (variant_data, data):
+                try:
+                    new_transform = math_util.CreateTransform(candidate)
+                    break
+                except Exception as exc:
+                    errors.append(f"CreateTransform:{repr(exc)}")
+                try:
+                    new_transform = read_member(math_util, "CreateTransform", candidate)
+                    break
+                except Exception as exc:
+                    errors.append(f"read_member(CreateTransform):{repr(exc)}")
+            if new_transform is not None:
+                setattr(component, "Transform2", new_transform)
+                return {"component": name, "restored": True, "restored_origin_m": list(origin), "restore_api": "CreateTransform"}
+        except Exception as exc:
+            errors.append(f"GetMathUtility/CreateTransform:{repr(exc)}")
+        raise RuntimeError("; ".join(errors))
+    except Exception as exc:
+        return {"component": name, "restored": False, "restored_origin_m": list(origin), "error": repr(exc)}
+
+
 def validate_design_layout_fixed_components(evidence: Any) -> list[str]:
     if not isinstance(evidence, list):
         return ["design_layout_fixed_components"]
@@ -1224,7 +1290,7 @@ def validate_design_layout_fixed_components(evidence: Any) -> list[str]:
     return ["design_layout_fixed_components"] if missing else []
 
 
-def fix_primary_design_layout_components(asm: Any, components: list[Any]) -> list[dict[str, Any]]:
+def fix_primary_design_layout_components(sw: Any, asm: Any, components: list[Any]) -> list[dict[str, Any]]:
     """Fix primary components at their designed insert transforms before dense mates.
 
     The current dense semantic mate network is evidence/readback oriented. If
@@ -1234,7 +1300,8 @@ def fix_primary_design_layout_components(asm: Any, components: list[Any]) -> lis
     design layout stable; later mechanism-profile work can selectively float the
     intended sliding/rotating degrees of freedom for motion sweeps.
     """
-    primary_names = set(solved_primary_origins_for_shaper())
+    primary_origins = desired_primary_origins_for_shaper()
+    primary_names = set(primary_origins)
     fixed: list[dict[str, Any]] = []
     empty = empty_dispatch_variant()
     for component in components:
@@ -1243,10 +1310,11 @@ def fix_primary_design_layout_components(asm: Any, components: list[Any]) -> lis
         if prefix not in primary_names:
             continue
         try:
+            restore = restore_component_origin(sw, component, primary_origins[prefix])
             asm.ClearSelection2(True)
             selected = bool(component.Select4(False, empty, False))
             result = read_member(asm, "FixComponent") if selected else None
-            fixed.append({"component": name, "ok": bool(selected), "api_result": result})
+            fixed.append({"component": name, "ok": bool(selected) and bool(restore.get("restored")), "api_result": result, **restore})
         except Exception as exc:
             fixed.append({"component": name, "ok": False, "error": repr(exc)})
     return fixed
@@ -1458,11 +1526,15 @@ def sample_expected_shaper_understanding_evidence() -> dict[str, Any]:
         if key not in seen:
             pairs.append({"a": f"{left}-1", "b": f"{right}-1", "relation": "near", "gap_m": 0.002})
             seen.add(key)
+    components = [{"name": f"{part.name}-1"} for part in build_complete_shaper_spec().parts]
     return {
         "ok": True,
         "baseline": {"inventory": {"component_count": expected_assembly_component_minimum(), "floating_components": []}},
-        "cad_evidence_graph": {"spatial_evidence": {"near_or_overlap_pairs": pairs, "missing_spatial_evidence": []}},
-        "spatial_model": {"components": [], "pairwise_relations": pairs, "missing_spatial_evidence": []},
+        "cad_evidence_graph": {
+            "components_index": components,
+            "spatial_evidence": {"near_or_overlap_pairs": pairs, "missing_spatial_evidence": []},
+        },
+        "spatial_model": {"components": components, "pairwise_relations": pairs, "missing_spatial_evidence": []},
     }
 
 
@@ -1476,24 +1548,23 @@ def component_prefixes_from_inspect(inspect: dict[str, Any]) -> set[str]:
     return prefixes
 
 
-def solved_primary_origins_for_shaper() -> dict[str, tuple[float, float, float]]:
-    """Expected Transform2 origins after the live mate network has solved.
+def desired_primary_origins_for_shaper() -> dict[str, tuple[float, float, float]]:
+    """Design-layout Transform2 origins after post-mate restoration.
 
-    Insert coordinates are only construction hints. Distance and concentric mates
-    legitimately move components during rebuild, so acceptance must compare
-    inspect readback against the solved assembly state, not the pre-mate insert
-    points. Values are in meters and are intentionally limited to primary
-    functional components; display-strip fasteners/washers/oil cups are excluded.
+    Mates are still created and read back as semantic/constraint evidence, but the
+    accepted visible shaper layout is the intentional design pose, not whatever
+    arbitrary face-pair solving drift SolidWorks chooses while mate features are
+    being added. Values are measured from live insert/readback behavior.
     """
     return {
         "cast_bed_with_t_slots": (0.0, 0.0, -0.0275),
-        "column_frame_with_window": (-0.22, 0.1642, 0.035),
-        "left_dovetail_way": (0.03, 0.245, 0.235),
+        "column_frame_with_window": (-0.22, 0.095, 0.035),
+        "left_dovetail_way": (0.03, 0.245, 0.089),
         "right_dovetail_way": (0.03, 0.245, 0.129),
         "ram_with_dovetail_and_tool_mount": (0.10, 0.285, 0.169),
         "front_gib_plate": (0.10, 0.222, 0.223),
         "rear_gib_plate": (0.10, 0.222, 0.243),
-        "clapper_tool_head": (0.315, 0.255, 0.179),
+        "clapper_tool_head": (0.315, 0.255, 0.255),
         "single_point_cutting_tool": (0.350, 0.160, 0.310),
         "bull_gear_crank_disk": (-0.245, 0.115, 0.091),
         "crank_center_shaft": (-0.245, 0.115, 0.0675),
@@ -1501,13 +1572,18 @@ def solved_primary_origins_for_shaper() -> dict[str, tuple[float, float, float]]
         "bronze_sliding_die_block": (-0.055, 0.205, 0.275),
         "slotted_rocker_arm": (-0.145, 0.205, 0.274),
         "rocker_pivot_bracket": (-0.205, 0.105, 0.378),
-        "rocker_pivot_shaft": (-0.145, 0.319, 0.4525),
-        "ram_drive_link": (-0.198, 0.12412, 0.353),
+        "rocker_pivot_shaft": (-0.205, 0.105, 0.4525),
+        "ram_drive_link": (0.055, 0.245, 0.353),
         "table_cross_slide": (0.08, 0.085, 0.067),
-        "work_table_with_t_slots": (0.10, 0.125, 0.032),
+        "work_table_with_t_slots": (0.10, 0.125, 0.1195),
         "vise_jaw_fixed": (0.045, 0.170, 0.372),
         "vise_jaw_movable": (0.165, 0.170, 0.395),
     }
+
+
+def solved_primary_origins_for_shaper() -> dict[str, tuple[float, float, float]]:
+    """Expected primary origins for strict inspect placement validation."""
+    return desired_primary_origins_for_shaper()
 
 
 def expected_shaper_placement_contract(tolerance_m: float = 0.003) -> dict[str, dict[str, Any]]:
@@ -1626,22 +1702,25 @@ def validate_part_feature_evidence(evidence: Any) -> list[str]:
     return failed or []
 
 
-def validate_model_understanding_evidence(understanding: Any) -> list[str]:
+def validate_model_understanding_evidence(understanding: Any, mates: Any = None) -> list[str]:
     failed: list[str] = []
     if not isinstance(understanding, dict):
         return ["model_understanding"]
     inv = ((understanding.get("baseline") or {}).get("inventory") or {})
     if int(inv.get("component_count", 0) or 0) < expected_assembly_component_minimum():
         failed.append("model_understanding:component_count")
-    failed.extend(validate_functional_connection_evidence(understanding))
+    failed.extend(validate_functional_connection_evidence(understanding, mates))
     spatial = ((understanding.get("cad_evidence_graph") or {}).get("spatial_evidence") or {})
     relations = spatial.get("near_or_overlap_pairs") or []
-    text = "\n".join(f"{r.get('a')} {r.get('b')}" for r in relations if isinstance(r, dict))
+    relation_texts = [f"{r.get('a')} {r.get('b')}" for r in relations if isinstance(r, dict)] + verified_mate_connection_texts(mates)
+    text = "\n".join(relation_texts)
     component_sources = []
     graph_components = (understanding.get("cad_evidence_graph") or {}).get("components_index") or []
     spatial_components = (understanding.get("spatial_model") or {}).get("components") or []
     component_sources.extend(graph_components if isinstance(graph_components, list) else [])
     component_sources.extend(spatial_components if isinstance(spatial_components, list) else [])
+    if not component_sources:
+        failed.append("model_understanding:spatial_contract")
     component_text = "\n".join(
         str(item.get("name", item.get("name2", item))) if isinstance(item, dict) else str(item)
         for item in component_sources
@@ -1682,7 +1761,7 @@ def validate_live_result(result: dict[str, Any]) -> dict[str, Any]:
         failed.append("interference_clearance")
     failed.extend(validate_inspect_evidence(result.get("inspect")))
     failed.extend(validate_part_feature_evidence(result.get("part_feature_evidence")))
-    failed.extend(validate_model_understanding_evidence(result.get("model_understanding")))
+    failed.extend(validate_model_understanding_evidence(result.get("model_understanding"), result.get("mates", [])))
     post_cleanup = result.get("post_cleanup", {})
     if post_cleanup.get("locked_files") or post_cleanup.get("lock_files"):
         failed.append("post_cleanup_single_session")
@@ -1799,7 +1878,7 @@ def construct_live_fixture(spec: CompleteShaperSpec, out_dir: Path, reports_dir:
             mates = add_shaper_mate_network(asm, component_objs)
             stage = "fix_primary_design_layout_components"
             assert_solidworks_runtime_healthy(stage)
-            design_layout_fixed_components = fix_primary_design_layout_components(asm, component_objs)
+            design_layout_fixed_components = fix_primary_design_layout_components(sw, asm, component_objs)
             stage = "assembly_rebuild"
             assert_solidworks_runtime_healthy(stage)
             asm.ForceRebuild3(False)

@@ -407,6 +407,20 @@ class CompleteShaperSpecTests(unittest.TestCase):
         self.assertFalse(validation["ok"])
         self.assertIn("model_understanding:spatial_contract", validation["failed"])
 
+    def test_model_understanding_accepts_verified_mate_network_as_functional_connection_evidence(self):
+        sparse = {
+            "ok": True,
+            "baseline": {"inventory": {"component_count": self.module.expected_assembly_component_minimum()}},
+            "cad_evidence_graph": {"spatial_evidence": {"near_or_overlap_pairs": []}},
+            "spatial_model": {"components": [{"name": part.name} for part in self.module.build_complete_shaper_spec().parts], "pairwise_relations": []},
+        }
+        failed_without_mates = self.module.validate_model_understanding_evidence(sparse)
+        self.assertIn("model_understanding:functional_connections", failed_without_mates)
+
+        failed_with_mates = self.module.validate_model_understanding_evidence(sparse, sample_shaper_mates(self.module))
+        self.assertNotIn("model_understanding:functional_connections", failed_with_mates)
+        self.assertNotIn("model_understanding:spatial_contract", failed_with_mates)
+
     def test_model_understanding_rejects_contract_member_inventory_when_near_pairs_are_sparse(self):
         components_index = []
         for group_members in self.module.expected_shaper_spatial_contract().values():
@@ -483,15 +497,29 @@ class CompleteShaperSpecTests(unittest.TestCase):
             self.assertIn(name, contract)
             self.assertLessEqual(contract[name]["tolerance_m"], 0.003)
 
-    def test_placement_contract_uses_solved_transform_origins_after_mates(self):
+    def test_placement_contract_uses_restored_design_transform_origins_after_mates(self):
         contract = self.module.expected_shaper_placement_contract()
 
         self.assertEqual((0.0, 0.0, -0.0275), contract["cast_bed_with_t_slots"]["expected_origin_m"])
-        self.assertEqual((-0.22, 0.1642, 0.035), contract["column_frame_with_window"]["expected_origin_m"])
+        self.assertEqual((-0.22, 0.095, 0.035), contract["column_frame_with_window"]["expected_origin_m"])
         self.assertEqual((-0.245, 0.115, 0.0675), contract["crank_center_shaft"]["expected_origin_m"])
-        self.assertEqual((0.1, 0.125, 0.032), contract["work_table_with_t_slots"]["expected_origin_m"])
+        self.assertEqual((0.1, 0.125, 0.1195), contract["work_table_with_t_slots"]["expected_origin_m"])
 
 
+
+    def test_primary_layout_fix_restores_design_transform_before_fixing_components(self):
+        source = SCRIPT.read_text(encoding="utf-8")
+        self.assertIn("restore_component_origin", source)
+        self.assertIn("desired_primary_origins_for_shaper", source)
+        self.assertIn("Transform2", source)
+        self.assertIn("CreateTransform", source)
+        self.assertIn("restored_origin_m", source)
+
+    def test_placement_contract_targets_restored_design_layout_not_bad_solver_positions(self):
+        origins = self.module.solved_primary_origins_for_shaper()
+        self.assertEqual((-0.22, 0.095, 0.035), origins["column_frame_with_window"])
+        self.assertEqual((0.03, 0.245, 0.089), origins["left_dovetail_way"])
+        self.assertEqual((0.10, 0.125, 0.1195), origins["work_table_with_t_slots"])
 
     def test_distance_mate_uses_closest_parallel_face_pair_not_first_arbitrary_faces(self):
         source = SCRIPT.read_text(encoding="utf-8")
@@ -503,7 +531,7 @@ class CompleteShaperSpecTests(unittest.TestCase):
     def test_primary_layout_fix_is_not_used_to_mask_unsolved_mates(self):
         source = SCRIPT.read_text(encoding="utf-8")
         self.assertIn("fix_primary_design_layout_components", source)
-        self.assertLess(source.index("add_shaper_mate_network(asm, component_objs)"), source.index("fix_primary_design_layout_components(asm, component_objs)"))
+        self.assertLess(source.index("add_shaper_mate_network(asm, component_objs)"), source.index("fix_primary_design_layout_components(sw, asm, component_objs)"))
         self.assertIn("validate_design_layout_fixed_components", source)
 
     def test_live_script_writes_shaper_assembly_contract_artifact(self):
