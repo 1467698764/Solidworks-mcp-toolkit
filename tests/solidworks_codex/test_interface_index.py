@@ -190,6 +190,47 @@ class InterfaceIndexTests(unittest.TestCase):
             self.assertIn("live_face_axis_selection_required", weak_face["selection_policy"]["required_evidence"])
             self.assertIn("interface_confidence_scoring_blocks_weak_bbox_only_targets", data["operator_notes"])
 
+    def test_indexes_named_cylindrical_interfaces_from_hole_and_shaft_evidence(self):
+        report = {
+            "active_document": {
+                "type": "assembly",
+                "title": "cylindrical_fixture.SLDASM",
+                "components": [
+                    {"name2": "bearing_block-1", "path": "C:/m/bearing_block.SLDPRT", "bbox_m": [-0.04, -0.03, -0.02, 0.04, 0.03, 0.02]},
+                    {"name2": "drive_shaft-1", "path": "C:/m/drive_shaft.SLDPRT", "bbox_m": [-0.012, -0.012, -0.08, 0.012, 0.012, 0.08]},
+                ],
+                "features": [
+                    {"name": "BearingBore_D24_Z", "type": "HoleWizard", "components": ["bearing_block-1"]},
+                    {"name": "ShaftAxis_D24_Z", "type": "RevolveBoss", "components": ["drive_shaft-1"]},
+                ],
+                "dimensions": [
+                    {"full_name": "DIA24@BearingBore_D24_Z@bearing_block.SLDPRT", "system_value_m": 0.024, "feature": "BearingBore_D24_Z"},
+                    {"full_name": "DIA24@ShaftAxis_D24_Z@drive_shaft.SLDPRT", "system_value_m": 0.024, "feature": "ShaftAxis_D24_Z"},
+                ],
+            }
+        }
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            src = root / "inspect.json"
+            out = root / "interface_index.json"
+            src.write_text(json.dumps(report), encoding="utf-8")
+
+            proc = run_py("--report", str(src), "--out", str(out))
+
+            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+            data = json.loads(out.read_text(encoding="utf-8-sig"))
+            axes = {item["interface_id"]: item for item in data["cylindrical_interfaces"]}
+            bore = axes["bearing_block-1:cylinder:BearingBore_D24_Z"]
+            shaft = axes["drive_shaft-1:cylinder:ShaftAxis_D24_Z"]
+            self.assertEqual(bore["role"], "bearing_bore")
+            self.assertEqual(shaft["role"], "shaft_axis")
+            self.assertEqual(bore["axis"], [0.0, 0.0, 1.0])
+            self.assertEqual(bore["radius_m"], 0.012)
+            self.assertEqual(bore["source_feature"], "BearingBore_D24_Z")
+            self.assertEqual(bore["confidence_level"], "reviewable")
+            self.assertEqual(bore["selector"]["fallback"]["type"], "cylindrical_axis")
+            self.assertIn("named_cylindrical_interfaces_from_feature_and_dimension_evidence", data["operator_notes"])
+
     def test_swctl_routes_interface_index(self):
         report = {
             "active_document": {

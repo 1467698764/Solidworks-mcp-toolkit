@@ -19,6 +19,10 @@ def active_document(report: dict[str, Any]) -> dict[str, Any]:
     return report.get("active_document") or report.get("document") or report
 
 
+def rows(value: Any) -> list[dict[str, Any]]:
+    return [item for item in (value or []) if isinstance(item, dict)]
+
+
 def component_name(item: dict[str, Any]) -> str:
     return str(item.get("name2") or item.get("name") or item.get("component") or item.get("path") or "<unnamed>")
 
@@ -31,6 +35,10 @@ def bbox(item: dict[str, Any]) -> list[float] | None:
         return [float(v) for v in raw]
     except (TypeError, ValueError):
         return None
+
+
+def item_name(item: dict[str, Any]) -> str:
+    return str(item.get("full_name") or item.get("name") or item.get("feature") or "")
 
 
 def bbox_gap(a: list[float], b: list[float]) -> float:
@@ -153,6 +161,150 @@ def apply_confidence_policy(candidate: dict[str, Any]) -> dict[str, Any]:
     return candidate
 
 
+def explicit_component_refs(item: dict[str, Any]) -> list[str]:
+    raw = item.get("components") or item.get("entities") or item.get("references") or item.get("component_refs")
+    if isinstance(raw, list):
+        return [str(value) for value in raw if str(value)]
+    if isinstance(raw, str):
+        return [value.strip() for value in raw.replace(";", ",").split(",") if value.strip()]
+    return []
+
+
+def feature_component_refs(feature: dict[str, Any], component_names: list[str]) -> list[str]:
+    refs = explicit_component_refs(feature)
+    text = " ".join(str(feature.get(key, "")) for key in ("name", "type", "description", "path")).lower()
+    for name in component_names:
+        if name.lower() in text:
+            refs.append(name)
+    result: list[str] = []
+    seen: set[str] = set()
+    for ref in refs:
+        if ref not in seen:
+            seen.add(ref)
+            result.append(ref)
+    return result
+
+
+def parse_diameter_m(text: str) -> float | None:
+    match = re.search(r"(?:dia|diameter|d)[_\-\s]*([0-9]+(?:\.[0-9]+)?)", text, re.IGNORECASE)
+    if not match:
+        return None
+    value = float(match.group(1))
+    if value <= 0:
+        return None
+    return value / 1000.0
+
+
+def dimension_diameter_by_feature(dimensions: list[dict[str, Any]]) -> dict[str, float]:
+    result: dict[str, float] = {}
+    for dim in dimensions:
+        name = item_name(dim)
+        text = " ".join(str(dim.get(key, "")) for key in ("full_name", "name", "feature", "type")).lower()
+        if not any(token in text for token in ("dia", "diameter", "直径", "bore", "shaft", "hole")):
+            continue
+        try:
+            value = float(dim.get("system_value_m"))
+        except (TypeError, ValueError):
+            parsed = parse_diameter_m(name)
+            if parsed is None:
+                continue
+            value = parsed
+        if value <= 0:
+            continue
+        feature = str(dim.get("feature") or name.split("@")[1] if "@" in name else dim.get("feature") or "")
+        if feature:
+            result[feature] = value
+    return result
+
+
+def cylinder_role(feature: dict[str, Any], component: str) -> str | None:
+    text = " ".join(str(feature.get(key, "")) for key in ("name", "type", "description", "kind")).lower()
+    comp = component.lower()
+    if any(token in text for token in ("bearing", "bore")):
+        return "bearing_bore"
+    if any(token in text for token in ("hole", "dowel", "pin")):
+        return "hole_axis"
+    if "shaft" in text or "shaft" in comp:
+        return "shaft_axis"
+    return None
+
+
+def cylinder_axis_from_text(text: str, box: list[float] | None) -> tuple[str, list[float]]:
+    lowered = text.lower()
+    if re.search(r"(^|[_\-\s])x($|[_\-\s])", lowered):
+        return "x", [1.0, 0.0, 0.0]
+    if re.search(r"(^|[_\-\s])y($|[_\-\s])", lowered):
+        return "y", [0.0, 1.0, 0.0]
+    if re.search(r"(^|[_\-\s])z($|[_\-\s])", lowered):
+        return "z", [0.0, 0.0, 1.0]
+    if box is not None:
+        sizes = size_from_bbox(box) or [0.0, 0.0, 0.0]
+        axis_index = max(range(3), key=lambda index: sizes[index])
+        axis_name = ("x", "y", "z")[axis_index]
+        vector = [0.0, 0.0, 0.0]
+        vector[axis_index] = 1.0
+        return axis_name, vector
+    return "z", [0.0, 0.0, 1.0]
+
+
+def cylinder_selector(component: str, component_path: str | None, interface: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "stable_id": interface["interface_id"],
+        "component": component,
+        "component_path": component_path,
+        "strategy": "stable_id_then_feature_dimension_bbox_fallback",
+        "fallback": {
+            "type": "cylindrical_axis",
+            "axis": interface["axis"],
+            "origin_m": interface["origin_m"],
+            "radius_m": interface.get("radius_m"),
+            "source_feature": interface.get("source_feature"),
+            "source": interface.get("source"),
+        },
+        "tags": ["reopen_repair_selector", "review_before_live_selection"],
+    }
+
+
+def cylindrical_interfaces_for_component(
+    component: dict[str, Any],
+    component_names: list[str],
+    features: list[dict[str, Any]],
+    diameter_by_feature: dict[str, float],
+    box: list[float] | None,
+) -> list[dict[str, Any]]:
+    name = component_name(component)
+    result: list[dict[str, Any]] = []
+    for feature in features:
+        refs = feature_component_refs(feature, component_names)
+        if name not in refs:
+            continue
+        role = cylinder_role(feature, name)
+        if role is None:
+            continue
+        feature_name = item_name(feature)
+        feature_text = " ".join(str(feature.get(key, "")) for key in ("name", "type", "description", "kind"))
+        diameter_m = diameter_by_feature.get(feature_name) or parse_diameter_m(feature_text)
+        axis_name, axis = cylinder_axis_from_text(feature_text, box)
+        origin = [(box[i] + box[i + 3]) / 2.0 for i in range(3)] if box is not None else None
+        interface_id = f"{name}:cylinder:{feature_name}"
+        interface = {
+            "interface_id": interface_id,
+            "component": name,
+            "kind": "cylindrical",
+            "role": role,
+            "axis_name": axis_name,
+            "axis": axis,
+            "origin_m": origin,
+            "radius_m": (diameter_m / 2.0) if diameter_m is not None else None,
+            "source_feature": feature_name,
+            "source": "feature_dimension_name_evidence",
+            "confidence": 0.68 if diameter_m is not None else 0.58,
+        }
+        interface["selector"] = cylinder_selector(name, component.get("path"), interface)
+        result.append(apply_confidence_policy(interface))
+    return result
+
+
 def coordinate_system_selector(component: str, component_path: str | None, coordinate_system: dict[str, Any]) -> dict[str, Any]:
     return {
         "stable_id": coordinate_system["coordinate_system_id"],
@@ -229,8 +381,12 @@ def role_hints(component: dict[str, Any], standard_re: re.Pattern[str]) -> list[
 def build_index(report: dict[str, Any], *, near_tolerance_m: float, standard_part_regex: str) -> dict[str, Any]:
     doc = active_document(report)
     components = list(doc.get("components") or [])
+    features = rows(doc.get("features"))
+    dimensions = rows(doc.get("dimensions"))
+    component_names = [component_name(c) for c in components]
     standard_re = re.compile(standard_part_regex, re.IGNORECASE)
     boxes = {component_name(c): bbox(c) for c in components}
+    diameter_by_feature = dimension_diameter_by_feature(dimensions)
 
     interfaces: list[dict[str, Any]] = []
     contact_plane_ids: set[str] = set()
@@ -262,6 +418,7 @@ def build_index(report: dict[str, Any], *, near_tolerance_m: float, standard_par
 
     indexed_components = []
     planar_interfaces: list[dict[str, Any]] = []
+    cylindrical_interfaces: list[dict[str, Any]] = []
     coordinate_systems: list[dict[str, Any]] = []
     for c in components:
         name = component_name(c)
@@ -280,6 +437,7 @@ def build_index(report: dict[str, Any], *, near_tolerance_m: float, standard_par
                 face["confidence"] = 0.6
             apply_confidence_policy(face)
             planar_interfaces.append(face)
+        cylindrical_interfaces.extend(cylindrical_interfaces_for_component(c, component_names, features, diameter_by_feature, boxes.get(name)))
         indexed_components.append({
             "component": name,
             "path": c.get("path"),
@@ -297,6 +455,7 @@ def build_index(report: dict[str, Any], *, near_tolerance_m: float, standard_par
         "components": sorted(indexed_components, key=lambda item: item["component"]),
         "coordinate_systems": sorted(coordinate_systems, key=lambda item: item["coordinate_system_id"]),
         "planar_interfaces": sorted(planar_interfaces, key=lambda item: item["interface_id"]),
+        "cylindrical_interfaces": sorted(cylindrical_interfaces, key=lambda item: item["interface_id"]),
         "interfaces": sorted(interfaces, key=lambda item: (item["gap_m"], item["a"], item["b"])),
         "parameters": {"near_tolerance_m": near_tolerance_m, "standard_part_regex": standard_part_regex},
         "operator_notes": [
@@ -305,6 +464,7 @@ def build_index(report: dict[str, Any], *, near_tolerance_m: float, standard_par
             "standard_part_role_is_name_based_and_may_require_confirmation",
             "selectors_are_stable_ids_with_bbox_fallbacks_not_native_entity_ids",
             "interface_confidence_scoring_blocks_weak_bbox_only_targets",
+            "named_cylindrical_interfaces_from_feature_and_dimension_evidence",
         ],
     }
 
