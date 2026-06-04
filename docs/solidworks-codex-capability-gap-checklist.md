@@ -123,7 +123,7 @@ Status values:
 | Fillet/chamfer | missing/partial | Edge selection by role, radius/angle, failure handling. | Feature is named and does not break rebuild. |
 | Patterns/mirror | missing/partial | Linear/circular pattern, seed feature, count, spacing. | Pattern instances read back or represented in feature index. |
 | Sketch/dimension edit | present but shallow | Locate by feature/dimension name, edit, rebuild, verify downstream. | Only intended dimension changes. |
-| Feature suppression/edit | missing/partial | Suppress/unsuppress, reorder where safe, modify depth/radius. | Rebuild health and feature state read back. |
+| Feature suppression/edit | partial/guarded | `feature-state` / `solidworks_feature_state` executes suppress, unsuppress, and delete by exact or unique feature-name match with live rebuild and before/after state evidence. Reorder and parameterized depth/radius edits remain separate capability tracks. | Rebuild health, feature count, and feature state read back. |
 | Part import/read-only inspect | partial | Existing `.SLDPRT` inventory without rewriting. | Feature/interface report works on user-provided part. |
 
 ### 6.3 Geometry Interfaces

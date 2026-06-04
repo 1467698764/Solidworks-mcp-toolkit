@@ -1,6 +1,6 @@
 {
-  "timestamp": "2026-06-04T18:03:42",
-  "count": 60,
+  "timestamp": "2026-06-04T21:28:15",
+  "count": 62,
   "capabilities": [
     {
       "cli": "assembly-contract",
@@ -223,6 +223,25 @@
         "target"
       ],
       "description": "Export active or specified SolidWorks document to target path. Format follows suffix."
+    },
+    {
+      "cli": "feature-state",
+      "mcp": "solidworks_feature_state",
+      "workflow": "guarded_edit",
+      "safety": "guarded_write",
+      "solidworks_required": true,
+      "required": [
+        "feature",
+        "action"
+      ],
+      "properties": [
+        "action",
+        "feature",
+        "model",
+        "out",
+        "save"
+      ],
+      "description": "Change part or assembly feature state by feature name: suppress/unsuppress/delete, then rebuild and report before/after evidence."
     },
     {
       "cli": "finalize",
@@ -722,6 +741,16 @@
       "description": "CLI-only support command."
     },
     {
+      "cli": "start-feature-state",
+      "mcp": null,
+      "workflow": "guarded_edit",
+      "safety": "guarded_write",
+      "solidworks_required": true,
+      "required": [],
+      "properties": [],
+      "description": "CLI-only support command."
+    },
+    {
       "cli": "start-inspect",
       "mcp": "solidworks_start_inspect",
       "workflow": "discover",
@@ -888,9 +917,9 @@
     }
   ],
   "coverage": {
-    "cli_commands": 60,
-    "mcp_tools": 46,
-    "mapped_mcp_tools": 46,
+    "cli_commands": 62,
+    "mcp_tools": 47,
+    "mapped_mcp_tools": 47,
     "has_cli_for_every_local_mcp": true,
     "has_safety_for_every_capability": true,
     "has_workflow_for_every_capability": true,

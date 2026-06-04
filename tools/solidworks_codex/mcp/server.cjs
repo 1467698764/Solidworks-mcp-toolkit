@@ -167,6 +167,11 @@ const toolSchemas = [
     inputSchema: { type: 'object', properties: { component: { type: 'string' }, action: { type: 'string', enum: ['hide','show','suppress','unsuppress','fix','float'] }, save: { type: 'boolean' }, out: { type: 'string' } }, required: ['component','action'], additionalProperties: false }
   },
   {
+    name: 'solidworks_feature_state',
+    description: 'Change part or assembly feature state by feature name: suppress/unsuppress/delete, then rebuild and report before/after evidence.',
+    inputSchema: { type: 'object', properties: { feature: { type: 'string' }, action: { type: 'string', enum: ['suppress','unsuppress','delete'] }, model: { type: 'string' }, save: { type: 'boolean' }, out: { type: 'string' } }, required: ['feature','action'], additionalProperties: false }
+  },
+  {
     name: 'solidworks_interference_check',
     description: 'Run conservative SolidWorks assembly interference detection and emit JSON.',
     inputSchema: { type: 'object', properties: { out: { type: 'string' } }, additionalProperties: false }
@@ -459,6 +464,12 @@ async function callTool(name, input) {
       break;
     case 'solidworks_component_state':
       args.push('component-state', '-Component', input.component, '-Action', input.action);
+      if (input?.save) args.push('-Save');
+      if (input?.out) args.push('-Out', input.out);
+      break;
+    case 'solidworks_feature_state':
+      args.push('feature-state', '-Target', input.feature, '-Action', input.action);
+      if (input?.model) args.push('-Model', input.model);
       if (input?.save) args.push('-Save');
       if (input?.out) args.push('-Out', input.out);
       break;

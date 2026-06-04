@@ -1,13 +1,13 @@
 # SolidWorks Codex Capability Matrix
 
-- Timestamp: `2026-06-04T18:03:42`
-- Capability count: `60`
+- Timestamp: `2026-06-04T21:28:15`
+- Capability count: `62`
 
 ## Coverage
 
-- CLI commands: `60`
-- MCP tools: `46`
-- MCP tools mapped to CLI: `46`
+- CLI commands: `62`
+- MCP tools: `47`
+- MCP tools mapped to CLI: `47`
 - CLI for every local MCP tool: `True`
 - Safety label for every capability: `True`
 - Workflow label for every capability: `True`
@@ -36,6 +36,7 @@
 | `component-state` | `solidworks_component_state` | `guarded_edit` | `guarded_write` | `True` | `component, action` |
 | `design-review` | `solidworks_design_review` | `analysis` | `read_only` | `False` | `report` |
 | `export` | `solidworks_export` | `verify_export` | `verification_or_export` | `True` | `target` |
+| `feature-state` | `solidworks_feature_state` | `guarded_edit` | `guarded_write` | `True` | `feature, action` |
 | `finalize` | `solidworks_finalize` | `release_gate` | `offline_gate` | `False` | `-` |
 | `github-readiness` | `-` | `release_gate` | `offline_gate` | `False` | `-` |
 | `handoff-bundle` | `solidworks_handoff_bundle` | `handoff` | `offline_or_read_only` | `False` | `report` |
@@ -70,6 +71,7 @@
 | `session-snapshot` | `solidworks_session_snapshot` | `handoff` | `offline_or_read_only` | `False` | `-` |
 | `set-dimension` | `solidworks_set_dimension` | `guarded_edit` | `guarded_write` | `True` | `dimension, value_m` |
 | `start-component-state` | `-` | `guarded_edit` | `guarded_write` | `True` | `-` |
+| `start-feature-state` | `-` | `guarded_edit` | `guarded_write` | `True` | `-` |
 | `start-inspect` | `solidworks_start_inspect` | `discover` | `read_only` | `True` | `-` |
 | `start-interference` | `-` | `verify_export` | `verification_or_export` | `True` | `-` |
 | `start-mass` | `-` | `discover` | `read_only` | `True` | `-` |
