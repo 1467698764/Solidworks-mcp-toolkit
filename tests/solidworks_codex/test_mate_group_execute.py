@@ -1,4 +1,5 @@
 import json
+import math
 import subprocess
 import sys
 import tempfile
@@ -288,6 +289,33 @@ class MateGroupExecuteTests(unittest.TestCase):
         self.assertEqual(bad_mate.suppression_calls[0][0], 0)
         self.assertEqual(asm.rebuilds[0], False)
 
+    def test_executes_distance_and_angle_parameters_from_manifest(self):
+        manifest = self.manifest()
+        manifest["macros"][0]["mate_type"] = "distance"
+        manifest["macros"][0]["distance_m"] = 0.0125
+        asm = FakeAssembly()
+
+        distance_result = mod.execute_manifest(manifest, asm)
+
+        self.assertTrue(distance_result["ok"], distance_result)
+        self.assertEqual(asm.mates[0][0], mod.MATE_TYPES["distance"])
+        self.assertEqual(asm.mates[0][3], 0.0125)
+        self.assertEqual(distance_result["executed_mates"][0]["distance_m"], 0.0125)
+
+        angle_manifest = self.manifest()
+        angle_manifest["macros"][0]["mate_type"] = "angle"
+        angle_manifest["macros"][0]["angle_deg"] = 30.0
+        angle_manifest["macros"][0]["flip"] = True
+        angle_asm = FakeAssembly()
+
+        angle_result = mod.execute_manifest(angle_manifest, angle_asm)
+
+        self.assertTrue(angle_result["ok"], angle_result)
+        self.assertEqual(angle_asm.mates[0][0], mod.MATE_TYPES["angle"])
+        self.assertTrue(angle_asm.mates[0][2])
+        self.assertAlmostEqual(angle_asm.mates[0][6], math.radians(30.0))
+        self.assertAlmostEqual(angle_result["executed_mates"][0]["angle_rad"], math.radians(30.0))
+
     def test_dry_run_reports_repair_actions_without_solidworks(self):
         manifest = self.manifest()
         manifest["execution_actions"] = [{"action": "suppress_mate", "target_mate": "Broken_Bolt_Mate"}]
@@ -318,6 +346,7 @@ class MateGroupExecuteTests(unittest.TestCase):
             self.assertTrue(data["ok"], data)
             self.assertEqual(data["mode"], "mate_group_live_execute")
             self.assertEqual(data["counts"]["planned_mates"], 1)
+            self.assertEqual(data["planned_mates"][0]["distance_m"], 0.0)
             self.assertEqual(data["planned_mates"][0]["selection_actions"][0]["type"], "FACE")
 
     def test_swctl_routes_mate_group_execute_dry_run(self):

@@ -146,7 +146,7 @@ Status values:
 | Coincident mate | present/guarded | Face contact selectors propagate from interface index to mate group macro manifest and `mate-group-execute` can select reviewed planar face evidence before `AddMate5`. | Readback type and participants match interface ids. |
 | Concentric mate | present/guarded | Hole/shaft axis selectors propagate from interface index to mate group macro manifest and validation requires axial locator evidence unless axial freedom is explicit mechanism intent. | Revolute joint is not accepted with concentric alone unless axial freedom is intended. |
 | Parallel/perpendicular | partial | Orientation constraints used as supporting constraints. | They do not stand alone for physical attachment. |
-| Distance/angle | partial | Clearance, offset, limit or design angle; not cosmetic spacing. | Dimension value and intent are read back. |
+| Distance/angle | partial/guarded | Clearance, offset, limit or design angle; mate group manifests carry distance/angle/flip parameters into `mate-group-execute`, which passes them to `AddMate5` after reviewed entity selection. | Dimension value and intent are read back. |
 | Tangent | missing/partial | Rollers, cams, rounded contact. | Only used with correct surface types and validation. |
 | Width/symmetry | missing | Slider centered between guide faces, symmetric jaws, centered plates. | Remaining DOF matches intent. |
 | Limit distance/angle | missing | Travel stops, hinge limits, slider stroke. | Mechanism samples endpoints and midpoints. |

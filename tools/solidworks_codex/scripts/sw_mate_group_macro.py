@@ -78,6 +78,10 @@ def build_macros(plan: dict[str, Any], *, out_dir: Path) -> dict[str, Any]:
                 "components": group.get("components", []),
                 "selection_intent": mate.get("selection_intent", ""),
                 "selection_selectors": mate.get("selection_selectors", []),
+                "distance_m": float(mate.get("distance_m", 0.0) or 0.0),
+                "angle_deg": float(mate.get("angle_deg", 0.0) or 0.0),
+                "angle_rad": float(mate.get("angle_rad", 0.0) or 0.0),
+                "flip": bool(mate.get("flip", False)),
                 "execution_actions": group.get("execution_actions", []),
                 "verification": group.get("verification", []),
             })

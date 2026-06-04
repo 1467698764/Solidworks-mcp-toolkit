@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -293,6 +294,9 @@ def planned_mate(item: dict[str, Any]) -> dict[str, Any]:
         "mate_type": str(item.get("mate_type", "")).casefold(),
         "expected_mate_name": item.get("expected_mate_name"),
         "components": item.get("components", []),
+        "distance_m": float(item.get("distance_m", 0.0) or 0.0),
+        "angle_rad": mate_angle_rad(item),
+        "flip": bool(item.get("flip", False)),
         "selection_actions": [selection_action(selector, append=index > 0) for index, selector in enumerate(selectors)],
     }
 
@@ -487,12 +491,28 @@ def execute_repair_action(assembly: Any, action: dict[str, Any]) -> dict[str, An
     }
 
 
+def mate_angle_rad(item: dict[str, Any]) -> float:
+    raw_rad = item.get("angle_rad")
+    if raw_rad not in (None, ""):
+        try:
+            return float(raw_rad)
+        except (TypeError, ValueError):
+            return 0.0
+    raw_deg = item.get("angle_deg")
+    if raw_deg not in (None, ""):
+        try:
+            return math.radians(float(raw_deg))
+        except (TypeError, ValueError):
+            return 0.0
+    return 0.0
+
+
 def add_selected_mate(assembly: Any, item: dict[str, Any]) -> dict[str, Any]:
     mate_type = str(item.get("mate_type", "")).casefold()
     if mate_type not in MATE_TYPES:
         return {"ok": False, "error": "unsupported_mate_type", "mate_type": mate_type}
     distance = float(item.get("distance_m", 0.0) or 0.0)
-    angle = float(item.get("angle_rad", 0.0) or 0.0)
+    angle = mate_angle_rad(item)
     mate_error = 0
     feature = assembly.AddMate5(
         MATE_TYPES[mate_type],
@@ -522,6 +542,8 @@ def add_selected_mate(assembly: Any, item: dict[str, Any]) -> dict[str, Any]:
         "api": "AddMate5",
         "mate_type": mate_type,
         "expected_mate_name": item.get("expected_mate_name"),
+        "distance_m": distance,
+        "angle_rad": angle,
         "mate_error": mate_error,
     }
 
