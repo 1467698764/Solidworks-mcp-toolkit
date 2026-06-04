@@ -1,6 +1,6 @@
 # SolidWorks Codex Current Readiness Report
 
-- Timestamp: `2026-06-04T17:01:03`
+- Timestamp: `2026-06-04T17:08:22`
 - Branch: `main`
 - Current stance: evidence-first SolidWorks MCP/control layer with offline gates, MCP smoke, validation profiles, and opt-in live SolidWorks validation.
 - Audit OK: `True`

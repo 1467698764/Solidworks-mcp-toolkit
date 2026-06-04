@@ -182,21 +182,31 @@ def diagnose(report: dict[str, Any], *, lock_root: Path | None = None, near_tole
     mates = normalized_mates(doc)
     adjacency: dict[str, set[str]] = {name: set() for name in names}
     mate_edges: list[dict[str, Any]] = []
+    mate_details: list[dict[str, Any]] = []
     bad_mates: list[str] = []
     no_participants: list[str] = []
 
     for mate in mates:
         participants = mate_component_names(mate, known)
+        bad = mate_is_bad(mate)
+        mate_details.append({
+            "name": str(mate.get("name")),
+            "mate_type": mate.get("type") or mate.get("mate_type"),
+            "participants": participants,
+            "suppressed": mate.get("suppressed") is True,
+            "status": mate.get("status", mate.get("solver_status")),
+            "mate_error": mate.get("mate_error"),
+            "bad": bad,
+        })
         if len(participants) < 2:
             no_participants.append(str(mate.get("name")))
         else:
             left, right = participants[0], participants[1]
-            bad = mate_is_bad(mate)
             if not bad:
                 adjacency.setdefault(left, set()).add(right)
                 adjacency.setdefault(right, set()).add(left)
             mate_edges.append({"mate": mate.get("name"), "type": mate.get("type"), "components": [left, right], "bad": bad})
-        if mate_is_bad(mate):
+        if bad:
             bad_mates.append(str(mate.get("name")))
 
     no_mate = sorted(name for name in names if not adjacency.get(name))
@@ -271,10 +281,12 @@ def diagnose(report: dict[str, Any], *, lock_root: Path | None = None, near_tole
             "mate_count": len(mates),
             "bad_mates": sorted(bad_mates),
             "without_component_readback": sorted(no_participants),
+            "details": sorted(mate_details, key=lambda item: item["name"]),
             "edges": mate_edges,
         },
         "mate_graph": {
             "mate_type_distribution": dict(sorted(Counter(str(m.get("type", "<unknown>")) for m in mates).items())),
+            "edges": sorted(mate_edges, key=lambda item: (str(item["mate"]), item["components"])),
             "no_mate_components": no_mate,
             "isolated_components": isolated,
             "connected_components": groups,

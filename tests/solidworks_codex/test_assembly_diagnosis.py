@@ -75,6 +75,16 @@ class AssemblyDiagnosisTests(unittest.TestCase):
             self.assertIn("bolt_m6-1", data["mate_graph"]["no_mate_components"])
             self.assertIn("bolt_m6-1", data["standard_parts"]["hostless"])
             self.assertEqual(data["mate_graph"]["mate_type_distribution"]["MateConcentric"], 2)
+            mate_details = {item["name"]: item for item in data["mates"]["details"]}
+            broken = mate_details["Broken_Mate"]
+            self.assertEqual(broken["mate_type"], "MateDistanceDim")
+            self.assertEqual(broken["participants"], ["cover_plate-1", "loose_handle-1"])
+            self.assertTrue(broken["suppressed"])
+            self.assertEqual(broken["status"], "unsolved")
+            self.assertEqual(broken["mate_error"], 4)
+            self.assertTrue(broken["bad"])
+            graph_edges = {(item["mate"], tuple(item["components"]), item["bad"]) for item in data["mate_graph"]["edges"]}
+            self.assertIn(("Base_Cover_Coincident", ("base_plate-1", "cover_plate-1"), False), graph_edges)
             self.assertIn("Broken_Mate", data["mates"]["bad_mates"])
             self.assertTrue(any(pair["a"] == "base_plate-1" and pair["b"] == "cover_plate-1" for pair in data["spatial"]["near_or_touching_pairs"]))
             self.assertFalse(any(item["kind"] == "isolated_functional_component" for item in data["findings"]["blocking"]))
