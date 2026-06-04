@@ -187,7 +187,7 @@ const toolSchemas = [
   {
     name: 'solidworks_mate_macro',
     description: 'Generate reviewable VBA macro for adding a mate between two preselected entities.',
-    inputSchema: { type: 'object', properties: { mate: { type: 'string', enum: ['coincident','concentric','tangent','distance','limit_distance','angle','limit_angle','parallel','perpendicular','symmetry','cam','cam_follower','gear'] }, distance_mm: { type: 'number' }, distance_min_mm: { type: 'number' }, distance_max_mm: { type: 'number' }, angle_deg: { type: 'number' }, angle_min_deg: { type: 'number' }, angle_max_deg: { type: 'number' }, gear_ratio_numerator: { type: 'number' }, gear_ratio_denominator: { type: 'number' }, flip: { type: 'boolean' }, out: { type: 'string' }, manifest: { type: 'string' } }, required: ['mate'], additionalProperties: false }
+    inputSchema: { type: 'object', properties: { mate: { type: 'string', enum: ['coincident','concentric','tangent','distance','limit_distance','angle','limit_angle','parallel','perpendicular','symmetry','cam','cam_follower','gear','slot'] }, distance_mm: { type: 'number' }, distance_min_mm: { type: 'number' }, distance_max_mm: { type: 'number' }, angle_deg: { type: 'number' }, angle_min_deg: { type: 'number' }, angle_max_deg: { type: 'number' }, gear_ratio_numerator: { type: 'number' }, gear_ratio_denominator: { type: 'number' }, slot_constraint_type: { type: 'integer' }, slot_distance_mm: { type: 'number' }, slot_percent: { type: 'number' }, flip: { type: 'boolean' }, out: { type: 'string' }, manifest: { type: 'string' } }, required: ['mate'], additionalProperties: false }
   },
   {
     name: 'solidworks_mate_group_macro',
@@ -509,6 +509,9 @@ async function callTool(name, input) {
       if (input?.angle_max_deg !== undefined) args.push('-AngleMaxDeg', String(input.angle_max_deg));
       if (input?.gear_ratio_numerator !== undefined) args.push('-GearRatioNumerator', String(input.gear_ratio_numerator));
       if (input?.gear_ratio_denominator !== undefined) args.push('-GearRatioDenominator', String(input.gear_ratio_denominator));
+      if (input?.slot_constraint_type !== undefined) args.push('-SlotConstraintType', String(input.slot_constraint_type));
+      if (input?.slot_distance_mm !== undefined) args.push('-SlotDistanceMm', String(input.slot_distance_mm));
+      if (input?.slot_percent !== undefined) args.push('-SlotPercent', String(input.slot_percent));
       if (input?.flip) args.push('-Flip');
       if (input?.out) args.push('-Out', input.out);
       if (input?.manifest) args.push('-Manifest', input.manifest);

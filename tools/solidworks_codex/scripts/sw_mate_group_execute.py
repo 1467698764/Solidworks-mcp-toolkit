@@ -23,6 +23,7 @@ MATE_TYPES = {
     "cam_follower": 9,
     "gear": 10,
     "width": 11,
+    "slot": 21,
 }
 
 FALLBACK_SELECT_TYPES = {
@@ -395,6 +396,9 @@ def planned_mate(item: dict[str, Any]) -> dict[str, Any]:
         "angle_max_rad": optional_angle_rad(item, "angle_max_rad", "angle_max_deg"),
         "width_constraint_type": int(item.get("width_constraint_type", item.get("constraint_type", 0)) or 0),
         "width_distance_m": optional_float(item.get("width_distance_m")),
+        "slot_constraint_type": int(item.get("slot_constraint_type", item.get("constraint_type", 0)) or 0),
+        "slot_distance_m": optional_float(item.get("slot_distance_m")),
+        "slot_percent": optional_float(item.get("slot_percent")),
         "gear_ratio_numerator": float(item.get("gear_ratio_numerator", 1.0) or 1.0),
         "gear_ratio_denominator": float(item.get("gear_ratio_denominator", 1.0) or 1.0),
         "flip": bool(item.get("flip", False)),
@@ -740,6 +744,50 @@ def add_width_mate(assembly: Any, item: dict[str, Any], select_reports: list[dic
     }
 
 
+def add_slot_mate(assembly: Any, item: dict[str, Any], select_reports: list[dict[str, Any]]) -> dict[str, Any]:
+    entities = [report.get("entity") for report in select_reports]
+    if len(entities) != 2 or any(entity is None for entity in entities):
+        return {"ok": False, "error": "slot_mate_requires_two_native_entities", "mate_type": "slot"}
+    create_data = getattr(assembly, "CreateMateData", None)
+    create_mate = getattr(assembly, "CreateMate", None)
+    if not callable(create_data) or not callable(create_mate):
+        return {"ok": False, "error": "slot_mate_create_data_unavailable", "mate_type": "slot"}
+    data = create_data(MATE_TYPES["slot"])
+    data.EntitiesToMate = entities
+    constraint_type = int(item.get("slot_constraint_type", item.get("constraint_type", 0)) or 0)
+    for attr in ("Constraint", "ConstraintType"):
+        try:
+            setattr(data, attr, constraint_type)
+        except Exception:
+            pass
+    if item.get("slot_distance_m") not in (None, ""):
+        try:
+            data.Distance = float(item["slot_distance_m"])
+        except (TypeError, ValueError):
+            pass
+    if item.get("slot_percent") not in (None, ""):
+        try:
+            data.Percent = float(item["slot_percent"])
+        except (TypeError, ValueError):
+            pass
+    feature = create_mate(data)
+    if feature is not None and item.get("expected_mate_name"):
+        try:
+            feature.Name = str(item["expected_mate_name"])
+        except Exception:
+            pass
+    return {
+        "ok": feature is not None,
+        "api": "CreateMateData/CreateMate",
+        "mate_type": "slot",
+        "expected_mate_name": item.get("expected_mate_name"),
+        "slot_constraint_type": constraint_type,
+        "slot_distance_m": getattr(data, "Distance", None),
+        "slot_percent": getattr(data, "Percent", None),
+        "entities_to_mate_count": len(getattr(data, "EntitiesToMate", [])),
+    }
+
+
 def execute_manifest(manifest: dict[str, Any], assembly: Any) -> dict[str, Any]:
     findings: dict[str, list[dict[str, Any]]] = {"blocking": [], "warning": [], "accepted": []}
     executed_actions: list[dict[str, Any]] = []
@@ -818,7 +866,12 @@ def execute_manifest(manifest: dict[str, Any], assembly: Any) -> dict[str, Any]:
                 "detail": guard,
             })
             continue
-        mate_result = add_width_mate(assembly, item, select_reports) if plan["mate_type"] == "width" else add_selected_mate(assembly, item)
+        if plan["mate_type"] == "width":
+            mate_result = add_width_mate(assembly, item, select_reports)
+        elif plan["mate_type"] == "slot":
+            mate_result = add_slot_mate(assembly, item, select_reports)
+        else:
+            mate_result = add_selected_mate(assembly, item)
         mate_result["selection_guard"] = guard
         mate_result["selected_entities"] = count
         if mate_result["ok"]:

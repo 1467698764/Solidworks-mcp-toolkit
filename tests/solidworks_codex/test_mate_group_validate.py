@@ -190,6 +190,77 @@ class MateGroupValidateTests(unittest.TestCase):
             kinds = {item["kind"] for item in data["findings"]["blocking"]}
             self.assertIn("width_selector_count", kinds)
 
+    def test_accepts_slot_group_and_blocks_invalid_slot_constraints(self):
+        plan = self.good_plan()
+        slot_mate = {
+            "type": "slot",
+            "slot_constraint_type": 1,
+            "selection_selectors": [
+                {"stable_id": "slot:centerline", "fallback": {"type": "slot_centerline"}},
+                {"stable_id": "pin:axis", "fallback": {"type": "cylindrical_axis"}},
+            ],
+        }
+        plan["mate_groups"][0]["suggested_mates"] = [slot_mate]
+        plan["mate_groups"][0]["dof_expectation"] = {
+            "intent": "pin_follows_slot",
+            "remaining_dof": ["translation_along_slot"],
+        }
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            plan_path = root / "mate_group_plan.json"
+            out = root / "validation.json"
+            plan_path.write_text(json.dumps(plan), encoding="utf-8")
+
+            proc = run_py("--mate-group-plan", str(plan_path), "--out", str(out))
+
+            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+            data = json.loads(out.read_text(encoding="utf-8-sig"))
+            self.assertTrue(data["ok"], data)
+
+        plan["mate_groups"][0]["suggested_mates"][0]["selection_selectors"] = slot_mate["selection_selectors"][:1]
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            plan_path = root / "mate_group_plan.json"
+            out = root / "validation.json"
+            plan_path.write_text(json.dumps(plan), encoding="utf-8")
+
+            proc = run_py("--mate-group-plan", str(plan_path), "--out", str(out))
+
+            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+            data = json.loads(out.read_text(encoding="utf-8-sig"))
+            kinds = {item["kind"] for item in data["findings"]["blocking"]}
+            self.assertIn("slot_selector_count", kinds)
+
+        plan["mate_groups"][0]["suggested_mates"][0]["selection_selectors"] = slot_mate["selection_selectors"]
+        plan["mate_groups"][0]["suggested_mates"][0]["slot_constraint_type"] = 2
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            plan_path = root / "mate_group_plan.json"
+            out = root / "validation.json"
+            plan_path.write_text(json.dumps(plan), encoding="utf-8")
+
+            proc = run_py("--mate-group-plan", str(plan_path), "--out", str(out))
+
+            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+            data = json.loads(out.read_text(encoding="utf-8-sig"))
+            kinds = {item["kind"] for item in data["findings"]["blocking"]}
+            self.assertIn("slot_distance_required", kinds)
+
+        plan["mate_groups"][0]["suggested_mates"][0]["slot_constraint_type"] = 3
+        plan["mate_groups"][0]["suggested_mates"][0]["slot_percent"] = 125.0
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            plan_path = root / "mate_group_plan.json"
+            out = root / "validation.json"
+            plan_path.write_text(json.dumps(plan), encoding="utf-8")
+
+            proc = run_py("--mate-group-plan", str(plan_path), "--out", str(out))
+
+            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+            data = json.loads(out.read_text(encoding="utf-8-sig"))
+            kinds = {item["kind"] for item in data["findings"]["blocking"]}
+            self.assertIn("slot_percent_range", kinds)
+
     def test_accepts_symmetry_group_with_three_selectors_and_blocks_short_selector_list(self):
         plan = self.good_plan()
         symmetry_mate = {

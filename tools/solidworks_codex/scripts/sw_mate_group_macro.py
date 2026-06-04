@@ -12,7 +12,7 @@ from typing import Any
 from sw_mate_macro import MATE_TYPES, macro
 
 
-SUPPORTED_TYPES = {"coincident", "concentric", "tangent", "distance", "limit_distance", "angle", "limit_angle", "parallel", "perpendicular", "symmetry", "cam", "cam_follower", "gear", "width"}
+SUPPORTED_TYPES = {"coincident", "concentric", "tangent", "distance", "limit_distance", "angle", "limit_angle", "parallel", "perpendicular", "symmetry", "cam", "cam_follower", "gear", "width", "slot"}
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -54,6 +54,9 @@ def annotated_macro(group: dict[str, Any], mate: dict[str, Any], mate_name: str)
             angle_degrees(mate, "angle_max_deg", "angle_max_rad"),
             float(mate.get("gear_ratio_numerator", 1.0) or 1.0),
             float(mate.get("gear_ratio_denominator", 1.0) or 1.0),
+            int(mate.get("slot_constraint_type", mate.get("constraint_type", 0)) or 0),
+            float(mate["slot_distance_m"]) if mate.get("slot_distance_m") not in (None, "") else None,
+            float(mate["slot_percent"]) if mate.get("slot_percent") not in (None, "") else None,
         )
     base = base.replace(
         "    Part.ForceRebuild3 False",
@@ -158,6 +161,9 @@ def build_macros(plan: dict[str, Any], *, out_dir: Path) -> dict[str, Any]:
                 "gear_ratio_denominator": float(mate.get("gear_ratio_denominator", 1.0) or 1.0),
                 "width_constraint_type": int(mate.get("width_constraint_type", mate.get("constraint_type", 0)) or 0),
                 "width_distance_m": float(mate["width_distance_m"]) if mate.get("width_distance_m") not in (None, "") else None,
+                "slot_constraint_type": int(mate.get("slot_constraint_type", mate.get("constraint_type", 0)) or 0),
+                "slot_distance_m": float(mate["slot_distance_m"]) if mate.get("slot_distance_m") not in (None, "") else None,
+                "slot_percent": float(mate["slot_percent"]) if mate.get("slot_percent") not in (None, "") else None,
                 "flip": bool(mate.get("flip", False)),
                 "execution_actions": group.get("execution_actions", []),
                 "verification": group.get("verification", []),

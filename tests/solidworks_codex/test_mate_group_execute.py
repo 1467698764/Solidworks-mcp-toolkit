@@ -161,10 +161,13 @@ class FakeFeature:
 class FakeMateData:
     def __init__(self, mate_type):
         self.Type = mate_type
+        self.EntitiesToMate = []
         self.WidthSelection = []
         self.TabSelection = []
+        self.Constraint = None
         self.ConstraintType = None
         self.Distance = None
+        self.Percent = None
 
 
 class FakeAssembly:
@@ -359,6 +362,91 @@ class MateGroupExecuteTests(unittest.TestCase):
         guard = result["executed_mates"][0]["selection_guard"]
         self.assertEqual([call["method"] for call in guard["select_by_id_calls"]], ["Edge.Select4", "Edge.Select4"])
         self.assertEqual(asm.Extension.calls, [])
+
+    def test_executes_slot_mate_with_native_slot_centerline_edges(self):
+        manifest = self.manifest()
+        manifest["macros"][0]["mate_type"] = "slot"
+        manifest["macros"][0]["expected_mate_name"] = "MG_slot_slider_01_slot"
+        manifest["macros"][0]["slot_constraint_type"] = 1
+        manifest["macros"][0]["selection_selectors"] = [
+            {
+                "stable_id": "slot_carrier-1:slot:centerline",
+                "component": "slot_carrier-1",
+                "fallback": {
+                    "type": "slot_centerline",
+                    "axis": [1.0, 0.0, 0.0],
+                    "centerline_m": {"start": [-0.03, 0.0, 0.0], "end": [0.03, 0.0, 0.0]},
+                },
+            },
+            {
+                "stable_id": "slider_pin-1:cylinder:pin_axis",
+                "component": "slider_pin-1",
+                "fallback": {
+                    "type": "cylindrical_axis",
+                    "axis": [1.0, 0.0, 0.0],
+                    "origin_m": [0.0, 0.0, 0.0],
+                    "radius_m": 0.006,
+                },
+            },
+        ]
+        slot_edge = FakeEdge(FakeCurve([0.0, 0.0, 0.0, 1.0, 0.0, 0.0]), [-0.03, -0.001, -0.001, 0.03, 0.001, 0.001])
+        pin_face = FakeFace(
+            FakeSurface("cylinder", [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.006]),
+            [-0.006, -0.006, -0.006, 0.006, 0.006, 0.006],
+        )
+        asm = FakeAssembly([
+            FakeComponent("slot_carrier-1", [], [slot_edge]),
+            FakeComponent("slider_pin-1", [pin_face]),
+        ])
+
+        result = mod.execute_manifest(manifest, asm)
+
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(result["executed_mates"][0]["api"], "CreateMateData/CreateMate")
+        self.assertEqual(result["executed_mates"][0]["mate_type"], "slot")
+        self.assertEqual(result["executed_mates"][0]["slot_constraint_type"], 1)
+        self.assertEqual(asm.mate_data[0].Type, mod.MATE_TYPES["slot"])
+        self.assertEqual(asm.mate_data[0].EntitiesToMate, [slot_edge, pin_face])
+        self.assertEqual(asm.mate_data[0].Constraint, 1)
+        self.assertEqual(slot_edge.select_calls, [(False, {"mark": 0})])
+        self.assertEqual(pin_face.select_calls, [(True, {"mark": 0})])
+        guard = result["executed_mates"][0]["selection_guard"]
+        self.assertEqual([call["method"] for call in guard["select_by_id_calls"]], ["Edge.Select4", "Face.Select4"])
+        self.assertNotIn("entity", guard["selection_reports"][0])
+
+    def test_executes_slot_distance_and_percent_constraints(self):
+        manifest = self.manifest()
+        manifest["macros"][0]["mate_type"] = "slot"
+        manifest["macros"][0]["slot_constraint_type"] = 2
+        manifest["macros"][0]["slot_distance_m"] = 0.018
+        edge_one = FakeEdge(FakeCurve([0.0, 0.0, 0.0, 1.0, 0.0, 0.0]), [-0.03, -0.001, -0.001, 0.03, 0.001, 0.001])
+        edge_two = FakeEdge(FakeCurve([0.0, 0.02, 0.0, 1.0, 0.0, 0.0]), [-0.03, 0.019, -0.001, 0.03, 0.021, 0.001])
+        manifest["macros"][0]["selection_selectors"] = [
+            {"stable_id": "slot-1:centerline", "component": "slot-1", "fallback": {"type": "slot_centerline", "axis": [1, 0, 0], "origin_m": [0, 0, 0]}},
+            {"stable_id": "pin-1:centerline", "component": "pin-1", "fallback": {"type": "slot_centerline", "axis": [1, 0, 0], "origin_m": [0, 0.02, 0]}},
+        ]
+        distance_asm = FakeAssembly([FakeComponent("slot-1", [], [edge_one]), FakeComponent("pin-1", [], [edge_two])])
+
+        distance_result = mod.execute_manifest(manifest, distance_asm)
+
+        self.assertTrue(distance_result["ok"], distance_result)
+        self.assertEqual(distance_asm.mate_data[0].Constraint, 2)
+        self.assertEqual(distance_asm.mate_data[0].Distance, 0.018)
+        self.assertEqual(distance_result["executed_mates"][0]["slot_distance_m"], 0.018)
+
+        percent_manifest = self.manifest()
+        percent_manifest["macros"][0]["mate_type"] = "slot"
+        percent_manifest["macros"][0]["slot_constraint_type"] = 3
+        percent_manifest["macros"][0]["slot_percent"] = 42.5
+        percent_manifest["macros"][0]["selection_selectors"] = manifest["macros"][0]["selection_selectors"]
+        percent_asm = FakeAssembly([FakeComponent("slot-1", [], [edge_one]), FakeComponent("pin-1", [], [edge_two])])
+
+        percent_result = mod.execute_manifest(percent_manifest, percent_asm)
+
+        self.assertTrue(percent_result["ok"], percent_result)
+        self.assertEqual(percent_asm.mate_data[0].Constraint, 3)
+        self.assertEqual(percent_asm.mate_data[0].Percent, 42.5)
+        self.assertEqual(percent_result["executed_mates"][0]["slot_percent"], 42.5)
 
     def test_executes_tangent_mate_with_native_cylinder_and_plane_faces(self):
         manifest = self.manifest()

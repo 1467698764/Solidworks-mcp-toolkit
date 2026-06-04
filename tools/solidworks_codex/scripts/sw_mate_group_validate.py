@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 
-SUPPORTED_MATES = {"coincident", "concentric", "tangent", "distance", "limit_distance", "angle", "limit_angle", "parallel", "perpendicular", "symmetry", "cam", "cam_follower", "gear", "width", "recreate_from_current_interfaces"}
+SUPPORTED_MATES = {"coincident", "concentric", "tangent", "distance", "limit_distance", "angle", "limit_angle", "parallel", "perpendicular", "symmetry", "cam", "cam_follower", "gear", "width", "slot", "recreate_from_current_interfaces"}
 REQUIRED_VERIFICATION = {"rebuild", "mate_errors"}
 AXIAL_LOCATOR_MATES = {"coincident", "distance"}
 AXIAL_LOCATOR_ROLES = {"axial_seating_locator", "axial_offset_locator"}
@@ -25,6 +25,16 @@ def add(findings: dict[str, list[dict[str, Any]]], severity: str, kind: str, gro
         "detail": detail,
         "reason": reason,
     })
+
+
+def finite_float(value: Any) -> float | None:
+    if value in (None, ""):
+        return None
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed
 
 
 def validate(plan: dict[str, Any]) -> dict[str, Any]:
@@ -52,6 +62,20 @@ def validate(plan: dict[str, Any]) -> dict[str, Any]:
             selectors = [item for item in mate.get("selection_selectors", []) if isinstance(item, dict)]
             if mate_type == "width" and selectors and len(selectors) != 4:
                 add(findings, "blocking", "width_selector_count", group_id, {"count": len(selectors), "selectors": selectors}, "width mates require four reviewed face selectors: two width faces and two tab faces")
+            if mate_type == "slot":
+                if selectors and len(selectors) != 2:
+                    add(findings, "blocking", "slot_selector_count", group_id, {"count": len(selectors), "selectors": selectors}, "slot mates require two reviewed selectors: a slot path entity and a mating pin/edge/axis entity")
+                constraint = finite_float(mate.get("slot_constraint_type", mate.get("constraint_type", 0)))
+                if constraint is None or not constraint.is_integer() or int(constraint) not in {0, 1, 2, 3}:
+                    add(findings, "blocking", "slot_constraint_type", group_id, mate.get("slot_constraint_type", mate.get("constraint_type")), "slot constraint type must be 0 free, 1 center, 2 distance, or 3 percent")
+                elif int(constraint) == 2:
+                    distance_m = finite_float(mate.get("slot_distance_m"))
+                    if distance_m is None or distance_m < 0:
+                        add(findings, "blocking", "slot_distance_required", group_id, mate.get("slot_distance_m"), "distance slot mates require a non-negative slot_distance_m")
+                elif int(constraint) == 3:
+                    percent = finite_float(mate.get("slot_percent"))
+                    if percent is None or percent < 0 or percent > 100:
+                        add(findings, "blocking", "slot_percent_range", group_id, mate.get("slot_percent"), "percent slot mates require slot_percent between 0 and 100")
             if mate_type == "symmetry" and selectors and len(selectors) != 3:
                 add(findings, "blocking", "symmetry_selector_count", group_id, {"count": len(selectors), "selectors": selectors}, "symmetry mates require three reviewed selectors: two symmetric entities and one symmetry plane")
             if mate_type == "gear":
