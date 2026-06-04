@@ -181,6 +181,7 @@ Do not treat an old `complete_shaper_build.json` with `ok: true` as current trut
 ## Handoff workflow
 
 `workflow-plan` maps `-Target` to the overall CAD goal, `-Action` to intent (`single_part`, `part_to_assembly`, `assembly`, or `mechanism_assembly`), and `-View` to runtime budget (`fast`, `standard`, `strict`; `auto` uses `standard`).
+Its JSON output includes an `assumption_ledger` artifact that separates `assumption`, `warning`, and `blocker` items for dimensions, materials, simplified geometry, validation scope, write safety, assembly interfaces, and mechanism evidence. Treat blocker entries as stage gates until the required evidence or an explicit rescope is recorded.
 
 ```powershell
 .\tools\solidworks_codex\swctl.ps1 workflow-plan -Target "design a checked bracket part and insert it into an assembly for placement and interference validation" -Action part_to_assembly -View fast -Out tools\solidworks_codex\reports\workflow_plan.md -JsonOut tools\solidworks_codex\reports\workflow_plan.json

@@ -217,6 +217,68 @@ def candidate_actions(intent: str) -> list[dict[str, str]]:
     return actions
 
 
+def assumption_ledger(goal: str, intent: str, runtime_budget: str) -> dict[str, Any]:
+    items = [
+        {
+            "topic": "dimensions",
+            "severity": "assumption",
+            "statement": "Dimensions not stated in the goal are placeholders until inspect evidence, user constraints, or a design brief records exact values.",
+            "required_resolution": "Record key driving dimensions before creating or editing native geometry.",
+            "blocks_stage": "",
+        },
+        {
+            "topic": "materials",
+            "severity": "assumption",
+            "statement": "Material, density, finish, and manufacturing process are unknown unless the source model or goal names them.",
+            "required_resolution": "Keep material-dependent mass, strength, and DFM/DFA checks as warnings unless the selected profile requires them.",
+            "blocks_stage": "",
+        },
+        {
+            "topic": "simplified_geometry",
+            "severity": "warning",
+            "statement": "Templates and generated macros may simplify fillets, chamfers, threads, cosmetic details, and vendor hardware.",
+            "required_resolution": "List omitted or simplified features in worklog/handoff before accepting the artifact.",
+            "blocks_stage": "",
+        },
+        {
+            "topic": "validation_scope",
+            "severity": "warning",
+            "statement": f"The `{runtime_budget}` runtime budget controls how expensive validation can be for `{intent}` intent.",
+            "required_resolution": "Escalate to strict validation or add explicit extra_checks when the task is release-like or safety-critical.",
+            "blocks_stage": "",
+        },
+        {
+            "topic": "native_write_safety",
+            "severity": "blocker",
+            "statement": "Any native file mutation without a backup target and rollback path is blocked.",
+            "required_resolution": "Run backup or safe-set-dimension and record backup_status before a write command.",
+            "blocks_stage": "part_model",
+        },
+    ]
+    if intent in {"part_to_assembly", "assembly", "mechanism_assembly"}:
+        items.append({
+            "topic": "assembly_interfaces",
+            "severity": "blocker",
+            "statement": "Assembly mates or placement changes are blocked when target interfaces/components cannot be identified from inspect, selection, or interface-index evidence.",
+            "required_resolution": "Run inspect/model-understand/interface-index/selection-report before creating mate macros or accepting component placement.",
+            "blocks_stage": "assembly_insert",
+        })
+    if intent == "mechanism_assembly":
+        items.append({
+            "topic": "motion_evidence",
+            "severity": "blocker",
+            "statement": "Mechanism acceptance is blocked when DOF intent, limit positions, or collision sampling evidence is absent.",
+            "required_resolution": "Run mechanism-profile checks and record unresolved DOF or motion-sweep gaps before handoff.",
+            "blocks_stage": "motion_or_dof_check",
+        })
+    return {
+        "artifact": "assumption_ledger",
+        "goal_excerpt": goal[:160],
+        "items": items,
+        "acceptance_rule": "Reports must distinguish assumption, warning, and blocker; blockers stop the named stage until resolved or explicitly rescoped.",
+    }
+
+
 def build_plan(goal: str, intent: str, runtime_budget: str) -> dict[str, Any]:
     normalized_intent = normalize_intent(intent)
     budget = normalize_budget(runtime_budget)
@@ -242,6 +304,7 @@ def build_plan(goal: str, intent: str, runtime_budget: str) -> dict[str, Any]:
         "stage_graph": stages,
         "feedback_edges": feedback_edges(normalized_intent),
         "candidate_actions": candidate_actions(normalized_intent),
+        "assumption_ledger": assumption_ledger(goal, normalized_intent, budget),
         "principle": "Compose small evidence loops: design, model, inspect, adjust, assemble, inspect again.",
     }
 
@@ -271,6 +334,12 @@ def markdown(plan: dict[str, Any]) -> str:
     lines.extend(["## Feedback Edges", ""])
     for edge in plan["feedback_edges"]:
         lines.append(f"- `{edge['from']}` -> `{edge['to']}` when {edge['condition']}")
+    ledger = plan.get("assumption_ledger") or {}
+    lines.extend(["", "## Assumption Ledger", ""])
+    lines.append(f"- Acceptance rule: {ledger.get('acceptance_rule', '')}")
+    for item in ledger.get("items", []):
+        blocked = f"; blocks `{item['blocks_stage']}`" if item.get("blocks_stage") else ""
+        lines.append(f"- `{item['severity']}` `{item['topic']}`: {item['statement']} Resolution: {item['required_resolution']}{blocked}")
     lines.extend(["", "## Candidate Actions", ""])
     for action in plan["candidate_actions"]:
         lines.append(f"- `{action['tool']}`: {action['why']}")

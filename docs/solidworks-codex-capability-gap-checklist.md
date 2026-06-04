@@ -106,7 +106,7 @@ Status values:
 | --- | --- | --- | --- |
 | Parse user goal into CAD scope | partial | Separate part, assembly, mechanism, validation-only, and modification requests. | Tool records profile and non-goals before live mutation. |
 | Mechanical decomposition | partial | Parts, subassemblies, standard parts, interfaces, motion pairs, references. | Design intent can be inspected without reading generator code. |
-| Assumption ledger | missing | Dimensions, materials, omitted features, simplified geometry, unavailable checks. | Report distinguishes assumption, warning, and blocker. |
+| Assumption ledger | present | `workflow-plan` emits a machine-readable `assumption_ledger` covering dimensions, materials, simplified geometry, validation scope, write safety, assembly interfaces, and mechanism motion evidence where applicable. | Report distinguishes assumption, warning, and blocker; blockers name the stage they stop. |
 | Validation profile selection | partial | Choose light/heavy checks based on task. | Small part tasks are not blocked by mechanism checks; mechanisms are not accepted by smoke checks. |
 | Cost/runtime budget | partial | Expected SolidWorks sessions, rebuild scope, memory ceiling, timeout, cleanup. | Live plan says when a full rebuild is justified. |
 
