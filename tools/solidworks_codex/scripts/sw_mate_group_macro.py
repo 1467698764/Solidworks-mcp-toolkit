@@ -12,7 +12,7 @@ from typing import Any
 from sw_mate_macro import MATE_TYPES, macro
 
 
-SUPPORTED_TYPES = {"coincident", "concentric", "tangent", "distance", "limit_distance", "angle", "limit_angle", "parallel", "perpendicular", "width"}
+SUPPORTED_TYPES = {"coincident", "concentric", "tangent", "distance", "limit_distance", "angle", "limit_angle", "parallel", "perpendicular", "symmetry", "width"}
 
 
 def load_json(path: Path) -> dict[str, Any]:

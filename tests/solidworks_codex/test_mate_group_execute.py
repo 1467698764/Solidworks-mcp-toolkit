@@ -470,6 +470,46 @@ class MateGroupExecuteTests(unittest.TestCase):
         self.assertEqual(asm.mate_data[0].TabSelection, [slider_left_face, slider_right_face])
         self.assertNotIn("entity", result["executed_mates"][0]["selection_guard"]["selection_reports"][0])
 
+    def test_executes_symmetry_mate_with_two_faces_and_reference_plane(self):
+        manifest = self.manifest()
+        manifest["macros"][0]["mate_type"] = "symmetry"
+        manifest["macros"][0]["expected_mate_name"] = "MG_left_right_01_symmetry"
+        manifest["macros"][0]["selection_selectors"] = [
+            {
+                "stable_id": "left_tab-1:plane:y_max",
+                "component": "left_tab-1",
+                "fallback": {"type": "bbox_planar_face", "normal": [0.0, 1.0, 0.0], "origin_m": [0.0, -0.02, 0.0]},
+            },
+            {
+                "stable_id": "right_tab-1:plane:y_min",
+                "component": "right_tab-1",
+                "fallback": {"type": "bbox_planar_face", "normal": [0.0, -1.0, 0.0], "origin_m": [0.0, 0.02, 0.0]},
+            },
+            {
+                "stable_id": "frame-1:plane:center",
+                "component": "frame-1",
+                "fallback": {"type": "bbox_planar_face", "normal": [0.0, 1.0, 0.0], "origin_m": [0.0, 0.0, 0.0]},
+            },
+        ]
+        left_face = FakeFace(FakeSurface("plane", [0.0, -0.02, 0.0, 0.0, 1.0, 0.0]), [-0.02, -0.021, -0.01, 0.02, -0.019, 0.01])
+        right_face = FakeFace(FakeSurface("plane", [0.0, 0.02, 0.0, 0.0, -1.0, 0.0]), [-0.02, 0.019, -0.01, 0.02, 0.021, 0.01])
+        center_plane = FakeFace(FakeSurface("plane", [0.0, 0.0, 0.0, 0.0, 1.0, 0.0]), [-0.05, -0.001, -0.05, 0.05, 0.001, 0.05])
+        asm = FakeAssembly([
+            FakeComponent("left_tab-1", [left_face]),
+            FakeComponent("right_tab-1", [right_face]),
+            FakeComponent("frame-1", [center_plane]),
+        ])
+
+        result = mod.execute_manifest(manifest, asm)
+
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(asm.mates[0][0], mod.MATE_TYPES["symmetry"])
+        self.assertEqual(result["executed_mates"][0]["mate_type"], "symmetry")
+        self.assertEqual(result["executed_mates"][0]["selected_entities"], 3)
+        self.assertEqual(left_face.select_calls, [(False, {"mark": 0})])
+        self.assertEqual(right_face.select_calls, [(True, {"mark": 0})])
+        self.assertEqual(center_plane.select_calls, [(True, {"mark": 0})])
+
     def test_dry_run_reports_repair_actions_without_solidworks(self):
         manifest = self.manifest()
         manifest["execution_actions"] = [{"action": "suppress_mate", "target_mate": "Broken_Bolt_Mate"}]

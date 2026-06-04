@@ -18,6 +18,7 @@ MATE_TYPES = {
     "limit_distance": 5,
     "angle": 6,
     "limit_angle": 6,
+    "symmetry": 8,
     "width": 11,
 }
 
@@ -335,7 +336,11 @@ def selected_count(assembly: Any) -> int:
 
 
 def required_selector_count(mate_type: str) -> int:
-    return 4 if mate_type == "width" else 2
+    if mate_type == "width":
+        return 4
+    if mate_type == "symmetry":
+        return 3
+    return 2
 
 
 def public_select_report(report: dict[str, Any]) -> dict[str, Any]:

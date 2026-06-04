@@ -190,6 +190,47 @@ class MateGroupValidateTests(unittest.TestCase):
             kinds = {item["kind"] for item in data["findings"]["blocking"]}
             self.assertIn("width_selector_count", kinds)
 
+    def test_accepts_symmetry_group_with_three_selectors_and_blocks_short_selector_list(self):
+        plan = self.good_plan()
+        symmetry_mate = {
+            "type": "symmetry",
+            "selection_selectors": [
+                {"stable_id": "left_tab:face", "fallback": {"type": "bbox_planar_face"}},
+                {"stable_id": "right_tab:face", "fallback": {"type": "bbox_planar_face"}},
+                {"stable_id": "center_plane:face", "fallback": {"type": "bbox_planar_face"}},
+            ],
+        }
+        plan["mate_groups"][0]["suggested_mates"] = [symmetry_mate]
+        plan["mate_groups"][0]["dof_expectation"] = {
+            "intent": "symmetric_attachment",
+            "remaining_dof": [],
+        }
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            plan_path = root / "mate_group_plan.json"
+            out = root / "validation.json"
+            plan_path.write_text(json.dumps(plan), encoding="utf-8")
+
+            proc = run_py("--mate-group-plan", str(plan_path), "--out", str(out))
+
+            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+            data = json.loads(out.read_text(encoding="utf-8-sig"))
+            self.assertTrue(data["ok"], data)
+
+        plan["mate_groups"][0]["suggested_mates"][0]["selection_selectors"] = symmetry_mate["selection_selectors"][:2]
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            plan_path = root / "mate_group_plan.json"
+            out = root / "validation.json"
+            plan_path.write_text(json.dumps(plan), encoding="utf-8")
+
+            proc = run_py("--mate-group-plan", str(plan_path), "--out", str(out))
+
+            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+            data = json.loads(out.read_text(encoding="utf-8-sig"))
+            kinds = {item["kind"] for item in data["findings"]["blocking"]}
+            self.assertIn("symmetry_selector_count", kinds)
+
     def test_swctl_routes_mate_group_validate(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)

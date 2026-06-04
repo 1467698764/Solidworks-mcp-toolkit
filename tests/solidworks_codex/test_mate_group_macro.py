@@ -129,6 +129,15 @@ class MateGroupMacroTests(unittest.TestCase):
                                 {"stable_id": "slider-1:plane:y_max", "width_role": "tab_face", "fallback": {"type": "bbox_planar_face", "origin_m": [0, 0.01, 0]}},
                             ],
                         },
+                        {
+                            "type": "symmetry",
+                            "selection_intent": "keep mirrored tabs symmetric around frame center plane",
+                            "selection_selectors": [
+                                {"stable_id": "left_tab-1:plane:y_max", "symmetry_role": "first_entity", "fallback": {"type": "bbox_planar_face", "origin_m": [0, -0.02, 0]}},
+                                {"stable_id": "right_tab-1:plane:y_min", "symmetry_role": "second_entity", "fallback": {"type": "bbox_planar_face", "origin_m": [0, 0.02, 0]}},
+                                {"stable_id": "frame-1:plane:center", "symmetry_role": "symmetry_plane", "fallback": {"type": "bbox_planar_face", "origin_m": [0, 0, 0]}},
+                            ],
+                        },
                     ],
                     "verification": ["rebuild", "mate_errors"],
                 },
@@ -159,7 +168,7 @@ class MateGroupMacroTests(unittest.TestCase):
             self.assertEqual(data["document"]["title"], "macro_fixture.SLDASM")
             self.assertEqual(data["execution_actions"][0]["action"], "suppress_mate")
             self.assertEqual(data["execution_actions"][0]["target_mate"], "Broken_Bolt_Mate")
-            self.assertEqual(len(data["macros"]), 8)
+            self.assertEqual(len(data["macros"]), 9)
             self.assertEqual(data["macros"][0]["expected_mate_name"], "MG_standard_bolt_m6_1_01_concentric")
             self.assertEqual(len(data["macros"][0]["selection_selectors"]), 2)
             distance_macro = next(item for item in data["macros"] if item["mate_type"] == "distance")
@@ -168,6 +177,7 @@ class MateGroupMacroTests(unittest.TestCase):
             limit_distance_macro = next(item for item in data["macros"] if item["mate_type"] == "limit_distance")
             limit_angle_macro = next(item for item in data["macros"] if item["mate_type"] == "limit_angle")
             width_macro = next(item for item in data["macros"] if item["mate_type"] == "width")
+            symmetry_macro = next(item for item in data["macros"] if item["mate_type"] == "symmetry")
             self.assertEqual(distance_macro["distance_m"], 0.0125)
             self.assertEqual(angle_macro["angle_deg"], 30.0)
             self.assertTrue(angle_macro["flip"])
@@ -182,6 +192,10 @@ class MateGroupMacroTests(unittest.TestCase):
             self.assertIn("CreateMateData(11)", width_text)
             self.assertIn("WidthSelection", width_text)
             self.assertIn("TabSelection", width_text)
+            self.assertEqual(len(symmetry_macro["selection_selectors"]), 3)
+            symmetry_text = Path(symmetry_macro["macro"]).read_text(encoding="utf-8")
+            self.assertIn("Preselect exactly three mate entities", symmetry_text)
+            self.assertIn("Mate type: symmetry", symmetry_text)
             skipped_groups = {item["group_id"] for item in data["skipped"]}
             self.assertIn("classify_handle-1", skipped_groups)
             self.assertIn("repair_Broken_Bolt_Mate", skipped_groups)
@@ -220,7 +234,7 @@ class MateGroupMacroTests(unittest.TestCase):
 
             self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
             data = json.loads(manifest.read_text(encoding="utf-8-sig"))
-            self.assertEqual(len(data["macros"]), 8)
+            self.assertEqual(len(data["macros"]), 9)
 
     def test_swctl_routes_limit_mate_macro_parameters(self):
         with tempfile.TemporaryDirectory() as d:
