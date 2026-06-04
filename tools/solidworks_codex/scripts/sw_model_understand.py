@@ -81,6 +81,54 @@ def rows(value: Any) -> list[dict[str, Any]]:
     return [x for x in (value or []) if isinstance(x, dict)]
 
 
+def explicit_component_refs(feature: dict[str, Any]) -> list[str]:
+    explicit = feature.get("components") or feature.get("entities") or feature.get("references")
+    found: list[str] = []
+    if isinstance(explicit, list):
+        found.extend(str(x) for x in explicit if str(x))
+    elif isinstance(explicit, str):
+        found.extend(x.strip() for x in explicit.replace(";", ",").split(",") if x.strip())
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for item in found:
+        if item not in seen:
+            seen.add(item)
+            deduped.append(item)
+    return deduped
+
+
+def feature_rows_with_mates(doc: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return feature evidence with explicit assembly mate readback included.
+
+    SolidWorks inspect reports expose ordinary feature tree rows under
+    ``features`` and also expose a curated ``mate_like_features`` list with
+    mate participant readback.  Earlier model-understand logic only consumed
+    ``features``.  That made the "model space relationship understanding" view
+    miss the most reliable mate evidence on real assemblies where the mate
+    folder was summarized separately.  Keep both streams, dedupe by name/type,
+    and mark the source so downstream graph evidence can prefer live mate
+    participant readback over name inference.
+    """
+    result: list[dict[str, Any]] = []
+    index_by_key: dict[tuple[str, str], int] = {}
+    for source_name, source_rows in (("features", rows(doc.get("features"))), ("mate_like_features", rows(doc.get("mate_like_features")))):
+        for item in source_rows:
+            copied = dict(item)
+            copied.setdefault("source", source_name)
+            key = (name_of(copied), str(copied.get("type") or ""))
+            existing_index = index_by_key.get(key)
+            if existing_index is not None:
+                existing = result[existing_index]
+                existing_refs = explicit_component_refs(existing)
+                copied_refs = explicit_component_refs(copied)
+                if source_name == "mate_like_features" and len(copied_refs) > len(existing_refs):
+                    result[existing_index] = copied
+                continue
+            index_by_key[key] = len(result)
+            result.append(copied)
+    return result
+
+
 def name_of(item: dict[str, Any]) -> str:
     return str(item.get("name2") or item.get("full_name") or item.get("display_name") or item.get("name") or "<unnamed>")
 
@@ -508,12 +556,7 @@ def infer_mate_type(feature: dict[str, Any]) -> str:
 
 
 def feature_entities(feature: dict[str, Any], component_names: list[str]) -> list[str]:
-    explicit = feature.get("entities") or feature.get("components") or feature.get("references")
-    found: list[str] = []
-    if isinstance(explicit, list):
-        found.extend(str(x) for x in explicit if str(x))
-    elif isinstance(explicit, str):
-        found.extend(x.strip() for x in explicit.replace(";", ",").split(",") if x.strip())
+    found: list[str] = explicit_component_refs(feature)
     text = text_of(feature)
     for name in component_names:
         if name.lower() in text:
@@ -537,6 +580,7 @@ def mate_evidence(features: list[dict[str, Any]], component_names: list[str]) ->
             "name": name_of(f),
             "mate_type": infer_mate_type(f),
             "references": refs,
+            "source": f.get("source", "features"),
             "evidence": "feature name/type/entities from inspect report",
         }
         if len(refs) >= 2:
@@ -936,6 +980,20 @@ def evidence_graph(components: list[dict[str, Any]], dimensions: list[dict[str, 
         unresolved = [m["name"] for m in mates if len(m.get("references", [])) < 2]
         if unresolved:
             gaps.append({"kind": "mate_reference_partial", "why": "Some mate-like features lack two explicit component references in the inspect report.", "objects": ", ".join(unresolved[:5])})
+        explicit_edges = [(m.get("a"), m.get("b")) for m in mates if m.get("a") and m.get("b")]
+        constrained_components = {str(x) for edge in explicit_edges for x in edge}
+        # A single mate in a many-part assembly is almost always too weak for
+        # real assembly understanding.  Do not pretend that "some mate exists"
+        # means the spatial/constraint model is credible; surface it as a
+        # graph-level evidence gap so the operator is pushed toward diagnose /
+        # repair-plan / mate-group planning.
+        if len(component_names) >= 3 and len(explicit_edges) <= 1:
+            missing = sorted(name for name in component_names if name not in constrained_components)
+            gaps.append({
+                "kind": "constraint_network_underconnected",
+                "why": "Only one or zero explicit component-to-component mate edges were readable for a three-or-more-component assembly.",
+                "objects": ", ".join(missing[:8]),
+            })
     if spatial["missing_spatial_evidence"]:
         gaps.append({"kind": "spatial_evidence_partial", "why": "Some components lack bounding boxes, so proximity/containment reasoning is incomplete."})
     spatial_evidence = {
@@ -1041,7 +1099,7 @@ def understand(report: dict[str, Any], task: str, object_limit: int, anchor_limi
     doc = active_doc(report)
     comps = rows(doc.get("components"))
     dims = rows(doc.get("dimensions"))
-    feats = rows(doc.get("features"))
+    feats = feature_rows_with_mates(doc)
     view = resolve_view(requested_view, task)
     domains = detect_domains(task, comps, dims, feats)
     mode = "focused" if any(d["task_mentioned"] for d in domains) else "broad"

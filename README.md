@@ -14,7 +14,7 @@
 ## 核心能力
 
 - **45 个保守 MCP 工具**，由本地 CLI 路径和测试覆盖支撑。
-- **模型理解，而不只是自动化建模**：`model-understand` 会生成任务相关的 CAD 证据图，覆盖组件、尺寸、mate 证据、transform、空间关系、孔系/制造证据、决策就绪度和缺失信息；复杂 fixture 还可以用语义配合网络证明功能子装配之间确实被约束。
+- **模型理解，而不只是自动化建模**：`model-understand` 会生成任务相关的 CAD 证据图，覆盖组件、尺寸、`features` + `mate_like_features` 配合回读、transform、空间关系、孔系/制造证据、决策就绪度和缺失信息；复杂 fixture 还可以用语义配合网络证明功能子装配之间确实被约束。三零件及以上装配若只有 0/1 条可读组件间 mate 边，会显式标记 `constraint_network_underconnected`，不能再把“有一个 mate”误判为装配可信。
 - **不束缚强模型推理**：`report-context`、`report-search`、`worklog`、`handoff-bundle`、`tool-catalog` 提供上下文和检索能力，但不强行规定单一输出格式或固定领域流程。
 - **机械通用性**：示例和 fixture 聚焦通用机械结构，例如板件、壳体、定位界面、孔系、紧固件、间隙、坐标变换和可制造性证据，不绑定单一行业案例或个人课题场景。
 - **安全修改闭环**：`preflight`、`audit`、`release-tree`、`public-copy-guard`、`repo-health`、`github-readiness` 和 MCP smoke test 用于捕获常见发布与运行问题。

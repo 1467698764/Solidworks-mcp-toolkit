@@ -113,10 +113,69 @@ def summarize_preflight(preflight: Any) -> Any:
 
 
 def markdown(report: dict[str, Any]) -> str:
-    lines = ["# SolidWorks Codex Final Readiness Report", ""]
-    lines += [f"- Timestamp: `{report['timestamp']}`", f"- Audit OK: `{report['audit_ok']}`", f"- Preflight OK: `{report['preflight_ok']}`", ""]
+    lines = ["# SolidWorks Codex Current Readiness Report", ""]
+    lines += [
+        f"- Timestamp: `{report['timestamp']}`",
+        "- Branch: `main`",
+        "- Current stance: evidence-first SolidWorks MCP/control layer with offline gates, MCP smoke, validation profiles, and opt-in live SolidWorks validation.",
+        f"- Audit OK: `{report['audit_ok']}`",
+        f"- Preflight OK: `{report['preflight_ok']}`",
+        "",
+    ]
+    lines += [
+        "## What is considered ready",
+        "",
+        "- 45 MCP tools are documented and routed through the local PowerShell/Python control layer.",
+        "- Offline unit tests cover report parsing, context/search/model-understand flows, guarded change verification, release gates, public-copy guard, live-gate validation logic, validation profiles, and fixture-level assembly contracts.",
+        "- Native `.SLDASM/.SLDPRT` artifacts are treated as the deliverable for CAD work; STEP optional smoke is only supplemental.",
+        "- Intent-scoped validation profiles exist: `draft_part`, `single_part`, `assembly`, `mechanism_assembly`, and `engineering_release`.",
+        "- `runtime_budget` and `extra_checks` let the reasoning model scale validation without forcing full engineering release checks on every draft.",
+        "- `model-understand` fuses feature-tree evidence with explicit `mate_like_features` readback, so sparse feature rows do not hide semantic mate participation or underconnected constraint networks.",
+        "",
+        "## Latest live SolidWorks evidence",
+        "",
+        "Latest verified live capability suite:",
+        "",
+        "```text",
+        "tools/solidworks_codex/live_fixture/live_capability_suite/capability_suite.SLDASM",
+        "tools/solidworks_codex/reports/live_capability_suite/live_capability_suite.json",
+        "```",
+        "",
+        "Evidence summary:",
+        "",
+        "- `ok: true`",
+        "- validation failed list empty",
+        "- `part_geometry_readback` present for four reopened native `.SLDPRT` files",
+        "- native file readback covers body count, bbox size, volume, and semantic solid-effect evidence for boss/cut/revolve/revolved cut operations",
+        "- `assembly_component_placements` solved origins match the accepted layout",
+        "- `mate_error: 1` on AddMate calls, which is SolidWorks AddMate no-error",
+        "- interference callback should report `0 interference` for static acceptance",
+        "- post-cleanup lock files empty",
+        "",
+        "Simple-mechanism regression fixture:",
+        "",
+        "```text",
+        "tools/solidworks_codex/live_fixture/shaper_machine_v5/bullhead_shaper_complete.SLDASM",
+        "tools/solidworks_codex/reports/shaper_machine_v5/complete_shaper_build.json",
+        "```",
+        "",
+        "This fixture should be read as a regression target with known limitations, not as a showcase. Current readiness claims should focus on the generic evidence it can exercise: native file creation, part feature readback, component placement/readback, semantic mate participation, fixed/floating policy, interference callback, model-understanding output, and cleanup. A passing JSON report is not enough if the SolidWorks window shows a scattered assembly or the mate graph is only fixture-stabilized.",
+        "",
+        "Old fixture JSON should not be treated as proof after validator changes. The current direction is to replace fixture-specific placement confidence with general assembly diagnosis, interface indexing, mate groups, visual validation, and local repair. Until those are implemented and live-verified, the project should not claim general mechanism assembly competence.",
+        "",
+    ]
     lines += ["## Capabilities"] + [f"- {c}" for c in CAPABILITIES] + [""]
     lines += ["## Recommended real-model workflow"] + [f"{i+1}. {step}" for i, step in enumerate(NEXT_WORKFLOW)] + [""]
+    lines += [
+        "## Open hardening areas",
+        "",
+        "These are intentionally not claimed as solved globally:",
+        "",
+        "- Full general DOF solver and motion sweep validation are profile-scoped targets, not universal default checks.",
+        "- DFM/DFA and strength/stiffness screens are currently lightweight evidence gates unless the task explicitly requests deeper engineering validation.",
+        "- The live capability suite proves a useful native feature/mate/geometry path, but broad CAD usefulness still depends on assembly diagnosis, interface indexing, local repair, mate groups, visual validation, and mechanism-lite checks. Named fixtures are regression cases, not the project identity.",
+        "",
+    ]
     lines += ["## Key files"]
     for key, value in report["key_files"].items():
         lines.append(f"- {key}: `{value}`")

@@ -137,6 +137,123 @@ class ModelUnderstandEvidenceGraphTests(unittest.TestCase):
             self.assertIn("Constraint network", text)
             self.assertIn("mate:concentric", text)
 
+    def test_model_understand_uses_mate_like_features_and_flags_one_mate_cloud(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            report = {
+                "active_document": {
+                    "title": "one_mate_cloud.SLDASM",
+                    "path": "C:/machines/one_mate_cloud.SLDASM",
+                    "type": "assembly",
+                    "components": [
+                        {"name2": "base-1", "path": "C:/machines/base.SLDPRT", "suppressed": False, "hidden": False, "fixed": True, "bbox_m": [0, 0, 0, 0.1, 0.1, 0.01]},
+                        {"name2": "ram-1", "path": "C:/machines/ram.SLDPRT", "suppressed": False, "hidden": False, "fixed": False, "bbox_m": [0.2, 0, 0, 0.3, 0.1, 0.01]},
+                        {"name2": "link-1", "path": "C:/machines/link.SLDPRT", "suppressed": False, "hidden": False, "fixed": False, "bbox_m": [0.4, 0, 0, 0.5, 0.1, 0.01]},
+                        {"name2": "pin-1", "path": "C:/machines/pin.SLDPRT", "suppressed": False, "hidden": False, "fixed": False, "bbox_m": [0.6, 0, 0, 0.7, 0.1, 0.01]},
+                    ],
+                    "features": [],
+                    "mate_like_features": [
+                        {"name": "shaper_distance", "type": "MateDistanceDim", "components": ["base-1", "ram-1"], "suppressed": False}
+                    ],
+                }
+            }
+            report_path = root / "one_mate_cloud.json"
+            report_path.write_text(json.dumps(report), encoding="utf-8")
+            out_json = root / "one_mate_cloud_understanding.json"
+            out_md = root / "one_mate_cloud_understanding.md"
+            proc = run_py(
+                "tools/solidworks_codex/scripts/sw_model_understand.py",
+                "--report", str(report_path),
+                "--task", "装配体只有一个配合时判断是否可信",
+                "--view", "assembly-constraints",
+                "--out", str(out_md),
+                "--json-out", str(out_json),
+            )
+            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+            data = json.loads(out_json.read_text(encoding="utf-8-sig"))
+            graph = data["cad_evidence_graph"]
+            mate = graph["mate_evidence"][0]
+            self.assertEqual(mate["name"], "shaper_distance")
+            self.assertEqual(mate["a"], "base-1")
+            self.assertEqual(mate["b"], "ram-1")
+            gap_kinds = {g["kind"] for g in graph["evidence_gaps"]}
+            self.assertIn("constraint_network_underconnected", gap_kinds)
+            self.assertIn("link-1", " ".join(g.get("objects", "") for g in graph["evidence_gaps"]))
+            text = out_md.read_text(encoding="utf-8-sig")
+            self.assertIn("constraint_network_underconnected", text)
+
+    def test_model_understand_prefers_explicit_mate_like_refs_over_sparse_feature_duplicate(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            report = {
+                "active_document": {
+                    "title": "duplicate_mate_ref.SLDASM",
+                    "path": "C:/machines/duplicate_mate_ref.SLDASM",
+                    "type": "assembly",
+                    "components": [
+                        {"name2": "base-1", "path": "C:/machines/base.SLDPRT", "suppressed": False, "hidden": False, "fixed": True, "bbox_m": [0, 0, 0, 0.1, 0.1, 0.01]},
+                        {"name2": "ram-1", "path": "C:/machines/ram.SLDPRT", "suppressed": False, "hidden": False, "fixed": False, "bbox_m": [0, 0, 0.01, 0.1, 0.1, 0.02]},
+                    ],
+                    "features": [
+                        {"name": "coincident_base_ram", "type": "Mate", "entities": []}
+                    ],
+                    "mate_like_features": [
+                        {"name": "coincident_base_ram", "type": "Mate", "components": ["base-1", "ram-1"], "suppressed": False}
+                    ],
+                }
+            }
+            report_path = root / "duplicate_mate_ref.json"
+            report_path.write_text(json.dumps(report), encoding="utf-8")
+            out_json = root / "duplicate_mate_ref_understanding.json"
+            proc = run_py(
+                "tools/solidworks_codex/scripts/sw_model_understand.py",
+                "--report", str(report_path),
+                "--task", "verify duplicate mate readback keeps explicit components",
+                "--view", "assembly-constraints",
+                "--json-out", str(out_json),
+            )
+            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+            graph = json.loads(out_json.read_text(encoding="utf-8-sig"))["cad_evidence_graph"]
+            self.assertEqual(len(graph["mate_evidence"]), 1)
+            mate = graph["mate_evidence"][0]
+            self.assertEqual((mate["a"], mate["b"]), ("base-1", "ram-1"))
+            self.assertEqual(mate["source"], "mate_like_features")
+            gap_kinds = {g["kind"] for g in graph["evidence_gaps"]}
+            self.assertNotIn("mate_reference_partial", gap_kinds)
+            self.assertNotIn("constraint_network_underconnected", gap_kinds)
+
+    def test_two_component_single_mate_is_not_underconnected(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            report = {
+                "active_document": {
+                    "title": "two_component_single_mate.SLDASM",
+                    "path": "C:/machines/two_component_single_mate.SLDASM",
+                    "type": "assembly",
+                    "components": [
+                        {"name2": "base-1", "path": "C:/machines/base.SLDPRT", "suppressed": False, "hidden": False, "fixed": True, "bbox_m": [0, 0, 0, 0.1, 0.1, 0.01]},
+                        {"name2": "ram-1", "path": "C:/machines/ram.SLDPRT", "suppressed": False, "hidden": False, "fixed": False, "bbox_m": [0, 0, 0.01, 0.1, 0.1, 0.02]},
+                    ],
+                    "mate_like_features": [
+                        {"name": "base_ram_coincident", "type": "Mate", "components": ["base-1", "ram-1"], "suppressed": False}
+                    ],
+                }
+            }
+            report_path = root / "two_component_single_mate.json"
+            report_path.write_text(json.dumps(report), encoding="utf-8")
+            out_json = root / "two_component_single_mate_understanding.json"
+            proc = run_py(
+                "tools/solidworks_codex/scripts/sw_model_understand.py",
+                "--report", str(report_path),
+                "--task", "verify two component assembly does not overstate underconnection",
+                "--view", "assembly-constraints",
+                "--json-out", str(out_json),
+            )
+            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+            graph = json.loads(out_json.read_text(encoding="utf-8-sig"))["cad_evidence_graph"]
+            gap_kinds = {g["kind"] for g in graph["evidence_gaps"]}
+            self.assertNotIn("constraint_network_underconnected", gap_kinds)
+
     def test_decision_readiness_marks_supported_and_blocked_cad_tasks(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)

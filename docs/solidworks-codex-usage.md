@@ -137,7 +137,7 @@ SolidWorks AddMate error values follow the SolidWorks API enum; `mate_error: 1` 
   -Out tools\solidworks_codex\reports\assembly_contract.json
 ```
 
-`model-understand` must not be a placeholder. It cannot pass with only a component inventory or bounding-box proximity. A verified mate network may count as functional connection evidence only when mate semantics, selected entities, participating components, component index, and spatial model evidence are present.
+`model-understand` must not be a placeholder. It cannot pass with only a component inventory or bounding-box proximity. It now fuses both `features` and explicit `mate_like_features` from inspect reports, so a real mate folder readback is visible in the CAD evidence graph even when ordinary feature rows are sparse. A verified mate network may count as functional connection evidence only when mate semantics, selected entities, participating components, component index, and spatial model evidence are present. If an assembly with three or more components has only zero or one readable component-to-component mate edge, the graph emits `constraint_network_underconnected`; treat that as a repair/diagnosis trigger, not a successful model-understanding pass.
 
 ## Live SolidWorks gate
 
