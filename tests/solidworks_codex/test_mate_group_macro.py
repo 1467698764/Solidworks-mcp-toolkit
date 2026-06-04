@@ -141,6 +141,14 @@ class MateGroupMacroTests(unittest.TestCase):
                             ],
                         },
                         {
+                            "type": "path",
+                            "selection_intent": "follower point travels along guide slot path",
+                            "selection_selectors": [
+                                {"stable_id": "follower-1:vertex:path_point", "fallback": {"type": "bbox_vertex", "origin_m": [0, 0, 0]}},
+                                {"stable_id": "guide-1:slot:centerline", "fallback": {"type": "slot_centerline", "origin_m": [0, 0, 0]}},
+                            ],
+                        },
+                        {
                             "type": "symmetry",
                             "selection_intent": "keep mirrored tabs symmetric around frame center plane",
                             "selection_selectors": [
@@ -197,7 +205,7 @@ class MateGroupMacroTests(unittest.TestCase):
             self.assertEqual(data["document"]["title"], "macro_fixture.SLDASM")
             self.assertEqual(data["execution_actions"][0]["action"], "suppress_mate")
             self.assertEqual(data["execution_actions"][0]["target_mate"], "Broken_Bolt_Mate")
-            self.assertEqual(len(data["macros"]), 12)
+            self.assertEqual(len(data["macros"]), 13)
             self.assertEqual(data["macros"][0]["expected_mate_name"], "MG_standard_bolt_m6_1_01_concentric")
             self.assertEqual(len(data["macros"][0]["selection_selectors"]), 2)
             distance_macro = next(item for item in data["macros"] if item["mate_type"] == "distance")
@@ -207,6 +215,7 @@ class MateGroupMacroTests(unittest.TestCase):
             limit_angle_macro = next(item for item in data["macros"] if item["mate_type"] == "limit_angle")
             width_macro = next(item for item in data["macros"] if item["mate_type"] == "width")
             slot_macro = next(item for item in data["macros"] if item["mate_type"] == "slot")
+            path_macro = next(item for item in data["macros"] if item["mate_type"] == "path")
             symmetry_macro = next(item for item in data["macros"] if item["mate_type"] == "symmetry")
             gear_macro = next(item for item in data["macros"] if item["mate_type"] == "gear")
             cam_macro = next(item for item in data["macros"] if item["mate_type"] == "cam")
@@ -231,6 +240,9 @@ class MateGroupMacroTests(unittest.TestCase):
             self.assertIn("CreateMateData(21)", slot_text)
             self.assertIn("EntitiesToMate", slot_text)
             self.assertIn("Mate type: slot", slot_text)
+            path_text = Path(path_macro["macro"]).read_text(encoding="utf-8")
+            self.assertIn("Mate type: path", path_text)
+            self.assertIn("AddMate5(15", path_text)
             self.assertEqual(len(symmetry_macro["selection_selectors"]), 3)
             symmetry_text = Path(symmetry_macro["macro"]).read_text(encoding="utf-8")
             self.assertIn("Preselect exactly three mate entities", symmetry_text)
@@ -281,7 +293,7 @@ class MateGroupMacroTests(unittest.TestCase):
 
             self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
             data = json.loads(manifest.read_text(encoding="utf-8-sig"))
-            self.assertEqual(len(data["macros"]), 12)
+            self.assertEqual(len(data["macros"]), 13)
 
     def test_swctl_routes_limit_mate_macro_parameters(self):
         with tempfile.TemporaryDirectory() as d:
@@ -382,6 +394,35 @@ class MateGroupMacroTests(unittest.TestCase):
             self.assertEqual(data["slot_percent"], 42.5)
             self.assertIn("CreateMateData(21)", text)
             self.assertIn("MateData.Percent = 42.500000000", text)
+
+    def test_swctl_routes_path_mate_macro(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            macro_path = root / "path.swp.vba"
+            manifest = root / "path_manifest.json"
+
+            proc = subprocess.run(
+                [
+                    "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass",
+                    "-File", str(ROOT / "tools/solidworks_codex/swctl.ps1"),
+                    "mate-macro",
+                    "-Mate", "path",
+                    "-Out", str(macro_path),
+                    "-Manifest", str(manifest),
+                ],
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+            )
+
+            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+            data = json.loads(manifest.read_text(encoding="utf-8-sig"))
+            text = macro_path.read_text(encoding="utf-8")
+            self.assertEqual(data["mate"], "path")
+            self.assertIn("Mate type: path", text)
+            self.assertIn("AddMate5(15", text)
 
 
 if __name__ == "__main__":

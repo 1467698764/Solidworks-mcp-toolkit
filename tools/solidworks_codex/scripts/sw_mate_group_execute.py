@@ -23,12 +23,15 @@ MATE_TYPES = {
     "cam_follower": 9,
     "gear": 10,
     "width": 11,
+    "path": 15,
     "slot": 21,
 }
 
 FALLBACK_SELECT_TYPES = {
     "bbox_planar_face": "FACE",
     "cylindrical_axis": "AXIS",
+    "bbox_vertex": "VERTEX",
+    "point": "VERTEX",
     "slot_centerline": "EDGE",
 }
 
@@ -164,6 +167,16 @@ def body_edges(body: Any) -> list[Any]:
         return []
 
 
+def body_vertices(body: Any) -> list[Any]:
+    func = getattr(body, "GetVertices", None)
+    if not callable(func):
+        return []
+    try:
+        return as_list(func())
+    except Exception:
+        return []
+
+
 def component_faces(component: Any) -> list[Any]:
     faces: list[Any] = []
     for body in component_bodies(component):
@@ -176,6 +189,13 @@ def component_edges(component: Any) -> list[Any]:
     for body in component_bodies(component):
         edges.extend(body_edges(body))
     return edges
+
+
+def component_vertices(component: Any) -> list[Any]:
+    vertices: list[Any] = []
+    for body in component_bodies(component):
+        vertices.extend(body_vertices(body))
+    return vertices
 
 
 def surface_for_face(face: Any) -> Any | None:
@@ -344,6 +364,29 @@ def best_linear_edge(component: Any, fallback: dict[str, Any]) -> Any | None:
     return best[1] if best else None
 
 
+def vertex_point(vertex: Any, fallback: list[float]) -> list[float]:
+    for method in ("GetPoint", "GetPoint2"):
+        func = getattr(vertex, method, None)
+        if not callable(func):
+            continue
+        try:
+            point = vector(as_list(func()), fallback)
+        except Exception:
+            continue
+        return point
+    return center_from_box(getattr(vertex, "GetBox", lambda: [])(), fallback)
+
+
+def best_vertex(component: Any, fallback: dict[str, Any]) -> Any | None:
+    expected_origin = vector(fallback.get("origin_m"), [0.0, 0.0, 0.0])
+    best: tuple[float, Any] | None = None
+    for vertex in component_vertices(component):
+        score = distance(vertex_point(vertex, expected_origin), expected_origin)
+        if best is None or score < best[0]:
+            best = (score, vertex)
+    return best[1] if best else None
+
+
 def native_select_with_action(assembly: Any, action: dict[str, Any]) -> dict[str, Any]:
     component = find_component(assembly, str(action.get("component") or ""))
     if component is None:
@@ -355,12 +398,19 @@ def native_select_with_action(assembly: Any, action: dict[str, Any]) -> dict[str
         entity = best_cylindrical_face(component, fallback)
     elif action.get("fallback_type") == "slot_centerline":
         entity = best_linear_edge(component, fallback)
+    elif action.get("fallback_type") in {"bbox_vertex", "point"}:
+        entity = best_vertex(component, fallback)
     else:
         entity = None
     if entity is None:
         return {"ok": False, "method": "native_component_face", "error": "entity_not_found"}
     ok = select_entity(entity, assembly, bool(action["append"]))
-    method = "Edge.Select4" if action.get("fallback_type") == "slot_centerline" else "Face.Select4"
+    if action.get("fallback_type") == "slot_centerline":
+        method = "Edge.Select4"
+    elif action.get("fallback_type") in {"bbox_vertex", "point"}:
+        method = "Vertex.Select4"
+    else:
+        method = "Face.Select4"
     return {"ok": ok, "method": method, "component": component_display_name(component), "entity": entity}
 
 

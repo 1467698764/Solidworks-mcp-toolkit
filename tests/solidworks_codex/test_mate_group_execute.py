@@ -104,10 +104,24 @@ class FakeEdge:
         return True
 
 
+class FakeVertex:
+    def __init__(self, point):
+        self.point = point
+        self.select_calls = []
+
+    def GetPoint(self):
+        return self.point
+
+    def Select4(self, append, select_data):
+        self.select_calls.append((append, select_data))
+        return True
+
+
 class FakeBody:
-    def __init__(self, faces, edges=None):
+    def __init__(self, faces, edges=None, vertices=None):
         self.faces = faces
         self.edges = edges or []
+        self.vertices = vertices or []
 
     def GetFaces(self):
         return self.faces
@@ -115,15 +129,19 @@ class FakeBody:
     def GetEdges(self):
         return self.edges
 
+    def GetVertices(self):
+        return self.vertices
+
 
 class FakeComponent:
-    def __init__(self, name, faces, edges=None):
+    def __init__(self, name, faces, edges=None, vertices=None):
         self.Name2 = name
         self.faces = faces
         self.edges = edges or []
+        self.vertices = vertices or []
 
     def GetBodies3(self, body_type, visible_only):
-        return [FakeBody(self.faces, self.edges)]
+        return [FakeBody(self.faces, self.edges, self.vertices)]
 
 
 class FakeSelectionManager:
@@ -447,6 +465,46 @@ class MateGroupExecuteTests(unittest.TestCase):
         self.assertEqual(percent_asm.mate_data[0].Constraint, 3)
         self.assertEqual(percent_asm.mate_data[0].Percent, 42.5)
         self.assertEqual(percent_result["executed_mates"][0]["slot_percent"], 42.5)
+
+    def test_executes_path_mate_with_native_vertex_and_path_edge(self):
+        manifest = self.manifest()
+        manifest["macros"][0]["mate_type"] = "path"
+        manifest["macros"][0]["expected_mate_name"] = "MG_follower_slot_01_path"
+        manifest["macros"][0]["selection_selectors"] = [
+            {
+                "stable_id": "follower-1:vertex:path_point",
+                "component": "follower-1",
+                "fallback": {
+                    "type": "bbox_vertex",
+                    "origin_m": [0.0, 0.0, 0.0],
+                },
+            },
+            {
+                "stable_id": "guide-1:slot:centerline",
+                "component": "guide-1",
+                "fallback": {
+                    "type": "slot_centerline",
+                    "axis": [1.0, 0.0, 0.0],
+                    "centerline_m": {"start": [-0.03, 0.0, 0.0], "end": [0.03, 0.0, 0.0]},
+                },
+            },
+        ]
+        path_vertex = FakeVertex([0.0, 0.0, 0.0])
+        path_edge = FakeEdge(FakeCurve([0.0, 0.0, 0.0, 1.0, 0.0, 0.0]), [-0.03, -0.001, -0.001, 0.03, 0.001, 0.001])
+        asm = FakeAssembly([
+            FakeComponent("follower-1", [], vertices=[path_vertex]),
+            FakeComponent("guide-1", [], [path_edge]),
+        ])
+
+        result = mod.execute_manifest(manifest, asm)
+
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(asm.mates[0][0], mod.MATE_TYPES["path"])
+        self.assertEqual(result["executed_mates"][0]["mate_type"], "path")
+        self.assertEqual(path_vertex.select_calls, [(False, {"mark": 0})])
+        self.assertEqual(path_edge.select_calls, [(True, {"mark": 0})])
+        guard = result["executed_mates"][0]["selection_guard"]
+        self.assertEqual([call["method"] for call in guard["select_by_id_calls"]], ["Vertex.Select4", "Edge.Select4"])
 
     def test_executes_tangent_mate_with_native_cylinder_and_plane_faces(self):
         manifest = self.manifest()

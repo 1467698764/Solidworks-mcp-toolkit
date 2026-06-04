@@ -64,7 +64,7 @@ class MateGroupValidateTests(unittest.TestCase):
     def test_invalid_plan_reports_blockers(self):
         bad = self.good_plan()
         bad["mate_groups"][0]["components"] = ["bolt_m6-1"]
-        bad["mate_groups"][0]["suggested_mates"] = [{"type": "path"}]
+        bad["mate_groups"][0]["suggested_mates"] = [{"type": "unsupported_path_variant"}]
         bad["mate_groups"][0].pop("dof_expectation")
         bad["mate_groups"][0]["verification"] = ["visual_only"]
         with tempfile.TemporaryDirectory() as d:
@@ -260,6 +260,46 @@ class MateGroupValidateTests(unittest.TestCase):
             data = json.loads(out.read_text(encoding="utf-8-sig"))
             kinds = {item["kind"] for item in data["findings"]["blocking"]}
             self.assertIn("slot_percent_range", kinds)
+
+    def test_accepts_path_group_with_vertex_and_path_selectors_and_blocks_short_selector_list(self):
+        plan = self.good_plan()
+        path_mate = {
+            "type": "path",
+            "selection_selectors": [
+                {"stable_id": "follower:vertex", "fallback": {"type": "bbox_vertex"}},
+                {"stable_id": "guide:path", "fallback": {"type": "slot_centerline"}},
+            ],
+        }
+        plan["mate_groups"][0]["suggested_mates"] = [path_mate]
+        plan["mate_groups"][0]["dof_expectation"] = {
+            "intent": "point_follows_path",
+            "remaining_dof": ["translation_along_path"],
+        }
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            plan_path = root / "mate_group_plan.json"
+            out = root / "validation.json"
+            plan_path.write_text(json.dumps(plan), encoding="utf-8")
+
+            proc = run_py("--mate-group-plan", str(plan_path), "--out", str(out))
+
+            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+            data = json.loads(out.read_text(encoding="utf-8-sig"))
+            self.assertTrue(data["ok"], data)
+
+        plan["mate_groups"][0]["suggested_mates"][0]["selection_selectors"] = path_mate["selection_selectors"][:1]
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            plan_path = root / "mate_group_plan.json"
+            out = root / "validation.json"
+            plan_path.write_text(json.dumps(plan), encoding="utf-8")
+
+            proc = run_py("--mate-group-plan", str(plan_path), "--out", str(out))
+
+            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+            data = json.loads(out.read_text(encoding="utf-8-sig"))
+            kinds = {item["kind"] for item in data["findings"]["blocking"]}
+            self.assertIn("path_selector_count", kinds)
 
     def test_accepts_symmetry_group_with_three_selectors_and_blocks_short_selector_list(self):
         plan = self.good_plan()

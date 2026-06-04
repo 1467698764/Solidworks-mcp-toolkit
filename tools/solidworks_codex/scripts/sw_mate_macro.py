@@ -23,6 +23,7 @@ MATE_TYPES = {
     "cam": 9,
     "cam_follower": 9,
     "gear": 10,
+    "path": 15,
     "slot": 21,
     "parallel": 3,
     "perpendicular": 2,

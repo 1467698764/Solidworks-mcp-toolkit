@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 
-SUPPORTED_MATES = {"coincident", "concentric", "tangent", "distance", "limit_distance", "angle", "limit_angle", "parallel", "perpendicular", "symmetry", "cam", "cam_follower", "gear", "width", "slot", "recreate_from_current_interfaces"}
+SUPPORTED_MATES = {"coincident", "concentric", "tangent", "distance", "limit_distance", "angle", "limit_angle", "parallel", "perpendicular", "symmetry", "cam", "cam_follower", "gear", "width", "path", "slot", "recreate_from_current_interfaces"}
 REQUIRED_VERIFICATION = {"rebuild", "mate_errors"}
 AXIAL_LOCATOR_MATES = {"coincident", "distance"}
 AXIAL_LOCATOR_ROLES = {"axial_seating_locator", "axial_offset_locator"}
@@ -76,6 +76,8 @@ def validate(plan: dict[str, Any]) -> dict[str, Any]:
                     percent = finite_float(mate.get("slot_percent"))
                     if percent is None or percent < 0 or percent > 100:
                         add(findings, "blocking", "slot_percent_range", group_id, mate.get("slot_percent"), "percent slot mates require slot_percent between 0 and 100")
+            if mate_type == "path" and selectors and len(selectors) != 2:
+                add(findings, "blocking", "path_selector_count", group_id, {"count": len(selectors), "selectors": selectors}, "path mates require two reviewed selectors: a moving point/vertex and a continuous path curve/edge/sketch entity")
             if mate_type == "symmetry" and selectors and len(selectors) != 3:
                 add(findings, "blocking", "symmetry_selector_count", group_id, {"count": len(selectors), "selectors": selectors}, "symmetry mates require three reviewed selectors: two symmetric entities and one symmetry plane")
             if mate_type == "gear":
