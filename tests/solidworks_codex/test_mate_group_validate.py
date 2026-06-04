@@ -148,6 +148,48 @@ class MateGroupValidateTests(unittest.TestCase):
             data = json.loads(out.read_text(encoding="utf-8-sig"))
             self.assertTrue(data["ok"], data)
 
+    def test_accepts_width_group_with_four_face_selectors_and_blocks_short_selector_list(self):
+        plan = self.good_plan()
+        width_mate = {
+            "type": "width",
+            "selection_selectors": [
+                {"stable_id": "guide_left:face", "fallback": {"type": "bbox_planar_face"}},
+                {"stable_id": "guide_right:face", "fallback": {"type": "bbox_planar_face"}},
+                {"stable_id": "slider_left:face", "fallback": {"type": "bbox_planar_face"}},
+                {"stable_id": "slider_right:face", "fallback": {"type": "bbox_planar_face"}},
+            ],
+        }
+        plan["mate_groups"][0]["suggested_mates"] = [width_mate]
+        plan["mate_groups"][0]["dof_expectation"] = {
+            "intent": "centered_slider_between_guides",
+            "remaining_dof": ["translation_along_guide"],
+        }
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            plan_path = root / "mate_group_plan.json"
+            out = root / "validation.json"
+            plan_path.write_text(json.dumps(plan), encoding="utf-8")
+
+            proc = run_py("--mate-group-plan", str(plan_path), "--out", str(out))
+
+            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+            data = json.loads(out.read_text(encoding="utf-8-sig"))
+            self.assertTrue(data["ok"], data)
+
+        plan["mate_groups"][0]["suggested_mates"][0]["selection_selectors"] = width_mate["selection_selectors"][:3]
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            plan_path = root / "mate_group_plan.json"
+            out = root / "validation.json"
+            plan_path.write_text(json.dumps(plan), encoding="utf-8")
+
+            proc = run_py("--mate-group-plan", str(plan_path), "--out", str(out))
+
+            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+            data = json.loads(out.read_text(encoding="utf-8-sig"))
+            kinds = {item["kind"] for item in data["findings"]["blocking"]}
+            self.assertIn("width_selector_count", kinds)
+
     def test_swctl_routes_mate_group_validate(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)

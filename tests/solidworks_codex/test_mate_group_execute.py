@@ -125,6 +125,15 @@ class FakeFeature:
         return True
 
 
+class FakeMateData:
+    def __init__(self, mate_type):
+        self.Type = mate_type
+        self.WidthSelection = []
+        self.TabSelection = []
+        self.ConstraintType = None
+        self.Distance = None
+
+
 class FakeAssembly:
     def __init__(self, components=None, features=None):
         self._native_selected_count = 0
@@ -134,6 +143,7 @@ class FakeAssembly:
         self.features = {feature.Name: feature for feature in (features or [])}
         self.cleared = []
         self.mates = []
+        self.mate_data = []
         self.rebuilds = []
 
     def ClearSelection2(self, value):
@@ -143,6 +153,15 @@ class FakeAssembly:
 
     def AddMate5(self, *args):
         self.mates.append(args)
+        return FakeFeature()
+
+    def CreateMateData(self, mate_type):
+        data = FakeMateData(mate_type)
+        self.mate_data.append(data)
+        return data
+
+    def CreateMate(self, mate_data):
+        self.mates.append(("CreateMate", mate_data))
         return FakeFeature()
 
     def ForceRebuild3(self, value):
@@ -397,6 +416,59 @@ class MateGroupExecuteTests(unittest.TestCase):
         self.assertAlmostEqual(angle_asm.mates[0][10], math.radians(15.0))
         self.assertAlmostEqual(angle_result["executed_mates"][0]["angle_max_rad"], math.radians(75.0))
         self.assertAlmostEqual(angle_result["executed_mates"][0]["angle_min_rad"], math.radians(15.0))
+
+    def test_executes_width_mate_with_four_native_planar_faces(self):
+        manifest = self.manifest()
+        manifest["macros"][0]["mate_type"] = "width"
+        manifest["macros"][0]["expected_mate_name"] = "MG_slider_guide_01_width"
+        manifest["macros"][0]["width_constraint_type"] = 0
+        manifest["macros"][0]["selection_selectors"] = [
+            {
+                "stable_id": "guide_left-1:plane:y_min",
+                "component": "guide_left-1",
+                "width_role": "width_face",
+                "fallback": {"type": "bbox_planar_face", "normal": [0.0, -1.0, 0.0], "origin_m": [0.0, -0.02, 0.0]},
+            },
+            {
+                "stable_id": "guide_right-1:plane:y_max",
+                "component": "guide_right-1",
+                "width_role": "width_face",
+                "fallback": {"type": "bbox_planar_face", "normal": [0.0, 1.0, 0.0], "origin_m": [0.0, 0.02, 0.0]},
+            },
+            {
+                "stable_id": "slider-1:plane:y_min",
+                "component": "slider-1",
+                "width_role": "tab_face",
+                "fallback": {"type": "bbox_planar_face", "normal": [0.0, -1.0, 0.0], "origin_m": [0.0, -0.01, 0.0]},
+            },
+            {
+                "stable_id": "slider-1:plane:y_max",
+                "component": "slider-1",
+                "width_role": "tab_face",
+                "fallback": {"type": "bbox_planar_face", "normal": [0.0, 1.0, 0.0], "origin_m": [0.0, 0.01, 0.0]},
+            },
+        ]
+        guide_left_face = FakeFace(FakeSurface("plane", [0.0, -0.02, 0.0, 0.0, -1.0, 0.0]), [-0.02, -0.021, -0.01, 0.02, -0.019, 0.01])
+        guide_right_face = FakeFace(FakeSurface("plane", [0.0, 0.02, 0.0, 0.0, 1.0, 0.0]), [-0.02, 0.019, -0.01, 0.02, 0.021, 0.01])
+        slider_left_face = FakeFace(FakeSurface("plane", [0.0, -0.01, 0.0, 0.0, -1.0, 0.0]), [-0.015, -0.011, -0.01, 0.015, -0.009, 0.01])
+        slider_right_face = FakeFace(FakeSurface("plane", [0.0, 0.01, 0.0, 0.0, 1.0, 0.0]), [-0.015, 0.009, -0.01, 0.015, 0.011, 0.01])
+        asm = FakeAssembly([
+            FakeComponent("guide_left-1", [guide_left_face]),
+            FakeComponent("guide_right-1", [guide_right_face]),
+            FakeComponent("slider-1", [slider_left_face, slider_right_face]),
+        ])
+
+        result = mod.execute_manifest(manifest, asm)
+
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(result["executed_mates"][0]["api"], "CreateMateData/CreateMate")
+        self.assertEqual(result["executed_mates"][0]["mate_type"], "width")
+        self.assertEqual(result["executed_mates"][0]["width_selection_count"], 2)
+        self.assertEqual(result["executed_mates"][0]["tab_selection_count"], 2)
+        self.assertEqual(asm.mate_data[0].Type, mod.MATE_TYPES["width"])
+        self.assertEqual(asm.mate_data[0].WidthSelection, [guide_left_face, guide_right_face])
+        self.assertEqual(asm.mate_data[0].TabSelection, [slider_left_face, slider_right_face])
+        self.assertNotIn("entity", result["executed_mates"][0]["selection_guard"]["selection_reports"][0])
 
     def test_dry_run_reports_repair_actions_without_solidworks(self):
         manifest = self.manifest()

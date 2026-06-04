@@ -18,6 +18,7 @@ MATE_TYPES = {
     "limit_distance": 5,
     "angle": 6,
     "limit_angle": 6,
+    "width": 11,
 }
 
 FALLBACK_SELECT_TYPES = {
@@ -271,7 +272,7 @@ def native_select_with_action(assembly: Any, action: dict[str, Any]) -> dict[str
     if entity is None:
         return {"ok": False, "method": "native_component_face", "error": "entity_not_found"}
     ok = select_entity(entity, assembly, bool(action["append"]))
-    return {"ok": ok, "method": "Face.Select4", "component": component_display_name(component)}
+    return {"ok": ok, "method": "Face.Select4", "component": component_display_name(component), "entity": entity}
 
 
 def selection_action(selector: dict[str, Any], append: bool) -> dict[str, Any]:
@@ -287,6 +288,7 @@ def selection_action(selector: dict[str, Any], append: bool) -> dict[str, Any]:
         "strategy": selector.get("strategy"),
         "fallback_type": fallback_type,
         "fallback": fallback,
+        "width_role": selector.get("width_role") or fallback.get("width_role"),
     }
 
 
@@ -303,6 +305,8 @@ def planned_mate(item: dict[str, Any]) -> dict[str, Any]:
         "angle_rad": mate_angle_rad(item),
         "angle_min_rad": optional_angle_rad(item, "angle_min_rad", "angle_min_deg"),
         "angle_max_rad": optional_angle_rad(item, "angle_max_rad", "angle_max_deg"),
+        "width_constraint_type": int(item.get("width_constraint_type", item.get("constraint_type", 0)) or 0),
+        "width_distance_m": optional_float(item.get("width_distance_m")),
         "flip": bool(item.get("flip", False)),
         "selection_actions": [selection_action(selector, append=index > 0) for index, selector in enumerate(selectors)],
     }
@@ -328,6 +332,14 @@ def selected_count(assembly: Any) -> int:
         return int(assembly.SelectionManager.GetSelectedObjectCount2(-1))
     except Exception:
         return 0
+
+
+def required_selector_count(mate_type: str) -> int:
+    return 4 if mate_type == "width" else 2
+
+
+def public_select_report(report: dict[str, Any]) -> dict[str, Any]:
+    return {key: value for key, value in report.items() if key != "entity"}
 
 
 def call_member(obj: Any, name: str, *args: Any) -> Any:
@@ -596,6 +608,40 @@ def add_selected_mate(assembly: Any, item: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def add_width_mate(assembly: Any, item: dict[str, Any], select_reports: list[dict[str, Any]]) -> dict[str, Any]:
+    entities = [report.get("entity") for report in select_reports]
+    if len(entities) != 4 or any(entity is None for entity in entities):
+        return {"ok": False, "error": "width_mate_requires_four_native_face_entities", "mate_type": "width"}
+    create_data = getattr(assembly, "CreateMateData", None)
+    create_mate = getattr(assembly, "CreateMate", None)
+    if not callable(create_data) or not callable(create_mate):
+        return {"ok": False, "error": "width_mate_create_data_unavailable", "mate_type": "width"}
+    data = create_data(MATE_TYPES["width"])
+    data.WidthSelection = entities[:2]
+    data.TabSelection = entities[2:]
+    data.ConstraintType = int(item.get("width_constraint_type", item.get("constraint_type", 0)) or 0)
+    if item.get("width_distance_m") not in (None, ""):
+        try:
+            data.Distance = float(item["width_distance_m"])
+        except (TypeError, ValueError):
+            pass
+    feature = create_mate(data)
+    if feature is not None and item.get("expected_mate_name"):
+        try:
+            feature.Name = str(item["expected_mate_name"])
+        except Exception:
+            pass
+    return {
+        "ok": feature is not None,
+        "api": "CreateMateData/CreateMate",
+        "mate_type": "width",
+        "expected_mate_name": item.get("expected_mate_name"),
+        "width_constraint_type": data.ConstraintType,
+        "width_selection_count": len(data.WidthSelection),
+        "tab_selection_count": len(data.TabSelection),
+    }
+
+
 def execute_manifest(manifest: dict[str, Any], assembly: Any) -> dict[str, Any]:
     findings: dict[str, list[dict[str, Any]]] = {"blocking": [], "warning": [], "accepted": []}
     executed_actions: list[dict[str, Any]] = []
@@ -643,11 +689,12 @@ def execute_manifest(manifest: dict[str, Any], assembly: Any) -> dict[str, Any]:
                     "detail": result,
                 })
         plan = planned_mate(item)
-        if len(plan["selection_actions"]) != 2:
+        required_count = required_selector_count(plan["mate_type"])
+        if len(plan["selection_actions"]) != required_count:
             findings["blocking"].append({
                 "kind": "selector_count",
                 "mate": item.get("expected_mate_name"),
-                "reason": "live mate execution requires exactly two reviewed selection selectors",
+                "reason": f"live {plan['mate_type']} mate execution requires exactly {required_count} reviewed selection selectors",
                 "detail": plan,
             })
             continue
@@ -663,17 +710,17 @@ def execute_manifest(manifest: dict[str, Any], assembly: Any) -> dict[str, Any]:
             "component_pair": item.get("components", []),
             "select_by_id_calls": plan["selection_actions"],
             "select_results": [bool(report.get("ok")) for report in select_reports],
-            "selection_reports": select_reports,
+            "selection_reports": [public_select_report(report) for report in select_reports],
         }
-        if count != 2 or not all(report.get("ok") for report in select_reports):
+        if count != required_count or not all(report.get("ok") for report in select_reports):
             findings["blocking"].append({
                 "kind": "selection_failed",
                 "mate": item.get("expected_mate_name"),
-                "reason": "selector execution did not produce exactly two selected entities",
+                "reason": f"selector execution did not produce exactly {required_count} selected entities",
                 "detail": guard,
             })
             continue
-        mate_result = add_selected_mate(assembly, item)
+        mate_result = add_width_mate(assembly, item, select_reports) if plan["mate_type"] == "width" else add_selected_mate(assembly, item)
         mate_result["selection_guard"] = guard
         mate_result["selected_entities"] = count
         if mate_result["ok"]:
@@ -682,7 +729,7 @@ def execute_manifest(manifest: dict[str, Any], assembly: Any) -> dict[str, Any]:
             findings["accepted"].append({
                 "kind": "mate_executed",
                 "mate": item.get("expected_mate_name"),
-                "reason": "selected entities were mated with AddMate5 and rebuild was requested",
+                "reason": f"selected entities were mated with {mate_result.get('api')} and rebuild was requested",
             })
         else:
             findings["blocking"].append({
@@ -714,11 +761,12 @@ def dry_run_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
     planned_actions = [item for item in manifest.get("execution_actions", []) if isinstance(item, dict)]
     blockers = []
     for item in planned:
-        if len(item["selection_actions"]) != 2:
+        required_count = required_selector_count(item["mate_type"])
+        if len(item["selection_actions"]) != required_count:
             blockers.append({
                 "kind": "selector_count",
                 "mate": item.get("expected_mate_name"),
-                "reason": "dry-run found a mate without exactly two executable selectors",
+                "reason": f"dry-run found a {item['mate_type']} mate without exactly {required_count} executable selectors",
                 "detail": item,
             })
     return {

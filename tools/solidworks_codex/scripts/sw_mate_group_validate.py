@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 
-SUPPORTED_MATES = {"coincident", "concentric", "tangent", "distance", "limit_distance", "angle", "limit_angle", "parallel", "perpendicular", "recreate_from_current_interfaces"}
+SUPPORTED_MATES = {"coincident", "concentric", "tangent", "distance", "limit_distance", "angle", "limit_angle", "parallel", "perpendicular", "width", "recreate_from_current_interfaces"}
 REQUIRED_VERIFICATION = {"rebuild", "mate_errors"}
 AXIAL_LOCATOR_MATES = {"coincident", "distance"}
 AXIAL_LOCATOR_ROLES = {"axial_seating_locator", "axial_offset_locator"}
@@ -49,6 +49,9 @@ def validate(plan: dict[str, Any]) -> dict[str, Any]:
             mate_type = str(mate.get("type", "")).casefold()
             if mate_type not in SUPPORTED_MATES:
                 add(findings, "blocking", "unsupported_mate_type", group_id, mate_type, "mate type is not supported by current macro/live planning")
+            selectors = [item for item in mate.get("selection_selectors", []) if isinstance(item, dict)]
+            if mate_type == "width" and selectors and len(selectors) != 4:
+                add(findings, "blocking", "width_selector_count", group_id, {"count": len(selectors), "selectors": selectors}, "width mates require four reviewed face selectors: two width faces and two tab faces")
         if mates and not dof:
             add(findings, "blocking", "missing_dof_expectation", group_id, {}, "actionable mate groups must state intended remaining degrees of freedom")
         if dof:
