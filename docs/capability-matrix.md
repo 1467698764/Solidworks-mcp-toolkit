@@ -1,13 +1,13 @@
 # SolidWorks Codex Capability Matrix
 
-- Timestamp: `2026-06-05T02:49:46`
-- Capability count: `66`
+- Timestamp: `2026-06-05T03:04:35`
+- Capability count: `68`
 
 ## Coverage
 
-- CLI commands: `66`
-- MCP tools: `49`
-- MCP tools mapped to CLI: `49`
+- CLI commands: `68`
+- MCP tools: `50`
+- MCP tools mapped to CLI: `50`
 - CLI for every local MCP tool: `True`
 - Safety label for every capability: `True`
 - Workflow label for every capability: `True`
@@ -56,6 +56,7 @@
 | `mate-macro` | `solidworks_mate_macro` | `macro_generation` | `generated_reviewable_artifact` | `False` | `mate` |
 | `mate-selection-check` | `solidworks_mate_selection_check` | `analysis` | `read_only` | `False` | `macro_manifest, selection_report` |
 | `mcp-tools` | `solidworks_existing_mcp_tools` | `external_reference` | `offline_reference` | `False` | `-` |
+| `metadata-execute` | `solidworks_metadata_execute` | `guarded_edit` | `guarded_write` | `True` | `spec` |
 | `model-understand` | `solidworks_model_understand` | `analysis` | `read_only` | `False` | `report` |
 | `offline-demo` | `solidworks_offline_demo` | `handoff` | `offline_or_read_only` | `False` | `-` |
 | `part-feature-execute` | `solidworks_part_feature_execute` | `guarded_edit` | `guarded_write` | `True` | `spec` |
@@ -78,6 +79,7 @@
 | `start-inspect` | `solidworks_start_inspect` | `discover` | `read_only` | `True` | `-` |
 | `start-interference` | `-` | `verify_export` | `verification_or_export` | `True` | `-` |
 | `start-mass` | `-` | `discover` | `read_only` | `True` | `-` |
+| `start-metadata-execute` | `-` | `guarded_edit` | `guarded_write` | `True` | `-` |
 | `start-part-feature-execute` | `-` | `guarded_edit` | `guarded_write` | `True` | `-` |
 | `start-probe` | `solidworks_start_probe` | `discover` | `read_only` | `True` | `-` |
 | `start-rebuild` | `-` | `guarded_edit` | `guarded_write` | `True` | `-` |

@@ -176,7 +176,7 @@ Status values:
 | Clearance/near evidence | present | `assembly-diagnose` emits bbox pairwise near/contact pairs, largest separated pairs, missing-bbox components, and `clearance_summary` with minimum gap relation, near/separated counts, scattered components, tolerance, and evidence source. | Scattered components and floating details are detected. |
 | Motion sweep lite | missing | Sample key positions, limits, collisions. | Mechanism_lite can reject path collisions and dead layouts. |
 | Visual screenshot review | partial/missing | Computer Use window capture, stored evidence, visual findings. | Screenshot contradicting report blocks acceptance. |
-| BOM/metadata | partial | Name, quantity, material, config, standard part spec. | Engineering_lite report can produce a useful BOM. |
+| BOM/metadata | partial/guarded | `metadata-execute` / `solidworks_metadata_execute` writes reviewed material and custom-property specs to active or specified models with rebuild/save evidence; inspect/report tools still provide readback and BOM-oriented summaries. Quantity rollups and drawing BOM generation remain separate tracks. | Engineering_lite report can produce a useful BOM. |
 | DFM/DFA-lite | missing/defer | Wall thickness, hole edge, tool access, assembly order, fastener access. | Optional warnings, not mandatory for draft profiles. |
 
 ### 6.7 Runtime And Cleanup

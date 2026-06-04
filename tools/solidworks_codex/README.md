@@ -5,7 +5,7 @@ This directory contains the local control layer used by the MCP server and by di
 ## Responsibilities
 
 - `swctl.ps1` is the stable command router for humans, tests, CI, and MCP.
-- `mcp/server.cjs` exposes the 49 MCP tools and delegates to `swctl.ps1`, including MCP entries such as `solidworks_component_insert`, `solidworks_part_feature_execute`, `solidworks_tool_catalog`, `solidworks_handoff_bundle`, and `solidworks_worklog`.
+- `mcp/server.cjs` exposes the 50 MCP tools and delegates to `swctl.ps1`, including MCP entries such as `solidworks_component_insert`, `solidworks_part_feature_execute`, `solidworks_metadata_execute`, `solidworks_tool_catalog`, `solidworks_handoff_bundle`, and `solidworks_worklog`.
 - `scripts/*.py` implement focused operations: inspect, compare, model understanding, validation profiles, guarded edits, worklog, handoff, live gates, and release gates.
 - `sandbox/report_before.json` and `sandbox/report_after.json` are deterministic offline fixtures used by tests and demos.
 

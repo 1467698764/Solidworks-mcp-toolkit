@@ -182,6 +182,11 @@ const toolSchemas = [
     inputSchema: { type: 'object', properties: { spec: { type: 'string', description: 'JSON spec with operation, selectors, and parameters.' }, model: { type: 'string' }, start: { type: 'boolean' }, save: { type: 'boolean' }, dry_run: { type: 'boolean' }, out: { type: 'string' } }, required: ['spec'], additionalProperties: false }
   },
   {
+    name: 'solidworks_metadata_execute',
+    description: 'Execute reviewed material and custom-property metadata writes for active or specified SolidWorks models.',
+    inputSchema: { type: 'object', properties: { spec: { type: 'string', description: 'JSON spec with material and/or custom properties.' }, model: { type: 'string' }, start: { type: 'boolean' }, save: { type: 'boolean' }, dry_run: { type: 'boolean' }, out: { type: 'string' } }, required: ['spec'], additionalProperties: false }
+  },
+  {
     name: 'solidworks_interference_check',
     description: 'Run conservative SolidWorks assembly interference detection and emit JSON.',
     inputSchema: { type: 'object', properties: { out: { type: 'string' } }, additionalProperties: false }
@@ -494,6 +499,13 @@ async function callTool(name, input) {
       break;
     case 'solidworks_part_feature_execute':
       args.push(input?.start ? 'start-part-feature-execute' : 'part-feature-execute', '-Report', input.spec);
+      if (input?.model) args.push('-Model', input.model);
+      if (input?.save) args.push('-Save');
+      if (input?.dry_run) args.push('-ValidateOnly');
+      if (input?.out) args.push('-Out', input.out);
+      break;
+    case 'solidworks_metadata_execute':
+      args.push(input?.start ? 'start-metadata-execute' : 'metadata-execute', '-Report', input.spec);
       if (input?.model) args.push('-Model', input.model);
       if (input?.save) args.push('-Save');
       if (input?.dry_run) args.push('-ValidateOnly');
