@@ -147,7 +147,7 @@ Status values:
 | Concentric mate | present/guarded | Hole/shaft axis selectors propagate from interface index to mate group macro manifest and validation requires axial locator evidence unless axial freedom is explicit mechanism intent. | Revolute joint is not accepted with concentric alone unless axial freedom is intended. |
 | Parallel/perpendicular | partial | Orientation constraints used as supporting constraints. | They do not stand alone for physical attachment. |
 | Distance/angle | partial/guarded | Clearance, offset, limit or design angle; mate group manifests carry distance/angle/flip parameters into `mate-group-execute`, which passes them to `AddMate5` after reviewed entity selection. | Dimension value and intent are read back. |
-| Tangent | missing/partial | Rollers, cams, rounded contact. | Only used with correct surface types and validation. |
+| Tangent | partial/guarded | `mate-macro`, `mate-group-macro`, and `mate-group-execute` support tangent mates through reviewed selectors and native planar/cylindrical face selection before `AddMate5`. | Only used with correct surface types and validation. |
 | Width/symmetry | missing | Slider centered between guide faces, symmetric jaws, centered plates. | Remaining DOF matches intent. |
 | Limit distance/angle | missing | Travel stops, hinge limits, slider stroke. | Mechanism samples endpoints and midpoints. |
 | Slot/path/cam/gear mates | missing/defer | Mechanism-specific, use when SolidWorks API support is reliable. | Optional until standard mechanism_lite is stable. |

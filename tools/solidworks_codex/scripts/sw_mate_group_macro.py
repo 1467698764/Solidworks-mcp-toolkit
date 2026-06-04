@@ -11,7 +11,7 @@ from typing import Any
 from sw_mate_macro import MATE_TYPES, macro
 
 
-SUPPORTED_TYPES = {"coincident", "concentric", "distance", "angle", "parallel", "perpendicular"}
+SUPPORTED_TYPES = {"coincident", "concentric", "tangent", "distance", "angle", "parallel", "perpendicular"}
 
 
 def load_json(path: Path) -> dict[str, Any]:

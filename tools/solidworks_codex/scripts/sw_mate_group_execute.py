@@ -13,6 +13,7 @@ MATE_TYPES = {
     "concentric": 1,
     "perpendicular": 2,
     "parallel": 3,
+    "tangent": 4,
     "distance": 5,
     "angle": 6,
 }

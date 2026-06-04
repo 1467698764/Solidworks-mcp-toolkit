@@ -267,6 +267,49 @@ class MateGroupExecuteTests(unittest.TestCase):
         self.assertEqual(shaft_face.select_calls, [(False, {"mark": 0})])
         self.assertEqual(hole_face.select_calls, [(True, {"mark": 0})])
 
+    def test_executes_tangent_mate_with_native_cylinder_and_plane_faces(self):
+        manifest = self.manifest()
+        manifest["macros"][0]["mate_type"] = "tangent"
+        manifest["macros"][0]["expected_mate_name"] = "MG_cam_roller_01_tangent"
+        manifest["macros"][0]["selection_selectors"] = [
+            {
+                "stable_id": "roller-1:cylinder:outer",
+                "component": "roller-1",
+                "fallback": {
+                    "type": "cylindrical_axis",
+                    "axis": [0.0, 0.0, 1.0],
+                    "origin_m": [0.0, 0.0, 0.0],
+                    "radius_m": 0.015,
+                },
+            },
+            {
+                "stable_id": "cam_plate-1:plane:x_max",
+                "component": "cam_plate-1",
+                "fallback": {
+                    "type": "bbox_planar_face",
+                    "normal": [1.0, 0.0, 0.0],
+                    "origin_m": [0.015, 0.0, 0.0],
+                },
+            },
+        ]
+        roller_face = FakeFace(
+            FakeSurface("cylinder", [0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.015]),
+            [-0.015, -0.015, -0.02, 0.015, 0.015, 0.02],
+        )
+        cam_face = FakeFace(
+            FakeSurface("plane", [0.015, 0.0, 0.0, 1.0, 0.0, 0.0]),
+            [0.014, -0.04, -0.02, 0.016, 0.04, 0.02],
+        )
+        asm = FakeAssembly([FakeComponent("roller-1", [roller_face]), FakeComponent("cam_plate-1", [cam_face])])
+
+        result = mod.execute_manifest(manifest, asm)
+
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(asm.mates[0][0], mod.MATE_TYPES["tangent"])
+        self.assertEqual(result["executed_mates"][0]["mate_type"], "tangent")
+        self.assertEqual(roller_face.select_calls, [(False, {"mark": 0})])
+        self.assertEqual(cam_face.select_calls, [(True, {"mark": 0})])
+
     def test_executes_bad_mate_suppression_actions_before_addmate5(self):
         manifest = self.manifest()
         manifest["execution_actions"] = [

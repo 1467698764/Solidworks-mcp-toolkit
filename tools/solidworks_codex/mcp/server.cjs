@@ -187,7 +187,7 @@ const toolSchemas = [
   {
     name: 'solidworks_mate_macro',
     description: 'Generate reviewable VBA macro for adding a mate between two preselected entities.',
-    inputSchema: { type: 'object', properties: { mate: { type: 'string', enum: ['coincident','concentric','distance','angle','parallel','perpendicular'] }, distance_mm: { type: 'number' }, angle_deg: { type: 'number' }, flip: { type: 'boolean' }, out: { type: 'string' }, manifest: { type: 'string' } }, required: ['mate'], additionalProperties: false }
+    inputSchema: { type: 'object', properties: { mate: { type: 'string', enum: ['coincident','concentric','tangent','distance','angle','parallel','perpendicular'] }, distance_mm: { type: 'number' }, angle_deg: { type: 'number' }, flip: { type: 'boolean' }, out: { type: 'string' }, manifest: { type: 'string' } }, required: ['mate'], additionalProperties: false }
   },
   {
     name: 'solidworks_mate_group_macro',

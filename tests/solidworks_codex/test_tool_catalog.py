@@ -4,6 +4,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from tools.solidworks_codex.scripts import sw_tool_catalog
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -33,6 +34,7 @@ class ToolCatalogTests(unittest.TestCase):
             text = out_md.read_text(encoding="utf-8-sig")
             data = json.loads(out_json.read_text(encoding="utf-8-sig"))
             names = {tool["name"] for tool in data["tools"]}
+            by_name = {tool["name"]: tool for tool in data["tools"]}
             self.assertIn("SolidWorks MCP Tool Catalog", text)
             self.assertIn("solidworks_handoff_bundle", names)
             self.assertIn("solidworks_worklog", names)
@@ -50,6 +52,10 @@ class ToolCatalogTests(unittest.TestCase):
             self.assertIn("solidworks_mate_selection_check", names)
             self.assertIn("solidworks_mate_group_execution_check", names)
             self.assertIn("solidworks_mate_group_live_protocol", names)
+            self.assertIn("mate", by_name["solidworks_mate_macro"]["properties"])
+            schemas = {tool["name"]: tool for tool in sw_tool_catalog.list_tools_via_node()}
+            mate_enum = schemas["solidworks_mate_macro"]["inputSchema"]["properties"]["mate"]["enum"]
+            self.assertIn("tangent", mate_enum)
             self.assertIn("read_only", data["groups"])
             self.assertIn("handoff", data["groups"])
             self.assertGreaterEqual(data["count"], 29)

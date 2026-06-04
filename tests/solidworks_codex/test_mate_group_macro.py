@@ -88,6 +88,14 @@ class MateGroupMacroTests(unittest.TestCase):
                                 {"stable_id": "base_plate-1:plane:y_max", "fallback": {"type": "bbox_planar_face", "origin_m": [0, 0, 0]}},
                             ],
                         },
+                        {
+                            "type": "tangent",
+                            "selection_intent": "roller outer surface tangent to cam plate",
+                            "selection_selectors": [
+                                {"stable_id": "roller-1:cylinder:outer", "fallback": {"type": "cylindrical_axis", "origin_m": [0, 0, 0], "radius_m": 0.015}},
+                                {"stable_id": "cam_plate-1:plane:x_max", "fallback": {"type": "bbox_planar_face", "origin_m": [0.015, 0, 0]}},
+                            ],
+                        },
                     ],
                     "verification": ["rebuild", "mate_errors"],
                 },
@@ -118,14 +126,16 @@ class MateGroupMacroTests(unittest.TestCase):
             self.assertEqual(data["document"]["title"], "macro_fixture.SLDASM")
             self.assertEqual(data["execution_actions"][0]["action"], "suppress_mate")
             self.assertEqual(data["execution_actions"][0]["target_mate"], "Broken_Bolt_Mate")
-            self.assertEqual(len(data["macros"]), 4)
+            self.assertEqual(len(data["macros"]), 5)
             self.assertEqual(data["macros"][0]["expected_mate_name"], "MG_standard_bolt_m6_1_01_concentric")
             self.assertEqual(len(data["macros"][0]["selection_selectors"]), 2)
             distance_macro = next(item for item in data["macros"] if item["mate_type"] == "distance")
             angle_macro = next(item for item in data["macros"] if item["mate_type"] == "angle")
+            tangent_macro = next(item for item in data["macros"] if item["mate_type"] == "tangent")
             self.assertEqual(distance_macro["distance_m"], 0.0125)
             self.assertEqual(angle_macro["angle_deg"], 30.0)
             self.assertTrue(angle_macro["flip"])
+            self.assertEqual(tangent_macro["expected_mate_name"], "MG_standard_bolt_m6_1_05_tangent")
             skipped_groups = {item["group_id"] for item in data["skipped"]}
             self.assertIn("classify_handle-1", skipped_groups)
             self.assertIn("repair_Broken_Bolt_Mate", skipped_groups)
@@ -164,7 +174,7 @@ class MateGroupMacroTests(unittest.TestCase):
 
             self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
             data = json.loads(manifest.read_text(encoding="utf-8-sig"))
-            self.assertEqual(len(data["macros"]), 4)
+            self.assertEqual(len(data["macros"]), 5)
 
 
 if __name__ == "__main__":

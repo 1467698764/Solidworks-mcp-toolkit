@@ -13,6 +13,7 @@ from pathlib import Path
 MATE_TYPES = {
     "coincident": 0,
     "concentric": 1,
+    "tangent": 4,
     "distance": 5,
     "angle": 6,
     "parallel": 3,

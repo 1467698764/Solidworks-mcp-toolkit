@@ -106,6 +106,26 @@ class MateGroupValidateTests(unittest.TestCase):
             kinds = {item["kind"] for item in data["findings"]["blocking"]}
             self.assertIn("concentric_without_axial_locator", kinds)
 
+    def test_accepts_tangent_roller_contact_group(self):
+        plan = self.good_plan()
+        plan["mate_groups"][0]["suggested_mates"] = [{"type": "tangent"}]
+        plan["mate_groups"][0]["dof_expectation"] = {
+            "intent": "roller_surface_contact",
+            "remaining_dof": ["rotation_about_roller_axis"],
+            "rotation_about_axis": "free",
+        }
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            plan_path = root / "mate_group_plan.json"
+            out = root / "validation.json"
+            plan_path.write_text(json.dumps(plan), encoding="utf-8")
+
+            proc = run_py("--mate-group-plan", str(plan_path), "--out", str(out))
+
+            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+            data = json.loads(out.read_text(encoding="utf-8-sig"))
+            self.assertTrue(data["ok"], data)
+
     def test_swctl_routes_mate_group_validate(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
