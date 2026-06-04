@@ -53,7 +53,24 @@ def size_from_bbox(box: list[float] | None) -> list[float] | None:
     return [max(0.0, box[i + 3] - box[i]) for i in range(3)]
 
 
-def planar_face(component: str, box: list[float], axis: int, side: str) -> dict[str, Any]:
+def planar_selector(component: str, component_path: str | None, interface_id: str, face_name: str, face: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "stable_id": interface_id,
+        "component": component,
+        "component_path": component_path,
+        "strategy": "stable_id_then_bbox_fallback",
+        "fallback": {
+            "type": "bbox_planar_face",
+            "face": face_name,
+            "origin_m": face["local_frame"]["origin_m"],
+            "normal": face["normal"],
+            "source": face["source"],
+        },
+        "tags": ["reopen_repair_selector", "review_before_live_selection"],
+    }
+
+
+def planar_face(component: str, component_path: str | None, box: list[float], axis: int, side: str) -> dict[str, Any]:
     axis_names = ("x", "y", "z")
     sign = -1.0 if side == "min" else 1.0
     center = [(box[i] + box[i + 3]) / 2.0 for i in range(3)]
@@ -66,7 +83,8 @@ def planar_face(component: str, box: list[float], axis: int, side: str) -> dict[
     u_axis[tangent_axes[0]] = 1.0
     v_axis[tangent_axes[1]] = 1.0
     face_name = f"{axis_names[axis]}_{side}"
-    return {
+    interface_id = f"{component}:plane:{face_name}"
+    face = {
         "interface_id": f"{component}:plane:{face_name}",
         "component": component,
         "kind": "planar",
@@ -82,23 +100,41 @@ def planar_face(component: str, box: list[float], axis: int, side: str) -> dict[
         "confidence": 0.45,
         "source": "axis_aligned_bbox_face",
     }
+    face["selector"] = planar_selector(component, component_path, interface_id, face_name, face)
+    return face
 
 
-def planar_faces_for_component(component: str, box: list[float] | None) -> list[dict[str, Any]]:
+def planar_faces_for_component(component: str, component_path: str | None, box: list[float] | None) -> list[dict[str, Any]]:
     if box is None:
         return []
     return [
-        planar_face(component, box, axis, side)
+        planar_face(component, component_path, box, axis, side)
         for axis in range(3)
         for side in ("min", "max")
     ]
 
 
-def coordinate_system_for_component(component: str, box: list[float] | None, roles: list[str]) -> dict[str, Any] | None:
+def coordinate_system_selector(component: str, component_path: str | None, coordinate_system: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "stable_id": coordinate_system["coordinate_system_id"],
+        "component": component,
+        "component_path": component_path,
+        "strategy": "stable_id_then_bbox_fallback",
+        "fallback": {
+            "type": "bbox_center_coordinate_system",
+            "origin_m": coordinate_system["origin_m"],
+            "axes": coordinate_system["axes"],
+            "source": coordinate_system["source"],
+        },
+        "tags": ["reopen_repair_selector", "review_before_live_selection"],
+    }
+
+
+def coordinate_system_for_component(component: str, component_path: str | None, box: list[float] | None, roles: list[str]) -> dict[str, Any] | None:
     if box is None:
         return None
     size = size_from_bbox(box) or [0.0, 0.0, 0.0]
-    return {
+    coordinate_system = {
         "coordinate_system_id": f"{component}:csys:bbox_center",
         "component": component,
         "origin_role": "fixed_root_reference" if "fixed_root" in roles else "component_bbox_center",
@@ -112,6 +148,8 @@ def coordinate_system_for_component(component: str, box: list[float] | None, rol
         "confidence": 0.5 if "fixed_root" in roles else 0.4,
         "source": "axis_aligned_bbox",
     }
+    coordinate_system["selector"] = coordinate_system_selector(component, component_path, coordinate_system)
+    return coordinate_system
 
 
 def overlapping_on_other_axes(a: list[float], b: list[float], axis: int) -> bool:
@@ -179,6 +217,7 @@ def build_index(report: dict[str, Any], *, near_tolerance_m: float, standard_par
             planar_ids = contact_planar_interface_ids(a, box_a, b, box_b, near_tolerance_m)
             if planar_ids is not None:
                 item["planar_interface_ids"] = planar_ids
+                item["selector_refs"] = dict(planar_ids)
                 contact_plane_ids.update(planar_ids.values())
             interfaces.append(item)
 
@@ -189,10 +228,11 @@ def build_index(report: dict[str, Any], *, near_tolerance_m: float, standard_par
         name = component_name(c)
         near_name, near_gap = nearest.get(name, (None, None))
         component_roles = role_hints(c, standard_re)
-        coordinate_system = coordinate_system_for_component(name, boxes.get(name), component_roles)
+        component_path = c.get("path")
+        coordinate_system = coordinate_system_for_component(name, component_path, boxes.get(name), component_roles)
         if coordinate_system is not None:
             coordinate_systems.append(coordinate_system)
-        for face in planar_faces_for_component(name, boxes.get(name)):
+        for face in planar_faces_for_component(name, component_path, boxes.get(name)):
             if face["interface_id"] in contact_plane_ids:
                 face["role"] = "contact_face"
                 face["confidence"] = 0.7
@@ -222,7 +262,8 @@ def build_index(report: dict[str, Any], *, near_tolerance_m: float, standard_par
         "operator_notes": [
             "heuristic_bbox_only",
             "use_live_face_axis_selection_before_applying_mates",
-            "standard_part_role_is_name_based_and_may_require_confirmation",
+        "standard_part_role_is_name_based_and_may_require_confirmation",
+        "selectors_are_stable_ids_with_bbox_fallbacks_not_native_entity_ids",
         ],
     }
 

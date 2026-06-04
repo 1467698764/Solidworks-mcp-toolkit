@@ -47,9 +47,10 @@ cd <repo>
 
 `interface-index` records bbox-derived component proximity, standard-part hints,
 `coordinate_systems`, and `planar_interfaces` with stable ids such as
-`base_plate-1:plane:z_max`, normals, local frames, role, confidence, and source
-evidence. Treat these as reviewable selection targets until live face/axis
-selection confirms exact SolidWorks entities.
+`base_plate-1:plane:z_max`, normals, local frames, role, confidence, source
+evidence, and fallback `selector` records for reopen/repair. Treat these as
+reviewable selection targets until live face/axis selection confirms exact
+SolidWorks entities.
 
 Allowing the command to launch SolidWorks is explicit:
 

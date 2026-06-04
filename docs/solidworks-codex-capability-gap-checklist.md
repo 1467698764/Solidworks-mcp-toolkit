@@ -135,7 +135,7 @@ Status values:
 | Slot/path interfaces | missing | Slider slot, cam path, rail path, path endpoints. | Path can drive slot/path/cam mate or validation. |
 | Coordinate systems/datums | present | `interface-index` emits per-component `coordinate_systems` from bbox evidence with stable ids, origin role, axes, size, confidence, and source; live/native coordinate systems remain a refinement layer. | Downstream drawing/CAM/assembly checks know orientation. |
 | Interface confidence scoring | partial | Bbox/nearest-neighbor and role-hint evidence is indexed; live face/axis confidence is still pending. | Low confidence blocks or asks for alternative, not silent mate creation. |
-| Interface persistence | missing | Store stable references when possible and fallback selectors when not. | Reopen/repair can find the same interface. |
+| Interface persistence | present | `interface-index` emits per-interface and coordinate-system selectors with stable ids, component path, bbox fallback data, strategy, and review tags; native entity ids remain a future refinement. | Reopen/repair can find the same interface. |
 
 ### 6.4 Assembly Planning And Mates
 
