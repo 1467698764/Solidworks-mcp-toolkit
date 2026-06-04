@@ -133,7 +133,7 @@ Status values:
 | Named planar interfaces | present | `interface-index` emits bbox-derived planar interface candidates for datum, mounting, and contact faces, including stable interface ids, normals, local frames, confidence, and source evidence; live face identity remains a later refinement. | Interface id maps to face evidence and local frame. |
 | Named cylindrical interfaces | partial | Shaft axis, hole axis, pin bore, bearing bore, screw hole. | Axis candidates scored by radius, role, location, direction, source feature. |
 | Slot/path interfaces | missing | Slider slot, cam path, rail path, path endpoints. | Path can drive slot/path/cam mate or validation. |
-| Coordinate systems/datums | missing/partial | Part origin role, assembly origin, principal axes, local frames. | Downstream drawing/CAM/assembly checks know orientation. |
+| Coordinate systems/datums | present | `interface-index` emits per-component `coordinate_systems` from bbox evidence with stable ids, origin role, axes, size, confidence, and source; live/native coordinate systems remain a refinement layer. | Downstream drawing/CAM/assembly checks know orientation. |
 | Interface confidence scoring | partial | Bbox/nearest-neighbor and role-hint evidence is indexed; live face/axis confidence is still pending. | Low confidence blocks or asks for alternative, not silent mate creation. |
 | Interface persistence | missing | Store stable references when possible and fallback selectors when not. | Reopen/repair can find the same interface. |
 

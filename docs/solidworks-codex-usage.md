@@ -46,7 +46,7 @@ cd <repo>
 ```
 
 `interface-index` records bbox-derived component proximity, standard-part hints,
-and `planar_interfaces` with stable ids such as
+`coordinate_systems`, and `planar_interfaces` with stable ids such as
 `base_plate-1:plane:z_max`, normals, local frames, role, confidence, and source
 evidence. Treat these as reviewable selection targets until live face/axis
 selection confirms exact SolidWorks entities.

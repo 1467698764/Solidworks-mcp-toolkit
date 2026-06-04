@@ -89,6 +89,36 @@ class InterfaceIndexTests(unittest.TestCase):
             self.assertEqual(contact["planar_interface_ids"]["a"], "base_plate-1:plane:z_max")
             self.assertEqual(contact["planar_interface_ids"]["b"], "cover_plate-1:plane:z_min")
 
+    def test_indexes_component_coordinate_systems_from_bbox_evidence(self):
+        report = {
+            "active_document": {
+                "type": "assembly",
+                "title": "coordinate_fixture.SLDASM",
+                "components": [
+                    {"name2": "base_plate-1", "path": "C:/m/base_plate.SLDPRT", "fixed": True, "bbox_m": [0.0, 0.0, 0.0, 0.20, 0.10, 0.012]},
+                    {"name2": "slide-1", "path": "C:/m/slide.SLDPRT", "fixed": False, "bbox_m": [0.05, 0.02, 0.012, 0.15, 0.08, 0.04]},
+                ],
+            }
+        }
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            src = root / "inspect.json"
+            out = root / "interface_index.json"
+            src.write_text(json.dumps(report), encoding="utf-8")
+
+            proc = run_py("--report", str(src), "--out", str(out))
+
+            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+            data = json.loads(out.read_text(encoding="utf-8-sig"))
+            systems = {item["component"]: item for item in data["coordinate_systems"]}
+            base = systems["base_plate-1"]
+            self.assertEqual(base["coordinate_system_id"], "base_plate-1:csys:bbox_center")
+            self.assertEqual(base["origin_role"], "fixed_root_reference")
+            self.assertEqual(base["origin_m"], [0.1, 0.05, 0.006])
+            self.assertEqual(base["axes"]["x"], [1.0, 0.0, 0.0])
+            self.assertEqual(base["source"], "axis_aligned_bbox")
+            self.assertEqual(systems["slide-1"]["origin_role"], "component_bbox_center")
+
     def test_swctl_routes_interface_index(self):
         report = {
             "active_document": {

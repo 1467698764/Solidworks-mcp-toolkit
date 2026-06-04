@@ -94,6 +94,26 @@ def planar_faces_for_component(component: str, box: list[float] | None) -> list[
     ]
 
 
+def coordinate_system_for_component(component: str, box: list[float] | None, roles: list[str]) -> dict[str, Any] | None:
+    if box is None:
+        return None
+    size = size_from_bbox(box) or [0.0, 0.0, 0.0]
+    return {
+        "coordinate_system_id": f"{component}:csys:bbox_center",
+        "component": component,
+        "origin_role": "fixed_root_reference" if "fixed_root" in roles else "component_bbox_center",
+        "origin_m": [(box[i] + box[i + 3]) / 2.0 for i in range(3)],
+        "axes": {
+            "x": [1.0, 0.0, 0.0],
+            "y": [0.0, 1.0, 0.0],
+            "z": [0.0, 0.0, 1.0],
+        },
+        "size_m": size,
+        "confidence": 0.5 if "fixed_root" in roles else 0.4,
+        "source": "axis_aligned_bbox",
+    }
+
+
 def overlapping_on_other_axes(a: list[float], b: list[float], axis: int) -> bool:
     for other in range(3):
         if other == axis:
@@ -164,10 +184,14 @@ def build_index(report: dict[str, Any], *, near_tolerance_m: float, standard_par
 
     indexed_components = []
     planar_interfaces: list[dict[str, Any]] = []
+    coordinate_systems: list[dict[str, Any]] = []
     for c in components:
         name = component_name(c)
         near_name, near_gap = nearest.get(name, (None, None))
         component_roles = role_hints(c, standard_re)
+        coordinate_system = coordinate_system_for_component(name, boxes.get(name), component_roles)
+        if coordinate_system is not None:
+            coordinate_systems.append(coordinate_system)
         for face in planar_faces_for_component(name, boxes.get(name)):
             if face["interface_id"] in contact_plane_ids:
                 face["role"] = "contact_face"
@@ -191,6 +215,7 @@ def build_index(report: dict[str, Any], *, near_tolerance_m: float, standard_par
         "ok": True,
         "document": {"type": doc.get("type"), "title": doc.get("title") or doc.get("name")},
         "components": sorted(indexed_components, key=lambda item: item["component"]),
+        "coordinate_systems": sorted(coordinate_systems, key=lambda item: item["coordinate_system_id"]),
         "planar_interfaces": sorted(planar_interfaces, key=lambda item: item["interface_id"]),
         "interfaces": sorted(interfaces, key=lambda item: (item["gap_m"], item["a"], item["b"])),
         "parameters": {"near_tolerance_m": near_tolerance_m, "standard_part_regex": standard_part_regex},
