@@ -560,6 +560,50 @@ class MateGroupExecuteTests(unittest.TestCase):
         self.assertEqual(pinion_face.select_calls, [(False, {"mark": 0})])
         self.assertEqual(gear_face.select_calls, [(True, {"mark": 0})])
 
+    def test_executes_cam_follower_mate_with_native_faces(self):
+        manifest = self.manifest()
+        manifest["macros"][0]["mate_type"] = "cam"
+        manifest["macros"][0]["expected_mate_name"] = "MG_cam_follower_01_cam"
+        manifest["macros"][0]["selection_selectors"] = [
+            {
+                "stable_id": "cam_plate-1:cylinder:cam_surface",
+                "component": "cam_plate-1",
+                "fallback": {
+                    "type": "cylindrical_axis",
+                    "axis": [0.0, 0.0, 1.0],
+                    "origin_m": [0.0, 0.0, 0.0],
+                    "radius_m": 0.03,
+                },
+            },
+            {
+                "stable_id": "follower-1:cylinder:roller",
+                "component": "follower-1",
+                "fallback": {
+                    "type": "cylindrical_axis",
+                    "axis": [0.0, 0.0, 1.0],
+                    "origin_m": [0.05, 0.0, 0.0],
+                    "radius_m": 0.012,
+                },
+            },
+        ]
+        cam_face = FakeFace(
+            FakeSurface("cylinder", [0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.03]),
+            [-0.03, -0.03, -0.01, 0.03, 0.03, 0.01],
+        )
+        follower_face = FakeFace(
+            FakeSurface("cylinder", [0.05, 0.0, 0.0, 0.0, 0.0, 1.0, 0.012]),
+            [0.038, -0.012, -0.01, 0.062, 0.012, 0.01],
+        )
+        asm = FakeAssembly([FakeComponent("cam_plate-1", [cam_face]), FakeComponent("follower-1", [follower_face])])
+
+        result = mod.execute_manifest(manifest, asm)
+
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(asm.mates[0][0], mod.MATE_TYPES["cam"])
+        self.assertEqual(result["executed_mates"][0]["mate_type"], "cam")
+        self.assertEqual(cam_face.select_calls, [(False, {"mark": 0})])
+        self.assertEqual(follower_face.select_calls, [(True, {"mark": 0})])
+
     def test_dry_run_reports_repair_actions_without_solidworks(self):
         manifest = self.manifest()
         manifest["execution_actions"] = [{"action": "suppress_mate", "target_mate": "Broken_Bolt_Mate"}]

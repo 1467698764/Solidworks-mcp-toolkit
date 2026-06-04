@@ -547,7 +547,7 @@ def feature_text(feature: dict[str, Any]) -> str:
 
 def infer_mate_type(feature: dict[str, Any]) -> str:
     text = feature_text(feature)
-    for kind in ("concentric", "coincident", "parallel", "perpendicular", "tangent", "distance", "angle", "width", "symmetry", "gear"):
+    for kind in ("concentric", "coincident", "parallel", "perpendicular", "tangent", "distance", "angle", "width", "symmetry", "cam", "cam_follower", "gear"):
         if kind in text:
             return kind
     if "mate" in text:

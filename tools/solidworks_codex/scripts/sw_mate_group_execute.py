@@ -19,6 +19,8 @@ MATE_TYPES = {
     "angle": 6,
     "limit_angle": 6,
     "symmetry": 8,
+    "cam": 9,
+    "cam_follower": 9,
     "gear": 10,
     "width": 11,
 }

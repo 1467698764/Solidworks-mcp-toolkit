@@ -64,7 +64,7 @@ class MateGroupValidateTests(unittest.TestCase):
     def test_invalid_plan_reports_blockers(self):
         bad = self.good_plan()
         bad["mate_groups"][0]["components"] = ["bolt_m6-1"]
-        bad["mate_groups"][0]["suggested_mates"] = [{"type": "cam"}]
+        bad["mate_groups"][0]["suggested_mates"] = [{"type": "path"}]
         bad["mate_groups"][0].pop("dof_expectation")
         bad["mate_groups"][0]["verification"] = ["visual_only"]
         with tempfile.TemporaryDirectory() as d:
@@ -287,6 +287,46 @@ class MateGroupValidateTests(unittest.TestCase):
             data = json.loads(out.read_text(encoding="utf-8-sig"))
             kinds = {item["kind"] for item in data["findings"]["blocking"]}
             self.assertIn("gear_selector_count", kinds)
+
+    def test_accepts_cam_group_with_two_selectors_and_blocks_short_selector_list(self):
+        plan = self.good_plan()
+        cam_mate = {
+            "type": "cam",
+            "selection_selectors": [
+                {"stable_id": "cam:surface", "fallback": {"type": "cylindrical_axis"}},
+                {"stable_id": "follower:roller", "fallback": {"type": "cylindrical_axis"}},
+            ],
+        }
+        plan["mate_groups"][0]["suggested_mates"] = [cam_mate]
+        plan["mate_groups"][0]["dof_expectation"] = {
+            "intent": "cam_follower_contact",
+            "remaining_dof": ["follower_motion_along_cam_profile"],
+        }
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            plan_path = root / "mate_group_plan.json"
+            out = root / "validation.json"
+            plan_path.write_text(json.dumps(plan), encoding="utf-8")
+
+            proc = run_py("--mate-group-plan", str(plan_path), "--out", str(out))
+
+            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+            data = json.loads(out.read_text(encoding="utf-8-sig"))
+            self.assertTrue(data["ok"], data)
+
+        plan["mate_groups"][0]["suggested_mates"][0]["selection_selectors"] = cam_mate["selection_selectors"][:1]
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            plan_path = root / "mate_group_plan.json"
+            out = root / "validation.json"
+            plan_path.write_text(json.dumps(plan), encoding="utf-8")
+
+            proc = run_py("--mate-group-plan", str(plan_path), "--out", str(out))
+
+            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+            data = json.loads(out.read_text(encoding="utf-8-sig"))
+            kinds = {item["kind"] for item in data["findings"]["blocking"]}
+            self.assertIn("cam_selector_count", kinds)
 
     def test_swctl_routes_mate_group_validate(self):
         with tempfile.TemporaryDirectory() as d:
