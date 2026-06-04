@@ -104,7 +104,7 @@ Status values:
 
 | Capability | Status | Detail required | Acceptance |
 | --- | --- | --- | --- |
-| Parse user goal into CAD scope | partial | Separate part, assembly, mechanism, validation-only, and modification requests. | Tool records profile and non-goals before live mutation. |
+| Parse user goal into CAD scope | present | `workflow-plan` supports `auto` intent classification and emits `intent_classification` with source, detected signals, CAD scope, resolved intent, selected profile, and non-goals for part, assembly, mechanism, validation-only, and modification-like requests. | Tool records profile and non-goals before live mutation. |
 | Mechanical decomposition | present | `workflow-plan` emits `design_intent` with scope, validation profile, parts, subassemblies, standard parts, interfaces, motion pairs, editable parameters, non-goals, and an assumptions source. | Design intent can be inspected without reading generator code. |
 | Assumption ledger | present | `workflow-plan` emits a machine-readable `assumption_ledger` covering dimensions, materials, simplified geometry, validation scope, write safety, assembly interfaces, and mechanism motion evidence where applicable. | Report distinguishes assumption, warning, and blocker; blockers name the stage they stop. |
 | Validation profile selection | present | `workflow-plan` emits `validation_profile_selection` with selected profile, source profile, blocking/warning/not-applicable checks, stage profile mapping, runtime budget, and acceptance rule. | Small part tasks are not blocked by mechanism checks; mechanisms are not accepted by smoke checks. |

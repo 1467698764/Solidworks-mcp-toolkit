@@ -209,6 +209,66 @@ class GenericDesignToolsTests(unittest.TestCase):
             self.assertTrue(any(item["stage"] == "motion_or_dof_check" and item["profile"] == "mechanism_lite" for item in mechanism_selection["stage_profiles"]))
             self.assertIn("Validation Profile Selection", (root / "mechanism.md").read_text(encoding="utf-8-sig"))
 
+    def test_workflow_plan_auto_classifies_cad_scope_from_goal(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            validation_json = root / "validation.json"
+            proc = run_py(
+                "tools/solidworks_codex/scripts/sw_workflow_plan.py",
+                "--goal", "validate only the existing gearbox.SLDASM for mate errors and interference without changing native files",
+                "--intent", "auto",
+                "--runtime-budget", "standard",
+                "--out", str(root / "validation.md"),
+                "--json-out", str(validation_json),
+            )
+            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+
+            data = json.loads(validation_json.read_text(encoding="utf-8-sig"))
+            classification = data["intent_classification"]
+            self.assertEqual("intent_classification", classification["artifact"])
+            self.assertEqual("validation_only", classification["cad_scope"])
+            self.assertEqual("assembly", data["intent"])
+            self.assertIn("assembly", classification["detected_signals"])
+            self.assertIn("validation", classification["detected_signals"])
+            self.assertTrue(any("do not mutate" in item for item in classification["non_goals"]))
+            self.assertEqual("assembly_static", data["design_intent"]["validation_profile"])
+            self.assertIn("Intent Classification", (root / "validation.md").read_text(encoding="utf-8-sig"))
+
+    def test_swctl_workflow_plan_infers_action_when_omitted(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            out_md = root / "workflow.md"
+            out_json = root / "workflow.json"
+            proc = subprocess.run(
+                [
+                    "powershell",
+                    "-NoProfile",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(ROOT / "tools/solidworks_codex/swctl.ps1"),
+                    "workflow-plan",
+                    "-Target",
+                    "build a slider crank mechanism and sample motion limits",
+                    "-View",
+                    "strict",
+                    "-Out",
+                    str(out_md),
+                    "-JsonOut",
+                    str(out_json),
+                ],
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+            )
+            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+            data = json.loads(out_json.read_text(encoding="utf-8-sig"))
+            self.assertEqual("mechanism_assembly", data["intent"])
+            self.assertEqual("mechanism_lite", data["intent_classification"]["selected_profile"])
+            self.assertIn("motion_or_dof_check", [stage["name"] for stage in data["stage_graph"]])
+
     def test_swctl_exposes_workflow_plan_as_generic_analysis_command(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)

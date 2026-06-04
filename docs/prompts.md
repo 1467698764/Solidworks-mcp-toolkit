@@ -93,7 +93,7 @@ Do not modify the model in this turn.
 
 Expected tool flow:
 
-`workflow-plan` uses `-Target` for the overall CAD goal, `-Action` for intent (`single_part`, `part_to_assembly`, `assembly`, `mechanism_assembly`), and `-View` for runtime budget (`fast`, `standard`, `strict`, or `auto`).
+`workflow-plan` uses `-Target` for the overall CAD goal, `-Action` for intent (`auto`, `single_part`, `part_to_assembly`, `assembly`, `mechanism_assembly`), and `-View` for runtime budget (`fast`, `standard`, `strict`, or `auto`). Omit `-Action` when the goal text should drive `intent_classification`.
 
 ```powershell
 .\tools\solidworks_codex\swctl.ps1 workflow-plan -Target "<overall CAD goal>" -Action part_to_assembly -View fast -Out tools\solidworks_codex\reports\workflow_plan.md -JsonOut tools\solidworks_codex\reports\workflow_plan.json

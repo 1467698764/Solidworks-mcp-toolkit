@@ -18,7 +18,7 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[3]
 
-KNOWN_INTENTS = {"single_part", "part_to_assembly", "assembly", "mechanism_assembly"}
+KNOWN_INTENTS = {"auto", "single_part", "part_to_assembly", "assembly", "mechanism_assembly"}
 KNOWN_RUNTIME_BUDGETS = {"fast", "standard", "strict"}
 
 
@@ -39,8 +39,10 @@ def load_validation_profiles() -> Any:
 
 
 def normalize_intent(intent: str) -> str:
-    value = (intent or "single_part").strip().lower().replace("-", "_")
+    value = (intent or "auto").strip().lower().replace("-", "_")
     aliases = {
+        "infer": "auto",
+        "detect": "auto",
         "part": "single_part",
         "single": "single_part",
         "part_assembly": "part_to_assembly",
@@ -52,6 +54,64 @@ def normalize_intent(intent: str) -> str:
     if normalized not in KNOWN_INTENTS:
         raise ValueError(f"unknown workflow intent: {intent}")
     return normalized
+
+
+def goal_has_any(lowered: str, terms: tuple[str, ...]) -> bool:
+    return any(term in lowered for term in terms)
+
+
+def classify_intent(goal: str, requested_intent: str) -> dict[str, Any]:
+    normalized = normalize_intent(requested_intent)
+    lowered = goal.lower()
+    signals: list[str] = []
+    if goal_has_any(lowered, ("validate", "validation", "inspect", "check", "verify", "诊断", "验证", "检查", "校验")):
+        signals.append("validation")
+    if goal_has_any(lowered, (".sldasm", "assembly", "assembl", "mate", "component", "fit", "interference", "装配", "组件", "配合", "干涉")):
+        signals.append("assembly")
+    if goal_has_any(lowered, ("mechanism", "motion", "slider", "crank", "linkage", "dof", "limit", "sweep", "机构", "运动", "滑块", "曲柄", "自由度", "行程")):
+        signals.append("mechanism")
+    if goal_has_any(lowered, (".sldprt", "part", "bracket", "plate", "hole", "slot", "boss", "cut", "零件", "支架", "板", "孔", "槽")):
+        signals.append("part")
+    if goal_has_any(lowered, ("modify", "edit", "change", "adjust", "repair", "fix", "修改", "调整", "修复")):
+        signals.append("modification")
+    if goal_has_any(lowered, ("create", "build", "design", "generate", "make", "创建", "设计", "生成", "建模")):
+        signals.append("creation")
+    if goal_has_any(lowered, ("without changing", "no mutation", "read-only", "readonly", "只读", "不修改", "不要修改")):
+        signals.append("read_only")
+
+    if normalized != "auto":
+        resolved_intent = normalized
+        cad_scope = "validation_only" if "validation" in signals and "read_only" in signals else normalized
+    elif "mechanism" in signals:
+        resolved_intent = "mechanism_assembly"
+        cad_scope = "mechanism"
+    elif "assembly" in signals and "part" in signals and "creation" in signals:
+        resolved_intent = "part_to_assembly"
+        cad_scope = "part_to_assembly"
+    elif "assembly" in signals:
+        resolved_intent = "assembly"
+        cad_scope = "validation_only" if "validation" in signals and ("read_only" in signals or "creation" not in signals) else "assembly"
+    else:
+        resolved_intent = "single_part"
+        cad_scope = "part_modify" if "modification" in signals else "single_part"
+
+    source = "explicit_action" if normalized != "auto" else "goal_text"
+    non_goals = [
+        "do not mutate native files when cad_scope is validation_only",
+        "do not infer exact dimensions from broad category words",
+    ]
+    if resolved_intent != "mechanism_assembly":
+        non_goals.append("do not require mechanism motion evidence unless mechanism signals or explicit action request it")
+    return {
+        "artifact": "intent_classification",
+        "source": source,
+        "requested_intent": normalized,
+        "resolved_intent": resolved_intent,
+        "cad_scope": cad_scope,
+        "selected_profile": public_profile_name(selected_profile_for_intent(resolved_intent)),
+        "detected_signals": signals,
+        "non_goals": non_goals,
+    }
 
 
 def normalize_budget(runtime_budget: str) -> str:
@@ -424,7 +484,8 @@ def design_intent(goal: str, intent: str) -> dict[str, Any]:
 
 
 def build_plan(goal: str, intent: str, runtime_budget: str) -> dict[str, Any]:
-    normalized_intent = normalize_intent(intent)
+    classification = classify_intent(goal, intent)
+    normalized_intent = classification["resolved_intent"]
     budget = normalize_budget(runtime_budget)
     vp = load_validation_profiles()
     profiles = build_profiles(vp, budget)
@@ -445,6 +506,7 @@ def build_plan(goal: str, intent: str, runtime_budget: str) -> dict[str, Any]:
         "goal": goal,
         "intent": normalized_intent,
         "runtime_budget": budget,
+        "intent_classification": classification,
         "design_intent": design_intent(goal, normalized_intent),
         "stage_graph": stages,
         "feedback_edges": feedback_edges(normalized_intent),
@@ -464,7 +526,20 @@ def markdown(plan: dict[str, Any]) -> str:
         f"- Runtime budget: `{plan['runtime_budget']}`",
         f"- Principle: {plan['principle']}",
         "",
-        "## Design Intent",
+        "## Intent Classification",
+    ])
+    classification = plan.get("intent_classification") or {}
+    lines.extend([
+        f"- CAD scope: `{classification.get('cad_scope')}`",
+        f"- Source: `{classification.get('source')}`",
+        f"- Detected signals: {', '.join(f'`{x}`' for x in classification.get('detected_signals', [])) or '`<none>`'}",
+        "",
+        f"- Requested intent: `{classification.get('requested_intent')}`",
+        f"- Resolved intent: `{classification.get('resolved_intent')}`",
+        f"- Selected profile: `{classification.get('selected_profile')}`",
+        f"- Non-goals: {'; '.join(classification.get('non_goals', []))}",
+        "",
+        "## Design Intent Details",
     ])
     intent = plan.get("design_intent") or {}
     lines.extend([
