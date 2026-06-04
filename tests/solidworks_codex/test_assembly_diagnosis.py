@@ -28,7 +28,7 @@ class AssemblyDiagnosisTests(unittest.TestCase):
                 "title": "sample_machine.SLDASM",
                 "component_count_sampled": 7,
                 "components": [
-                    {"name2": "base_plate-1", "path": "C:/machines/base_plate.SLDPRT", "fixed": True, "suppressed": False, "hidden": False, "bbox_m": [-0.15, -0.10, 0.0, 0.15, 0.10, 0.012]},
+                    {"name2": "base_plate-1", "path": "C:/machines/base_plate.SLDPRT", "configuration": "Default", "fixed": True, "suppressed": False, "hidden": False, "bbox_m": [-0.15, -0.10, 0.0, 0.15, 0.10, 0.012], "transform_array": [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.01, 0.02, 0.03, 1.0, 0.0, 0.0, 0.0]},
                     {"name2": "cover_plate-1", "path": "C:/machines/cover_plate.SLDPRT", "fixed": False, "suppressed": False, "hidden": False, "bbox_m": [-0.14, -0.09, 0.012, 0.14, 0.09, 0.026]},
                     {"name2": "dowel_pin-1", "path": "C:/machines/dowel_pin.SLDPRT", "fixed": False, "suppressed": False, "hidden": False, "bbox_m": [-0.04, -0.03, -0.004, -0.034, -0.024, 0.05]},
                     {"name2": "shaft-1", "path": "C:/machines/shaft.SLDPRT", "fixed": False, "suppressed": False, "hidden": False, "bbox_m": [0.02, -0.01, 0.026, 0.12, 0.01, 0.046]},
@@ -60,6 +60,17 @@ class AssemblyDiagnosisTests(unittest.TestCase):
             self.assertEqual(data["document"]["type"], "assembly")
             self.assertEqual(data["inventory"]["component_count"], 7)
             self.assertEqual(data["inventory"]["fixed_components"], ["base_plate-1"])
+            components = {item["name"]: item for item in data["inventory"]["components"]}
+            base = components["base_plate-1"]
+            self.assertEqual(base["path"], "C:/machines/base_plate.SLDPRT")
+            self.assertEqual(base["configuration"], "Default")
+            self.assertEqual(base["bbox_m"], [-0.15, -0.10, 0.0, 0.15, 0.10, 0.012])
+            self.assertEqual(base["size_m"], [0.3, 0.2, 0.012])
+            self.assertTrue(base["fixed"])
+            self.assertFalse(base["suppressed"])
+            self.assertFalse(base["hidden"])
+            self.assertEqual(base["origin_m"], [0.01, 0.02, 0.03])
+            self.assertEqual(base["local_axes"]["x"], [1.0, 0.0, 0.0])
             self.assertIn("loose_handle-1", data["mate_graph"]["isolated_components"])
             self.assertIn("bolt_m6-1", data["mate_graph"]["no_mate_components"])
             self.assertIn("bolt_m6-1", data["standard_parts"]["hostless"])

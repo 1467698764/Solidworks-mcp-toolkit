@@ -95,6 +95,50 @@ def bbox_gap(a: list[float], b: list[float]) -> float:
     return math.sqrt(sum(g * g for g in gaps))
 
 
+def size_from_bbox(box: list[float] | None) -> list[float] | None:
+    if box is None:
+        return None
+    return [max(0.0, box[i + 3] - box[i]) for i in range(3)]
+
+
+def transform_array(component: dict[str, Any]) -> list[float] | None:
+    raw = component.get("transform_array") or component.get("transform")
+    if not isinstance(raw, list) or len(raw) < 12:
+        return None
+    try:
+        return [float(value) for value in raw]
+    except (TypeError, ValueError):
+        return None
+
+
+def component_inventory_row(component: dict[str, Any]) -> dict[str, Any]:
+    name = component_name(component)
+    box = bbox(component)
+    transform = transform_array(component)
+    row: dict[str, Any] = {
+        "name": name,
+        "path": component.get("path"),
+        "configuration": component.get("configuration") or component.get("config") or component.get("referenced_configuration"),
+        "fixed": component.get("fixed") is True,
+        "suppressed": component.get("suppressed") is True,
+        "hidden": component.get("hidden") is True,
+        "bbox_m": box,
+        "size_m": size_from_bbox(box),
+        "has_transform": transform is not None,
+    }
+    if transform is not None:
+        row["origin_m"] = [transform[9], transform[10], transform[11]]
+        row["local_axes"] = {
+            "x": [transform[0], transform[1], transform[2]],
+            "y": [transform[3], transform[4], transform[5]],
+            "z": [transform[6], transform[7], transform[8]],
+        }
+    else:
+        row["origin_m"] = None
+        row["local_axes"] = {}
+    return row
+
+
 def scan_locks(root: Path | None) -> list[str]:
     if root is None or not root.exists():
         return []
@@ -204,6 +248,10 @@ def diagnose(report: dict[str, Any], *, lock_root: Path | None = None, near_tole
         for item in components
         if item.get("path")
     }
+    inventory_components = sorted(
+        [component_inventory_row(item) for item in components],
+        key=lambda item: item["name"],
+    )
 
     return {
         "timestamp": datetime.now().isoformat(timespec="seconds"),
@@ -217,6 +265,7 @@ def diagnose(report: dict[str, Any], *, lock_root: Path | None = None, near_tole
             "hidden_components": hidden,
             "suppressed_components": suppressed,
             "component_paths": dict(sorted(component_paths.items())),
+            "components": inventory_components,
         },
         "mates": {
             "mate_count": len(mates),

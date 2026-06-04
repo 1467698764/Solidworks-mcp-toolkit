@@ -141,7 +141,7 @@ Status values:
 
 | Capability | Status | Detail required | Acceptance |
 | --- | --- | --- | --- |
-| Component inventory | partial | Paths, configs, transforms, bbox, fixed/floating, suppressed/hidden. | Existing and generated assemblies produce comparable inventory. |
+| Component inventory | present | `assembly-diagnose` emits comparable per-component inventory rows with path, configuration, fixed/suppressed/hidden state, bbox, size, transform origin, local axes, and transform availability, alongside aggregate fixed/floating/hidden/suppressed lists. | Existing and generated assemblies produce comparable inventory. |
 | Mate graph extraction | partial | Mate type, participants, suppressed/error, connected components. | Report identifies isolated and weakly connected components. |
 | Coincident mate | partial | Face contact and orientation; not arbitrary zero-distance pick. | Readback type and participants match interface ids. |
 | Concentric mate | partial | Hole/shaft axis pairing with axial locator. | Revolute joint is not accepted with concentric alone unless axial freedom is intended. |
