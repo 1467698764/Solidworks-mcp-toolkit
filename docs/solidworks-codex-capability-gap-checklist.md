@@ -123,7 +123,7 @@ Status values:
 | Fillet/chamfer | missing/partial | Edge selection by role, radius/angle, failure handling. | Feature is named and does not break rebuild. |
 | Patterns/mirror | missing/partial | Linear/circular pattern, seed feature, count, spacing. | Pattern instances read back or represented in feature index. |
 | Sketch/dimension edit | present but shallow | Locate by feature/dimension name, edit, rebuild, verify downstream. | Only intended dimension changes. |
-| Feature suppression/edit | partial/guarded | `feature-state` / `solidworks_feature_state` executes suppress, unsuppress, and delete by exact or unique feature-name match with live rebuild and before/after state evidence. Reorder and parameterized depth/radius edits remain separate capability tracks. | Rebuild health, feature count, and feature state read back. |
+| Feature suppression/edit | partial/guarded | `feature-state` / `solidworks_feature_state` executes suppress, unsuppress, delete, and feature-scoped dimension writes by exact or unique feature-name match with live rebuild and before/after state/dimension evidence. Reorder and richer definition-object edits remain separate capability tracks. | Rebuild health, feature count, feature state, and edited parameter values are read back. |
 | Part import/read-only inspect | partial | Existing `.SLDPRT` inventory without rewriting. | Feature/interface report works on user-provided part. |
 
 ### 6.3 Geometry Interfaces
@@ -162,7 +162,7 @@ Status values:
 | Local fault localization | partial/offline-ready | Assembly diagnosis, repair plan, interface index, and mate group plan localize bad mates, hostless standard parts, and isolated components. | Repair plan names the affected subgraph. |
 | Rollback copies | present | `assembly-diagnose` preserves component paths and `assembly-repair-plan` emits a `rollback_plan` with affected components/files, backup report path, backup/status/restore commands, missing path blockers, and mutation blocking until backup exists. | Report lists rollback paths. |
 | Selective mate repair | partial/guarded | Reviewable mate group macro drafts, selector-bearing execution manifests, `mate-group-execute`, and live protocols can be generated per actionable group; bad-mate suppress/delete actions now propagate from repair plans into execution manifests and run before replacement mates. Stronger native entity ids still need live hardening. | Untouched components keep file timestamps/transforms unless affected, and each changed group has rebuild/inspect/execution-check evidence. |
-| Selective part repair | missing | Edit only affected feature/sketch; rebuild dependent assembly. | Report lists changed feature and downstream checks. |
+| Selective part repair | partial/guarded | `feature-state` can edit an affected feature state or feature-scoped dimension while preserving before/after evidence; broader sketch/topology surgery remains a separate capability track. | Report lists changed feature, changed parameter, rebuild result, and downstream checks. |
 | Full rebuild justification | present | `workflow-plan` emits `full_rebuild_justification_policy` with local-repair-first default, allowed reasons (`stale_base`, `invalid_topology`, `missing_interface`, `cheaper_regeneration`), required evidence fields, and a blocking rule when no reason is recorded. | Full rebuild is a deliberate decision, not default behavior. |
 
 ### 6.6 Validation And Understanding

@@ -144,6 +144,46 @@ class ComPropertyReadingTests(unittest.TestCase):
         self.assertIn(("SetSuppression2", 1, 2, None), calls)
         self.assertIn(("DeleteSelection2", 0), calls)
 
+    def test_feature_state_sets_dimension_value_with_feature_scoped_resolution(self):
+        calls = []
+
+        class FakeDimension:
+            _oleobj_ = object()
+
+            def __init__(self, value):
+                self.SystemValue = value
+
+        class FakeModel:
+            def __init__(self):
+                self.dimension = FakeDimension(0.004)
+
+            def Parameter(self, name):
+                calls.append(("Parameter", name))
+                if name == "D1@Cut-1":
+                    return self.dimension
+                return None
+
+        class FakeFeature:
+            _oleobj_ = object()
+            Name = "Cut-1"
+
+            def GetNameForSelection(self):
+                return "Cut-1"
+
+            def Select2(self, append, mark):
+                calls.append(("Select2", append, mark))
+                return True
+
+        model = FakeModel()
+        result = feature_state_mod.apply_action(model, FakeFeature(), "set-dimension", dimension="D1", value_m=0.012)
+
+        self.assertEqual(result["dimension"]["name"], "D1@Cut-1")
+        self.assertEqual(result["dimension"]["before_m"], 0.004)
+        self.assertEqual(result["dimension"]["after_m"], 0.012)
+        self.assertEqual(model.dimension.SystemValue, 0.012)
+        self.assertEqual(calls[0], ("Select2", False, 0))
+        self.assertIn(("Parameter", "D1@Cut-1"), calls)
+
     def test_component_state_hide_show_uses_assembly_selection_commands(self):
         calls = []
 

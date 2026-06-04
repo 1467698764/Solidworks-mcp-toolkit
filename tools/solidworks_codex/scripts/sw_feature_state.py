@@ -1,6 +1,6 @@
-"""Change SolidWorks feature state by feature name and emit JSON evidence.
+"""Change SolidWorks feature state or feature-scoped dimensions and emit JSON evidence.
 
-Supported actions: suppress, unsuppress, delete.
+Supported actions: suppress, unsuppress, delete, set-dimension.
 Works on the active part/assembly document, or opens a provided model path.
 """
 from __future__ import annotations
@@ -186,7 +186,36 @@ def delete_selected(model: Any) -> Any:
     return read(model, "DeleteSelection", False)
 
 
-def apply_action(model: Any, feature: Any, action: str) -> Any:
+def resolve_feature_dimension(model: Any, feature: Any, dimension_query: str) -> tuple[Any, str]:
+    if not dimension_query:
+        raise ValueError("set-dimension requires a dimension name or feature-local dimension token")
+    feature_names = [item for item in (feature_name(feature), read(feature, "GetNameForSelection")) if isinstance(item, str)]
+    candidates = [dimension_query]
+    if "@" not in dimension_query:
+        candidates.extend(f"{dimension_query}@{name}" for name in feature_names)
+    seen: set[str] = set()
+    for candidate in candidates:
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        dim = read(model, "Parameter", candidate)
+        if dim is not None and not isinstance(dim, dict):
+            return dim, candidate
+    raise RuntimeError(f"Dimension not found for feature {feature_names[:2]}: {dimension_query}")
+
+
+def set_feature_dimension(model: Any, feature: Any, dimension_query: str, value_m: float) -> dict[str, Any]:
+    dim, resolved = resolve_feature_dimension(model, feature, dimension_query)
+    before = read(dim, "SystemValue")
+    try:
+        dim.SystemValue = float(value_m)
+    except Exception as exc:
+        raise RuntimeError(f"Could not set dimension {resolved} to {value_m}: {exc}") from exc
+    after = read(dim, "SystemValue")
+    return {"name": resolved, "before_m": before, "after_m": after, "target_m": float(value_m)}
+
+
+def apply_action(model: Any, feature: Any, action: str, dimension: str = "", value_m: float | None = None) -> Any:
     selection_result = select_feature(feature)
     if action == "suppress":
         return {"select": selection_result, "state": set_suppression(feature, True)}
@@ -194,6 +223,10 @@ def apply_action(model: Any, feature: Any, action: str) -> Any:
         return {"select": selection_result, "state": set_suppression(feature, False)}
     if action == "delete":
         return {"select": selection_result, "delete": delete_selected(model)}
+    if action == "set-dimension":
+        if value_m is None:
+            raise ValueError("set-dimension requires value_m")
+        return {"select": selection_result, "dimension": set_feature_dimension(model, feature, dimension, value_m)}
     raise ValueError(f"Unsupported action: {action}")
 
 
@@ -208,7 +241,9 @@ def save_model(model: Any) -> dict[str, Any]:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--feature", required=True, help="Feature name exact or unique substring")
-    parser.add_argument("--action", required=True, choices=["suppress", "unsuppress", "delete"])
+    parser.add_argument("--action", required=True, choices=["suppress", "unsuppress", "delete", "set-dimension"])
+    parser.add_argument("--dimension", default="", help="Exact dimension full name or feature-local token such as D1")
+    parser.add_argument("--value-m", type=float, default=None)
     parser.add_argument("--model", default=None)
     parser.add_argument("--start", action="store_true")
     parser.add_argument("--save", action="store_true")
@@ -221,7 +256,7 @@ def main() -> None:
     before_features = len(list_features(model))
     feature = find_feature(model, args.feature)
     before = snapshot(feature)
-    action_result = apply_action(model, feature, args.action)
+    action_result = apply_action(model, feature, args.action, dimension=args.dimension, value_m=args.value_m)
     rebuild_result = read(model, "ForceRebuild3", False)
     after = None if args.action == "delete" else snapshot(find_feature(model, args.feature))
     after_features = len(list_features(model))
@@ -234,6 +269,8 @@ def main() -> None:
         "document_path": read(model, "GetPathName"),
         "feature_query": args.feature,
         "action": args.action,
+        "dimension_query": args.dimension,
+        "value_m": args.value_m,
         "before_feature_count": before_features,
         "after_feature_count": after_features,
         "before": before,
