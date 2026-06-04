@@ -46,13 +46,14 @@ cd <repo>
 ```
 
 `interface-index` records bbox-derived component proximity, standard-part hints,
-`coordinate_systems`, `planar_interfaces`, and feature/dimension-derived
-`cylindrical_interfaces` with stable ids such as `base_plate-1:plane:z_max` and
-`shaft-1:cylinder:ShaftAxis_D24_Z`, normals or axes, local frames, role,
-confidence, `confidence_level`, `selection_policy`, source evidence, and
-fallback `selector` records for reopen/repair. Weak bbox-only candidates block
-automatic selection until live face/axis evidence confirms exact SolidWorks
-entities.
+`coordinate_systems`, `planar_interfaces`, feature/dimension-derived
+`cylindrical_interfaces`, and `slot_path_interfaces` with stable ids such as
+`base_plate-1:plane:z_max`, `shaft-1:cylinder:ShaftAxis_D24_Z`, and
+`guide-1:slot:SliderSlot_L120_W12_X`, normals, axes, centerline endpoints,
+local frames, role, confidence, `confidence_level`, `selection_policy`, source
+evidence, and fallback `selector` records for reopen/repair. Weak bbox-only
+candidates block automatic selection until live face/axis evidence confirms
+exact SolidWorks entities.
 
 Allowing the command to launch SolidWorks is explicit:
 

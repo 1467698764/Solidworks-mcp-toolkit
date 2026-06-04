@@ -61,6 +61,10 @@ def size_from_bbox(box: list[float] | None) -> list[float] | None:
     return [max(0.0, box[i + 3] - box[i]) for i in range(3)]
 
 
+def clean_vector(values: list[float]) -> list[float]:
+    return [round(float(value), 12) for value in values]
+
+
 def planar_selector(component: str, component_path: str | None, interface_id: str, face_name: str, face: dict[str, Any]) -> dict[str, Any]:
     return {
         "stable_id": interface_id,
@@ -217,6 +221,30 @@ def dimension_diameter_by_feature(dimensions: list[dict[str, Any]]) -> dict[str,
     return result
 
 
+def dimensions_by_feature(dimensions: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+    result: dict[str, list[dict[str, Any]]] = {}
+    for dim in dimensions:
+        name = item_name(dim)
+        feature = str(dim.get("feature") or name.split("@")[1] if "@" in name else dim.get("feature") or "")
+        if feature:
+            result.setdefault(feature, []).append(dim)
+    return result
+
+
+def dimension_value_for_feature(dimensions: list[dict[str, Any]], tokens: tuple[str, ...]) -> float | None:
+    for dim in dimensions:
+        text = item_name(dim).lower()
+        if not any(token in text for token in tokens):
+            continue
+        try:
+            value = float(dim.get("system_value_m"))
+        except (TypeError, ValueError):
+            continue
+        if value > 0:
+            return value
+    return None
+
+
 def cylinder_role(feature: dict[str, Any], component: str) -> str | None:
     text = " ".join(str(feature.get(key, "")) for key in ("name", "type", "description", "kind")).lower()
     comp = component.lower()
@@ -305,6 +333,111 @@ def cylindrical_interfaces_for_component(
     return result
 
 
+def parse_named_mm(text: str, prefix: str) -> float | None:
+    match = re.search(rf"(?:^|[_\-\s]){re.escape(prefix)}([0-9]+(?:\.[0-9]+)?)", text, re.IGNORECASE)
+    if not match:
+        return None
+    value = float(match.group(1))
+    return value / 1000.0 if value > 0 else None
+
+
+def slot_axis_from_text(text: str, box: list[float] | None) -> tuple[str, list[float]]:
+    lowered = text.lower()
+    if re.search(r"(^|[_\-\s])x($|[_\-\s])", lowered):
+        return "x", [1.0, 0.0, 0.0]
+    if re.search(r"(^|[_\-\s])y($|[_\-\s])", lowered):
+        return "y", [0.0, 1.0, 0.0]
+    if re.search(r"(^|[_\-\s])z($|[_\-\s])", lowered):
+        return "z", [0.0, 0.0, 1.0]
+    if box is not None:
+        sizes = size_from_bbox(box) or [0.0, 0.0, 0.0]
+        axis_index = max(range(3), key=lambda index: sizes[index])
+        axis_name = ("x", "y", "z")[axis_index]
+        vector = [0.0, 0.0, 0.0]
+        vector[axis_index] = 1.0
+        return axis_name, vector
+    return "x", [1.0, 0.0, 0.0]
+
+
+def slot_role(feature: dict[str, Any]) -> str | None:
+    text = " ".join(str(feature.get(key, "")) for key in ("name", "type", "description", "kind")).lower()
+    if "slot" not in text and "槽" not in text:
+        return None
+    if any(token in text for token in ("slide", "slider", "guide", "rail")):
+        return "slider_slot"
+    if any(token in text for token in ("cam", "path")):
+        return "cam_or_path_slot"
+    return "slot_path"
+
+
+def slot_selector(component: str, component_path: str | None, interface: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "stable_id": interface["interface_id"],
+        "component": component,
+        "component_path": component_path,
+        "strategy": "stable_id_then_feature_dimension_bbox_fallback",
+        "fallback": {
+            "type": "slot_centerline",
+            "path_axis": interface["path_axis"],
+            "centerline_m": interface["centerline_m"],
+            "width_m": interface.get("width_m"),
+            "source_feature": interface.get("source_feature"),
+            "source": interface.get("source"),
+        },
+        "tags": ["reopen_repair_selector", "review_before_live_selection"],
+    }
+
+
+def slot_path_interfaces_for_component(
+    component: dict[str, Any],
+    component_names: list[str],
+    features: list[dict[str, Any]],
+    dims_by_feature: dict[str, list[dict[str, Any]]],
+    box: list[float] | None,
+) -> list[dict[str, Any]]:
+    name = component_name(component)
+    result: list[dict[str, Any]] = []
+    for feature in features:
+        refs = feature_component_refs(feature, component_names)
+        if name not in refs:
+            continue
+        role = slot_role(feature)
+        if role is None:
+            continue
+        feature_name = item_name(feature)
+        feature_text = " ".join(str(feature.get(key, "")) for key in ("name", "type", "description", "kind"))
+        feature_dims = dims_by_feature.get(feature_name, [])
+        width_m = dimension_value_for_feature(feature_dims, ("width", "slotwidth")) or parse_named_mm(feature_text, "w")
+        length_m = dimension_value_for_feature(feature_dims, ("length", "slotlength")) or parse_named_mm(feature_text, "l")
+        path_axis, path_vector = slot_axis_from_text(feature_text, box)
+        axis_index = ("x", "y", "z").index(path_axis)
+        center = [(box[i] + box[i + 3]) / 2.0 for i in range(3)] if box is not None else [0.0, 0.0, 0.0]
+        if length_m is None and box is not None:
+            length_m = max(0.0, box[axis_index + 3] - box[axis_index])
+        half = (length_m or 0.0) / 2.0
+        start = list(center)
+        end = list(center)
+        start[axis_index] -= half
+        end[axis_index] += half
+        interface = {
+            "interface_id": f"{name}:slot:{feature_name}",
+            "component": name,
+            "kind": "slot_path",
+            "role": role,
+            "path_axis": path_axis,
+            "path_vector": path_vector,
+            "centerline_m": {"start": clean_vector(start), "end": clean_vector(end)},
+            "width_m": width_m,
+            "length_m": length_m,
+            "source_feature": feature_name,
+            "source": "feature_dimension_bbox_evidence",
+            "confidence": 0.66 if width_m is not None and length_m is not None else 0.56,
+        }
+        interface["selector"] = slot_selector(name, component.get("path"), interface)
+        result.append(apply_confidence_policy(interface))
+    return result
+
+
 def coordinate_system_selector(component: str, component_path: str | None, coordinate_system: dict[str, Any]) -> dict[str, Any]:
     return {
         "stable_id": coordinate_system["coordinate_system_id"],
@@ -387,6 +520,7 @@ def build_index(report: dict[str, Any], *, near_tolerance_m: float, standard_par
     standard_re = re.compile(standard_part_regex, re.IGNORECASE)
     boxes = {component_name(c): bbox(c) for c in components}
     diameter_by_feature = dimension_diameter_by_feature(dimensions)
+    dims_by_feature = dimensions_by_feature(dimensions)
 
     interfaces: list[dict[str, Any]] = []
     contact_plane_ids: set[str] = set()
@@ -419,6 +553,7 @@ def build_index(report: dict[str, Any], *, near_tolerance_m: float, standard_par
     indexed_components = []
     planar_interfaces: list[dict[str, Any]] = []
     cylindrical_interfaces: list[dict[str, Any]] = []
+    slot_path_interfaces: list[dict[str, Any]] = []
     coordinate_systems: list[dict[str, Any]] = []
     for c in components:
         name = component_name(c)
@@ -438,6 +573,7 @@ def build_index(report: dict[str, Any], *, near_tolerance_m: float, standard_par
             apply_confidence_policy(face)
             planar_interfaces.append(face)
         cylindrical_interfaces.extend(cylindrical_interfaces_for_component(c, component_names, features, diameter_by_feature, boxes.get(name)))
+        slot_path_interfaces.extend(slot_path_interfaces_for_component(c, component_names, features, dims_by_feature, boxes.get(name)))
         indexed_components.append({
             "component": name,
             "path": c.get("path"),
@@ -456,6 +592,7 @@ def build_index(report: dict[str, Any], *, near_tolerance_m: float, standard_par
         "coordinate_systems": sorted(coordinate_systems, key=lambda item: item["coordinate_system_id"]),
         "planar_interfaces": sorted(planar_interfaces, key=lambda item: item["interface_id"]),
         "cylindrical_interfaces": sorted(cylindrical_interfaces, key=lambda item: item["interface_id"]),
+        "slot_path_interfaces": sorted(slot_path_interfaces, key=lambda item: item["interface_id"]),
         "interfaces": sorted(interfaces, key=lambda item: (item["gap_m"], item["a"], item["b"])),
         "parameters": {"near_tolerance_m": near_tolerance_m, "standard_part_regex": standard_part_regex},
         "operator_notes": [
@@ -465,6 +602,7 @@ def build_index(report: dict[str, Any], *, near_tolerance_m: float, standard_par
             "selectors_are_stable_ids_with_bbox_fallbacks_not_native_entity_ids",
             "interface_confidence_scoring_blocks_weak_bbox_only_targets",
             "named_cylindrical_interfaces_from_feature_and_dimension_evidence",
+            "slot_path_interfaces_from_feature_dimension_bbox_evidence",
         ],
     }
 

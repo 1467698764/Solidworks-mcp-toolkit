@@ -231,6 +231,44 @@ class InterfaceIndexTests(unittest.TestCase):
             self.assertEqual(bore["selector"]["fallback"]["type"], "cylindrical_axis")
             self.assertIn("named_cylindrical_interfaces_from_feature_and_dimension_evidence", data["operator_notes"])
 
+    def test_indexes_slot_path_interfaces_from_slot_feature_evidence(self):
+        report = {
+            "active_document": {
+                "type": "assembly",
+                "title": "slot_fixture.SLDASM",
+                "components": [
+                    {"name2": "guide_plate-1", "path": "C:/m/guide_plate.SLDPRT", "bbox_m": [0.0, 0.0, 0.0, 0.20, 0.06, 0.012]},
+                ],
+                "features": [
+                    {"name": "SliderSlot_L120_W12_X", "type": "SlotCut", "components": ["guide_plate-1"]},
+                ],
+                "dimensions": [
+                    {"full_name": "SlotWidth@SliderSlot_L120_W12_X@guide_plate.SLDPRT", "system_value_m": 0.012, "feature": "SliderSlot_L120_W12_X"},
+                    {"full_name": "SlotLength@SliderSlot_L120_W12_X@guide_plate.SLDPRT", "system_value_m": 0.120, "feature": "SliderSlot_L120_W12_X"},
+                ],
+            }
+        }
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            src = root / "inspect.json"
+            out = root / "interface_index.json"
+            src.write_text(json.dumps(report), encoding="utf-8")
+
+            proc = run_py("--report", str(src), "--out", str(out))
+
+            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+            data = json.loads(out.read_text(encoding="utf-8-sig"))
+            paths = {item["interface_id"]: item for item in data["slot_path_interfaces"]}
+            slot = paths["guide_plate-1:slot:SliderSlot_L120_W12_X"]
+            self.assertEqual(slot["role"], "slider_slot")
+            self.assertEqual(slot["path_axis"], "x")
+            self.assertEqual(slot["width_m"], 0.012)
+            self.assertEqual(slot["length_m"], 0.12)
+            self.assertEqual(slot["centerline_m"]["start"], [0.04, 0.03, 0.006])
+            self.assertEqual(slot["centerline_m"]["end"], [0.16, 0.03, 0.006])
+            self.assertEqual(slot["selector"]["fallback"]["type"], "slot_centerline")
+            self.assertIn("slot_path_interfaces_from_feature_dimension_bbox_evidence", data["operator_notes"])
+
     def test_swctl_routes_interface_index(self):
         report = {
             "active_document": {
