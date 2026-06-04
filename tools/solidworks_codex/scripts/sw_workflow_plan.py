@@ -69,6 +69,18 @@ def profile_warnings(profile: Any) -> list[str]:
     return [check.name for check in profile.checks if check.severity == "warning"]
 
 
+def profile_not_applicable(profile: Any) -> list[str]:
+    return [check.name for check in profile.checks if check.severity == "not_applicable"]
+
+
+def public_profile_name(profile_name: str) -> str:
+    names = {
+        "assembly": "assembly_static",
+        "mechanism_assembly": "mechanism_lite",
+    }
+    return names.get(profile_name, profile_name)
+
+
 def stage(
     name: str,
     purpose: str,
@@ -98,6 +110,50 @@ def build_profiles(vp: Any, runtime_budget: str) -> dict[str, Any]:
         "single_part": vp.validation_profile_for_intent("single_part", runtime_budget=runtime_budget),
         "assembly": vp.validation_profile_for_intent("assembly", runtime_budget=runtime_budget),
         "mechanism_assembly": vp.validation_profile_for_intent("mechanism_assembly", runtime_budget=runtime_budget),
+    }
+
+
+def selected_profile_for_intent(intent: str) -> str:
+    if intent == "mechanism_assembly":
+        return "mechanism_assembly"
+    if intent in {"part_to_assembly", "assembly"}:
+        return "assembly"
+    return "single_part"
+
+
+def validation_profile_selection(
+    intent: str,
+    runtime_budget: str,
+    profiles: dict[str, Any],
+    stages: list[dict[str, Any]],
+    vp: Any,
+) -> dict[str, Any]:
+    profile_name = selected_profile_for_intent(intent)
+    profile = profiles[profile_name]
+    return {
+        "artifact": "validation_profile_selection",
+        "requested_intent": intent,
+        "runtime_budget": runtime_budget,
+        "source_profile": profile_name,
+        "selected_profile": public_profile_name(profile_name),
+        "blocking_checks": profile_blocking(profile),
+        "warning_checks": profile_warnings(profile),
+        "not_applicable_checks": profile_not_applicable(profile),
+        "stage_profiles": [
+            {
+                "stage": item["name"],
+                "profile": public_profile_name(item["validation_profile"]),
+                "source_profile": item["validation_profile"],
+            }
+            for item in stages
+        ],
+        "extra_checks": [],
+        "decision": vp.profile_decision_report(profile),
+        "acceptance_rule": (
+            "Use the selected profile as the handoff gate: single-part work keeps "
+            "assembly and motion checks not-applicable, while mechanism work requires "
+            "motion evidence when the runtime budget leaves it blocking."
+        ),
     }
 
 
@@ -347,7 +403,7 @@ def design_intent(goal: str, intent: str) -> dict[str, Any]:
     editable_parameters = ["key_dimensions", "feature_depths_or_offsets"]
     if any(key in lowered for key in ("hole", "孔", "bolt", "螺")):
         editable_parameters.append("hole_diameter_pattern_or_spacing")
-    validation_profile = "mechanism_assembly" if intent == "mechanism_assembly" else ("assembly" if intent in {"part_to_assembly", "assembly"} else "single_part")
+    validation_profile = public_profile_name(selected_profile_for_intent(intent))
     return {
         "artifact": "design_intent",
         "goal": goal,
@@ -393,6 +449,7 @@ def build_plan(goal: str, intent: str, runtime_budget: str) -> dict[str, Any]:
         "stage_graph": stages,
         "feedback_edges": feedback_edges(normalized_intent),
         "candidate_actions": candidate_actions(normalized_intent),
+        "validation_profile_selection": validation_profile_selection(normalized_intent, budget, profiles, stages, vp),
         "assumption_ledger": assumption_ledger(goal, normalized_intent, budget),
         "runtime_budget_plan": runtime_budget_plan(normalized_intent, budget),
         "principle": "Compose small evidence loops: design, model, inspect, adjust, assemble, inspect again.",
@@ -418,6 +475,16 @@ def markdown(plan: dict[str, Any]) -> str:
         f"- Motion pairs: {', '.join(f'`{x}`' for x in intent.get('motion_pairs', [])) or '`<none>`'}",
         f"- editable parameters: {', '.join(f'`{x}`' for x in intent.get('editable_parameters', [])) or '`<none>`'}",
         f"- Non-goals: {'; '.join(intent.get('non_goals', []))}",
+        "",
+        "## Validation Profile Selection",
+    ])
+    selection = plan.get("validation_profile_selection") or {}
+    lines.extend([
+        f"- Selected profile: `{selection.get('selected_profile')}` from `{selection.get('source_profile')}`",
+        f"- Runtime budget: `{selection.get('runtime_budget')}`",
+        f"- Blocking checks: {', '.join(f'`{x}`' for x in selection.get('blocking_checks', [])) or '`<none>`'}",
+        f"- Not-applicable checks: {', '.join(f'`{x}`' for x in selection.get('not_applicable_checks', [])) or '`<none>`'}",
+        f"- Acceptance rule: {selection.get('acceptance_rule', '')}",
         "",
         "## Stages",
     ])

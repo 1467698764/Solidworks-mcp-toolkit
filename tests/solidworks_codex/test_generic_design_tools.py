@@ -170,6 +170,45 @@ class GenericDesignToolsTests(unittest.TestCase):
             self.assertTrue(any(action["tool"] == "assembly-contract" for action in data["candidate_actions"]))
             self.assertNotIn("bullhead", text.lower())
 
+    def test_workflow_plan_records_validation_profile_selection(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            part_json = root / "part.json"
+            mechanism_json = root / "mechanism.json"
+            part_proc = run_py(
+                "tools/solidworks_codex/scripts/sw_workflow_plan.py",
+                "--goal", "create one simple mounting plate with two holes",
+                "--intent", "single_part",
+                "--runtime-budget", "fast",
+                "--out", str(root / "part.md"),
+                "--json-out", str(part_json),
+            )
+            mechanism_proc = run_py(
+                "tools/solidworks_codex/scripts/sw_workflow_plan.py",
+                "--goal", "build a slider crank mechanism and validate sampled motion limits",
+                "--intent", "mechanism_assembly",
+                "--runtime-budget", "strict",
+                "--out", str(root / "mechanism.md"),
+                "--json-out", str(mechanism_json),
+            )
+            self.assertEqual(part_proc.returncode, 0, part_proc.stderr + part_proc.stdout)
+            self.assertEqual(mechanism_proc.returncode, 0, mechanism_proc.stderr + mechanism_proc.stdout)
+
+            part = json.loads(part_json.read_text(encoding="utf-8-sig"))
+            mechanism = json.loads(mechanism_json.read_text(encoding="utf-8-sig"))
+            selection = part["validation_profile_selection"]
+            self.assertEqual("validation_profile_selection", selection["artifact"])
+            self.assertEqual("single_part", selection["selected_profile"])
+            self.assertNotIn("motion_sweep_collision", selection["blocking_checks"])
+            self.assertIn("motion_sweep_collision", selection["not_applicable_checks"])
+            self.assertTrue(any(item["stage"] == "part_self_check" and item["profile"] == "single_part" for item in selection["stage_profiles"]))
+
+            mechanism_selection = mechanism["validation_profile_selection"]
+            self.assertEqual("mechanism_lite", mechanism_selection["selected_profile"])
+            self.assertIn("motion_sweep_collision", mechanism_selection["blocking_checks"])
+            self.assertTrue(any(item["stage"] == "motion_or_dof_check" and item["profile"] == "mechanism_lite" for item in mechanism_selection["stage_profiles"]))
+            self.assertIn("Validation Profile Selection", (root / "mechanism.md").read_text(encoding="utf-8-sig"))
+
     def test_swctl_exposes_workflow_plan_as_generic_analysis_command(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
