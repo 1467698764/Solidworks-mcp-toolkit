@@ -170,6 +170,35 @@ def connected_components(names: list[str], adjacency: dict[str, set[str]]) -> li
     return sorted(groups, key=lambda item: (-len(item), item))
 
 
+def clearance_summary(
+    names: list[str],
+    near_pairs: list[dict[str, Any]],
+    far_pairs: list[dict[str, Any]],
+    components_without_bbox: list[str],
+    near_tolerance_m: float,
+) -> dict[str, Any]:
+    pairs = near_pairs + far_pairs
+    sorted_pairs = sorted(pairs, key=lambda item: (float(item.get("gap_m", 0.0)), item.get("a", ""), item.get("b", "")))
+    minimum = dict(sorted_pairs[0]) if sorted_pairs else None
+    if minimum is not None:
+        gap = float(minimum.get("gap_m", 0.0))
+        minimum["relation"] = "contact_or_overlap" if gap == 0.0 else ("near_clearance" if gap <= near_tolerance_m else "separated")
+    near_names: set[str] = set()
+    for pair in near_pairs:
+        near_names.add(str(pair.get("a")))
+        near_names.add(str(pair.get("b")))
+    scattered = sorted(name for name in names if name not in near_names and name not in set(components_without_bbox))
+    return {
+        "evidence": "axis_aligned_bbox_pairwise_clearance",
+        "minimum_gap_pair": minimum,
+        "near_pair_count": len(near_pairs),
+        "separated_pair_count": len(far_pairs),
+        "scattered_components": scattered,
+        "components_without_bbox": sorted(components_without_bbox),
+        "near_tolerance_m": near_tolerance_m,
+    }
+
+
 def add_finding(findings: dict[str, list[dict[str, Any]]], severity: str, kind: str, detail: Any, reason: str) -> None:
     findings.setdefault(severity, []).append({"kind": kind, "detail": detail, "reason": reason})
 
@@ -232,6 +261,8 @@ def diagnose(report: dict[str, Any], *, lock_root: Path | None = None, near_tole
             else:
                 far_pairs.append(item)
     far_pairs = sorted(far_pairs, key=lambda item: item["gap_m"], reverse=True)[:20]
+    components_without_bbox = sorted(name for name, box in bboxes.items() if box is None)
+    clearance = clearance_summary(names, near_pairs, far_pairs, components_without_bbox, near_tolerance_m)
 
     standard_names = standard_component_names(names, standard_part_regex)
     hostless_standard = sorted(name for name in standard_names if name in no_mate)
@@ -301,7 +332,8 @@ def diagnose(report: dict[str, Any], *, lock_root: Path | None = None, near_tole
             "near_tolerance_m": near_tolerance_m,
             "near_or_touching_pairs": sorted(near_pairs, key=lambda item: (item["gap_m"], item["a"], item["b"])),
             "largest_gap_pairs": far_pairs,
-            "components_without_bbox": sorted(name for name, box in bboxes.items() if box is None),
+            "components_without_bbox": components_without_bbox,
+            "clearance_summary": clearance,
         },
         "runtime": {"lock_root": str(lock_root.resolve()) if lock_root else None, "lock_files": scan_locks(lock_root)},
         "findings": findings,

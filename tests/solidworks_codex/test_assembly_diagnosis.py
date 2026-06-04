@@ -87,6 +87,13 @@ class AssemblyDiagnosisTests(unittest.TestCase):
             self.assertIn(("Base_Cover_Coincident", ("base_plate-1", "cover_plate-1"), False), graph_edges)
             self.assertIn("Broken_Mate", data["mates"]["bad_mates"])
             self.assertTrue(any(pair["a"] == "base_plate-1" and pair["b"] == "cover_plate-1" for pair in data["spatial"]["near_or_touching_pairs"]))
+            clearance = data["spatial"]["clearance_summary"]
+            self.assertEqual(clearance["minimum_gap_pair"]["a"], "base_plate-1")
+            self.assertEqual(clearance["minimum_gap_pair"]["b"], "cover_plate-1")
+            self.assertEqual(clearance["minimum_gap_pair"]["relation"], "contact_or_overlap")
+            self.assertIn("loose_handle-1", clearance["scattered_components"])
+            self.assertEqual(clearance["components_without_bbox"], [])
+            self.assertIn("axis_aligned_bbox_pairwise_clearance", clearance["evidence"])
             self.assertFalse(any(item["kind"] == "isolated_functional_component" for item in data["findings"]["blocking"]))
             self.assertTrue(any(item["kind"] == "isolated_component" for item in data["findings"]["warning"]))
             self.assertTrue(any(item["kind"] == "hostless_standard_part" for item in data["findings"]["blocking"]))

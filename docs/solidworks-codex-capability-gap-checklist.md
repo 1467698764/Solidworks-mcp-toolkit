@@ -173,7 +173,7 @@ Status values:
 | Part geometry validation | partial | bbox, body count, volume, key feature existence, interface count. | Plain block stack cannot pass a feature-rich intent. |
 | Assembly mate validation | partial | Mate type, participants, state, group, DOF expectation. | Decorative mate count cannot pass. |
 | Interference | present | Callback available and count/pairs reported. | Nonzero unexpected interference blocks static/mechanism profiles. |
-| Clearance/near evidence | partial | Pairwise gaps, intentional contact, min clearance. | Scattered components and floating details are detected. |
+| Clearance/near evidence | present | `assembly-diagnose` emits bbox pairwise near/contact pairs, largest separated pairs, missing-bbox components, and `clearance_summary` with minimum gap relation, near/separated counts, scattered components, tolerance, and evidence source. | Scattered components and floating details are detected. |
 | Motion sweep lite | missing | Sample key positions, limits, collisions. | Mechanism_lite can reject path collisions and dead layouts. |
 | Visual screenshot review | partial/missing | Computer Use window capture, stored evidence, visual findings. | Screenshot contradicting report blocks acceptance. |
 | BOM/metadata | partial | Name, quantity, material, config, standard part spec. | Engineering_lite report can produce a useful BOM. |
