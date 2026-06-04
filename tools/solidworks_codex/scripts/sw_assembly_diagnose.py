@@ -199,6 +199,11 @@ def diagnose(report: dict[str, Any], *, lock_root: Path | None = None, near_tole
     floating = sorted(name for name in names if name not in set(fixed))
     hidden = sorted(component_name(c) for c in components if c.get("hidden") is True)
     suppressed = sorted(component_name(c) for c in components if c.get("suppressed") is True)
+    component_paths = {
+        component_name(item): str(item.get("path"))
+        for item in components
+        if item.get("path")
+    }
 
     return {
         "timestamp": datetime.now().isoformat(timespec="seconds"),
@@ -211,6 +216,7 @@ def diagnose(report: dict[str, Any], *, lock_root: Path | None = None, near_tole
             "floating_components": floating,
             "hidden_components": hidden,
             "suppressed_components": suppressed,
+            "component_paths": dict(sorted(component_paths.items())),
         },
         "mates": {
             "mate_count": len(mates),

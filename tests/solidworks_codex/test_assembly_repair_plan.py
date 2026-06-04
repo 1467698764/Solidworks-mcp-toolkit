@@ -67,8 +67,24 @@ class AssemblyRepairPlanTests(unittest.TestCase):
             self.assertEqual(host_actions[0]["target"], "bolt_m6-1")
             self.assertEqual(host_actions[0]["suggested_host"], "cover_plate-1")
             self.assertTrue(any(item["kind"] == "classify_isolated_component" and item["target"] == "loose_handle-1" for item in actions))
+            rollback = data["rollback_plan"]
+            self.assertEqual("rollback_plan", rollback["artifact"])
+            self.assertEqual(
+                rollback["affected_files"],
+                [
+                    "C:/machines/bolt_m6.SLDPRT",
+                    "C:/machines/cover_plate.SLDPRT",
+                    "C:/machines/loose_handle.SLDPRT",
+                ],
+            )
+            self.assertIn("backup -Files", rollback["backup_command"])
+            self.assertIn("restore-backup -Report", rollback["restore_command"])
+            self.assertTrue(rollback["blocks_mutation_without_backup"])
+            self.assertIn("rollback_report_paths_are_required_before_mutation", data["operator_notes"])
             self.assertIn("do_not_apply_blindly", data["operator_notes"])
-            self.assertIn("Broken_Bolt_Mate", out_md.read_text(encoding="utf-8-sig"))
+            text = out_md.read_text(encoding="utf-8-sig")
+            self.assertIn("Broken_Bolt_Mate", text)
+            self.assertIn("Rollback Plan", text)
 
     def test_swctl_routes_assembly_repair_plan(self):
         with tempfile.TemporaryDirectory() as d:

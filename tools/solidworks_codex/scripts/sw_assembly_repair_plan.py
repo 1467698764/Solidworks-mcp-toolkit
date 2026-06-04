@@ -37,6 +37,59 @@ def nearest_host(component: str, diagnosis: dict[str, Any]) -> str | None:
     return sorted(candidates, key=lambda item: (item[0], item[1]))[0][1]
 
 
+def mate_participants(mate_name: str, diagnosis: dict[str, Any]) -> list[str]:
+    for edge in diagnosis.get("mates", {}).get("edges", []):
+        if str(edge.get("mate")) == mate_name:
+            return [str(item) for item in edge.get("components", []) if item]
+    return []
+
+
+def affected_components(actions: list[dict[str, Any]], diagnosis: dict[str, Any]) -> list[str]:
+    found: list[str] = []
+    for action in actions:
+        if action.get("kind") == "resolve_bad_mate":
+            found.extend(mate_participants(str(action.get("target")), diagnosis))
+        else:
+            target = action.get("target")
+            if target:
+                found.append(str(target))
+        if action.get("suggested_host"):
+            found.append(str(action["suggested_host"]))
+    result: list[str] = []
+    seen: set[str] = set()
+    for name in found:
+        if name not in seen:
+            seen.add(name)
+            result.append(name)
+    return sorted(result)
+
+
+def quote_arg(value: str) -> str:
+    return f"'{value}'"
+
+
+def rollback_plan(actions: list[dict[str, Any]], diagnosis: dict[str, Any]) -> dict[str, Any]:
+    paths = diagnosis.get("inventory", {}).get("component_paths", {})
+    components = affected_components(actions, diagnosis)
+    affected_files = sorted({str(paths[name]) for name in components if paths.get(name)})
+    backup_report = "tools/solidworks_codex/reports/repair_plan_backup.json"
+    return {
+        "artifact": "rollback_plan",
+        "affected_components": components,
+        "affected_files": affected_files,
+        "backup_report": backup_report,
+        "backup_command": (
+            "swctl.ps1 backup -Files "
+            + ",".join(quote_arg(path) for path in affected_files)
+            + f" -Out {backup_report}"
+        ) if affected_files else "blocked: no affected native file paths found in diagnosis",
+        "backup_status_command": f"swctl.ps1 backup-status -Report {backup_report}",
+        "restore_command": f"swctl.ps1 restore-backup -Report {backup_report} -Apply",
+        "blocks_mutation_without_backup": True,
+        "missing_component_paths": sorted(name for name in components if not paths.get(name)),
+    }
+
+
 def build_plan(diagnosis: dict[str, Any]) -> dict[str, Any]:
     actions: list[dict[str, Any]] = []
     bad_mates = list(diagnosis.get("mates", {}).get("bad_mates", []))
@@ -75,6 +128,7 @@ def build_plan(diagnosis: dict[str, Any]) -> dict[str, Any]:
         })
 
     findings = diagnosis.get("findings", {})
+    rollback = rollback_plan(actions, diagnosis)
     return {
         "timestamp": datetime.now().isoformat(timespec="seconds"),
         "mode": "read_only_plan",
@@ -82,10 +136,12 @@ def build_plan(diagnosis: dict[str, Any]) -> dict[str, Any]:
         "document": diagnosis.get("document", {}),
         "source_diagnosis_ok": diagnosis.get("ok"),
         "actions": actions,
+        "rollback_plan": rollback,
         "finding_counts": {key: len(value) for key, value in findings.items() if isinstance(value, list)},
         "operator_notes": [
             "do_not_apply_blindly",
             "prefer_local_repair_over_rebuild_when_geometry_and_interfaces_are_recoverable",
+            "rollback_report_paths_are_required_before_mutation",
             "verify_rebuild_mates_interference_and_visual_state_after_each_applied_group",
         ],
     }
@@ -110,6 +166,12 @@ def markdown(plan: dict[str, Any]) -> str:
         )
         if action.get("suggested_host"):
             lines.append(f"   - Suggested host: `{action['suggested_host']}`")
+    rollback = plan.get("rollback_plan") or {}
+    lines += ["", "## Rollback Plan"]
+    lines.append(f"- Affected files: {', '.join(f'`{item}`' for item in rollback.get('affected_files', [])) or '`<none>`'}")
+    lines.append(f"- Backup command: `{rollback.get('backup_command', '')}`")
+    lines.append(f"- Restore command: `{rollback.get('restore_command', '')}`")
+    lines.append(f"- Blocks mutation without backup: `{rollback.get('blocks_mutation_without_backup')}`")
     lines += ["", "## Operator notes"]
     for note in plan.get("operator_notes", []):
         lines.append(f"- {note}")

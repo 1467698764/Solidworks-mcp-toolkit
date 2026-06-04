@@ -110,6 +110,9 @@ selection evidence, run only reviewed macros, rebuild, inspect, run
 `mate-group-execution-check`, check interference, and clean up locks/windows
 before moving to the next group. If upstream validation has blocking findings,
 the protocol output is blocked and contains no executable group steps.
+The upstream repair plan includes `rollback_plan` with affected native files,
+backup, backup-status, and restore commands; missing paths or absent backup
+reports are blockers before any mate or feature mutation.
 `mate-selection-check` is the pre-macro guard: it compares the current
 `selection-report` against the expected mate macro, requires exactly two
 supported face/edge/axis/plane-style entities, and blocks component-level or
