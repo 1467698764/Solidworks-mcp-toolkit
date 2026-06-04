@@ -62,7 +62,7 @@ def build_complete_shaper_spec() -> CompleteShaperSpec:
         PartSpec("ram_with_dovetail_and_tool_mount", "ram", (330, 70, 58), "sliding ram with dovetail underside and tool-head bolt face", (F("dovetail_cut", 2, "lower dovetail ways"), F("bolt_hole_pattern", 6, "tool head mounting holes"), F("oil_groove", 2, "lubrication grooves"), F("hole", 8, "mounting and oil holes"), F("cut", 4, "dovetails and grooves"))),
         PartSpec("clapper_tool_head", "tool_head", (70, 105, 38), "clapper box and tool head with clamp holes", (F("bolt_hole_pattern", 4, "clapper cover bolts"), F("tool_slot_cut", 1, "vertical tool slot"), F("pin_bore", 1, "clapper pivot"), F("hole", 7, "bolts and pivot"), F("slot", 1, "tool slot"))),
         PartSpec("single_point_cutting_tool", "tool", (16, 115, 12), "visible cutting tool bit", (F("beveled_tip", 1, "angled cutting end"),)),
-        PartSpec("bull_gear_crank_disk", "crank_disk", (155, 155, 22), "round crank disk with center bore, eccentric pin hole, and lightening holes", (F("center_bore", 1, "main shaft hole"), F("eccentric_pin_hole", 1, "offset drive pin hole"), F("lightening_hole_pattern", 6, "circular lightening holes"), F("hole", 8, "disk holes"), F("cut", 8, "bores and lightening cuts"))),
+        PartSpec("bull_gear_crank_disk", "crank_disk", (155, 155, 22), "toothed bull gear crank disk with center bore, eccentric pin hole, and ordered lightening holes", (F("gear_tooth_profile", 32, "visible external gear teeth"), F("center_bore", 1, "main shaft hole"), F("eccentric_pin_hole", 1, "offset drive pin hole"), F("lightening_hole_pattern", 6, "ordered circular lightening holes"), F("hole", 8, "disk holes"), F("cut", 8, "bores and lightening cuts"))),
         PartSpec("eccentric_crank_pin", "pin", (22, 22, 70), "eccentric pin with washer stack", (F("pin_bore", 1, "cylindrical pin"),)),
         PartSpec("slotted_rocker_arm", "rocker", (70, 285, 22), "slotted rocker arm with rounded ends and pivot holes", (F("long_slot_cut", 1, "sliding die slot"), F("pin_bore", 3, "pivot and link holes"), F("rounded_end", 2, "rounded fork ends"), F("hole", 3, "pivot/link holes"), F("slot", 1, "main slot"), F("cut", 4, "slot and bores"))),
         PartSpec("bronze_sliding_die_block", "slider", (52, 38, 34), "die block in rocker slot with cross pin bore", (F("pin_bore", 1, "crank pin bore"), F("oil_groove", 1, "lubrication groove"), F("hole", 1, "pin hole"), F("cut", 2, "bore and groove"))),
@@ -89,7 +89,7 @@ def build_complete_shaper_spec() -> CompleteShaperSpec:
         reports_dir="tools/solidworks_codex/reports/shaper_machine_v5",
         assembly_file=f"{out}/bullhead_shaper_complete.SLDASM",
         parts=parts,
-        acceptance_rules=("no_plain_block_stack", "visible_holes_slots_and_fasteners", "recognizable_bullhead_shaper_silhouette", "mechanism_profile_blocking_checks"),
+        acceptance_rules=("no_plain_block_stack", "visible_holes_slots_and_fasteners", "named_gear_has_tooth_profile", "recognizable_bullhead_shaper_silhouette", "mechanism_profile_blocking_checks"),
     )
 
 
@@ -117,7 +117,7 @@ def expected_live_feature_names() -> dict[str, tuple[str, ...]]:
         "column_frame_with_window": ("Frame_Window_Cut", "Bearing_Bores_And_Cover_Holes"),
         "ram_with_dovetail_and_tool_mount": ("Dovetail_And_Oil_Groove_Cuts", "Angled_Dovetail_Underside_Cut", "Tool_Mount_Bolt_Holes"),
         "single_point_cutting_tool": ("Beveled_Cutting_Tip",),
-        "bull_gear_crank_disk": ("Center_Eccentric_And_Lightening_Holes",),
+        "bull_gear_crank_disk": ("Gear_Tooth_Profile", "Center_Eccentric_And_Lightening_Holes"),
         "slotted_rocker_arm": ("Long_Sliding_Slot", "Rocker_Pin_Bores"),
         "work_table_with_t_slots": ("Work_Table_T_Slots", "Table_Mount_Holes"),
         "left_dovetail_way": ("Dovetail_Relief", "Left_Angled_Dovetail_Flank", "Right_Angled_Dovetail_Flank", "Rail_Screw_Holes"),
@@ -732,6 +732,21 @@ def boss_regular_polygon(model: Any, sides: int, radius: float, depth: float, na
     feat.Name = name
 
 
+def cut_gear_tooth_spaces(model: Any, teeth: int, root_radius: float, tip_radius: float, depth: float, name: str) -> None:
+    if teeth < 8:
+        raise ValueError("gear tooth cuts need enough teeth to read visually")
+    for index in range(teeth):
+        center_angle = (math.pi * 2 * index) / teeth
+        flank = math.pi / teeth * 0.36
+        points = [
+            (math.cos(center_angle - flank) * tip_radius, math.sin(center_angle - flank) * tip_radius),
+            (math.cos(center_angle) * root_radius, math.sin(center_angle) * root_radius),
+            (math.cos(center_angle + flank) * tip_radius, math.sin(center_angle + flank) * tip_radius),
+            (math.cos(center_angle) * tip_radius * 1.10, math.sin(center_angle) * tip_radius * 1.10),
+        ]
+        cut_polygon(model, points, depth, f"{name}_{index + 1:02d}")
+
+
 def cut_polygon(model: Any, points: list[tuple[float, float]], depth: float, name: str) -> None:
     if len(points) < 3:
         raise ValueError("cut polygon needs at least three points")
@@ -918,6 +933,7 @@ def create_part_with_feature_evidence(sw: Any, out_dir: Path, part: PartSpec) ->
         elif name == "single_point_cutting_tool":
             cut_polygon(model, [(w*.12, -h*.50), (w*.50, -h*.50), (w*.50, h*.18)], depth, "Beveled_Cutting_Tip")
         elif name == "bull_gear_crank_disk":
+            cut_gear_tooth_spaces(model, 32, max(w, h) * 0.43, max(w, h) * 0.53, depth, "Gear_Tooth_Profile")
             cut_circles(model, [(0, 0, 0.018), (w*.23, 0, 0.010)] + circular_pattern(6, w*.58, 0.009, math.pi/6), depth, "Center_Eccentric_And_Lightening_Holes")
         elif name == "slotted_rocker_arm":
             cut_rects(model, [(0, 0, w*.25, h*.72)], depth, "Long_Sliding_Slot")
@@ -1070,7 +1086,7 @@ def byref_i4(value: int = 0) -> Any:
     return win32_client.VARIANT(pythoncom.VT_BYREF | pythoncom.VT_I4, value)
 
 
-def component_faces(component: Any, limit: int = 64) -> list[Any]:
+def component_faces(component: Any, limit: int = 2048) -> list[Any]:
     faces: list[Any] = []
     try:
         bodies = component.GetBodies2(0)
@@ -1080,7 +1096,9 @@ def component_faces(component: Any, limit: int = 64) -> list[Any]:
         return faces
     for body in bodies:
         face = body.GetFirstFace()
-        while face is not None and len(faces) < limit:
+        seen: set[int] = set()
+        while face is not None and len(faces) < limit and id(face) not in seen:
+            seen.add(id(face))
             faces.append(face)
             face = read_member(face, "GetNextFace")
     return faces

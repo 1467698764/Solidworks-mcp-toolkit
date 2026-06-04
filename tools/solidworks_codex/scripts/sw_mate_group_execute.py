@@ -41,6 +41,235 @@ def selector_origin(selector: dict[str, Any]) -> list[float]:
     return [float(value) for value in origin]
 
 
+def as_list(value: Any) -> list[Any]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return value
+    if isinstance(value, tuple):
+        return list(value)
+    try:
+        return list(value)
+    except TypeError:
+        return [value]
+
+
+def vector(value: Any, default: list[float] | None = None) -> list[float]:
+    if isinstance(value, list) and len(value) == 3:
+        return [float(item) for item in value]
+    if isinstance(value, tuple) and len(value) == 3:
+        return [float(item) for item in value]
+    return list(default or [0.0, 0.0, 0.0])
+
+
+def dot(a: list[float], b: list[float]) -> float:
+    return sum(float(a[i]) * float(b[i]) for i in range(3))
+
+
+def distance(a: list[float], b: list[float]) -> float:
+    return sum((float(a[i]) - float(b[i])) ** 2 for i in range(3)) ** 0.5
+
+
+def center_from_box(box: Any, fallback: list[float]) -> list[float]:
+    values = as_list(box)
+    if len(values) != 6:
+        return fallback
+    try:
+        nums = [float(item) for item in values]
+    except (TypeError, ValueError):
+        return fallback
+    return [(nums[i] + nums[i + 3]) / 2.0 for i in range(3)]
+
+
+def component_display_name(component: Any) -> str:
+    for attr in ("Name2", "Name", "name"):
+        value = getattr(component, attr, None)
+        if value:
+            return str(value)
+    for method in ("GetName2", "GetName", "GetPathName"):
+        func = getattr(component, method, None)
+        if callable(func):
+            try:
+                value = func()
+            except Exception:
+                value = None
+            if value:
+                return str(value)
+    return ""
+
+
+def names_match(actual: str, expected: str) -> bool:
+    left = str(actual or "").strip().casefold()
+    right = str(expected or "").strip().casefold()
+    return bool(left and right and (left == right or left.startswith(f"{right}/") or left.startswith(f"{right}@")))
+
+
+def assembly_components(assembly: Any) -> list[Any]:
+    for args in ((False,), (True,), tuple()):
+        try:
+            return as_list(assembly.GetComponents(*args))
+        except Exception:
+            continue
+    return []
+
+
+def find_component(assembly: Any, component_name: str) -> Any | None:
+    for component in assembly_components(assembly):
+        if names_match(component_display_name(component), component_name):
+            return component
+    return None
+
+
+def component_bodies(component: Any) -> list[Any]:
+    for method, args in (("GetBodies3", (0, None)), ("GetBodies3", (0, True)), ("GetBodies2", (0,)), ("GetBodies", tuple())):
+        func = getattr(component, method, None)
+        if not callable(func):
+            continue
+        try:
+            bodies = as_list(func(*args))
+        except Exception:
+            continue
+        if bodies:
+            return bodies
+    return []
+
+
+def body_faces(body: Any) -> list[Any]:
+    func = getattr(body, "GetFaces", None)
+    if not callable(func):
+        return []
+    try:
+        return as_list(func())
+    except Exception:
+        return []
+
+
+def component_faces(component: Any) -> list[Any]:
+    faces: list[Any] = []
+    for body in component_bodies(component):
+        faces.extend(body_faces(body))
+    return faces
+
+
+def surface_for_face(face: Any) -> Any | None:
+    func = getattr(face, "GetSurface", None)
+    if not callable(func):
+        return None
+    try:
+        return func()
+    except Exception:
+        return None
+
+
+def surface_bool(surface: Any, method: str) -> bool:
+    func = getattr(surface, method, None)
+    if not callable(func):
+        return False
+    try:
+        return bool(func())
+    except Exception:
+        return False
+
+
+def surface_params(surface: Any, method: str) -> list[float]:
+    func = getattr(surface, method, None)
+    if not callable(func):
+        return []
+    try:
+        return [float(item) for item in as_list(func())]
+    except Exception:
+        return []
+
+
+def select_data(assembly: Any) -> Any:
+    manager = getattr(assembly, "SelectionManager", None)
+    func = getattr(manager, "CreateSelectData", None)
+    if callable(func):
+        try:
+            return func()
+        except Exception:
+            return None
+    return None
+
+
+def select_entity(entity: Any, assembly: Any, append: bool) -> bool:
+    func = getattr(entity, "Select4", None)
+    if not callable(func):
+        return False
+    try:
+        ok = bool(func(bool(append), select_data(assembly)))
+    except TypeError:
+        ok = bool(func(bool(append), None))
+    if ok and hasattr(assembly, "_native_selected_count"):
+        try:
+            assembly._native_selected_count += 1
+        except Exception:
+            pass
+    return ok
+
+
+def best_planar_face(component: Any, fallback: dict[str, Any]) -> Any | None:
+    expected_normal = vector(fallback.get("normal"), [0.0, 0.0, 0.0])
+    expected_origin = vector(fallback.get("origin_m"), [0.0, 0.0, 0.0])
+    best: tuple[float, Any] | None = None
+    for face in component_faces(component):
+        surface = surface_for_face(face)
+        if surface is None or not surface_bool(surface, "IsPlane"):
+            continue
+        params = surface_params(surface, "PlaneParams")
+        normal = params[3:6] if len(params) >= 6 else expected_normal
+        normal_score = abs(dot(normal, expected_normal)) if any(expected_normal) else 1.0
+        if normal_score < 0.8:
+            continue
+        face_center = center_from_box(getattr(face, "GetBox", lambda: [])(), expected_origin)
+        score = distance(face_center, expected_origin) - normal_score
+        if best is None or score < best[0]:
+            best = (score, face)
+    return best[1] if best else None
+
+
+def best_cylindrical_face(component: Any, fallback: dict[str, Any]) -> Any | None:
+    expected_axis = vector(fallback.get("axis"), [0.0, 0.0, 0.0])
+    expected_origin = vector(fallback.get("origin_m"), [0.0, 0.0, 0.0])
+    expected_radius = fallback.get("radius_m")
+    best: tuple[float, Any] | None = None
+    for face in component_faces(component):
+        surface = surface_for_face(face)
+        if surface is None or not surface_bool(surface, "IsCylinder"):
+            continue
+        params = surface_params(surface, "CylinderParams")
+        if len(params) < 7:
+            continue
+        origin = params[:3]
+        axis = params[3:6]
+        radius = params[6]
+        axis_score = abs(dot(axis, expected_axis)) if any(expected_axis) else 1.0
+        if axis_score < 0.8:
+            continue
+        radius_penalty = abs(radius - float(expected_radius)) if expected_radius not in (None, "") else 0.0
+        score = distance(origin, expected_origin) + radius_penalty - axis_score
+        if best is None or score < best[0]:
+            best = (score, face)
+    return best[1] if best else None
+
+
+def native_select_with_action(assembly: Any, action: dict[str, Any]) -> dict[str, Any]:
+    component = find_component(assembly, str(action.get("component") or ""))
+    if component is None:
+        return {"ok": False, "method": "native_component_face", "error": "component_not_found"}
+    fallback = action.get("fallback") if isinstance(action.get("fallback"), dict) else {}
+    if action.get("fallback_type") == "bbox_planar_face":
+        entity = best_planar_face(component, fallback)
+    elif action.get("fallback_type") == "cylindrical_axis":
+        entity = best_cylindrical_face(component, fallback)
+    else:
+        entity = None
+    if entity is None:
+        return {"ok": False, "method": "native_component_face", "error": "entity_not_found"}
+    ok = select_entity(entity, assembly, bool(action["append"]))
+    return {"ok": ok, "method": "Face.Select4", "component": component_display_name(component)}
+
+
 def selection_action(selector: dict[str, Any], append: bool) -> dict[str, Any]:
     fallback = selector.get("fallback") if isinstance(selector.get("fallback"), dict) else {}
     fallback_type = str(fallback.get("type") or "")
@@ -53,6 +282,7 @@ def selection_action(selector: dict[str, Any], append: bool) -> dict[str, Any]:
         "append": append,
         "strategy": selector.get("strategy"),
         "fallback_type": fallback_type,
+        "fallback": fallback,
     }
 
 
@@ -67,13 +297,19 @@ def planned_mate(item: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def select_with_action(assembly: Any, action: dict[str, Any]) -> bool:
+def select_with_action(assembly: Any, action: dict[str, Any]) -> dict[str, Any]:
+    native = native_select_with_action(assembly, action)
+    if native.get("ok"):
+        action["method"] = native.get("method")
+        return native
     x, y, z = action["xyz_m"]
     callout = None
     try:
-        return bool(assembly.Extension.SelectByID2("", action["type"], x, y, z, bool(action["append"]), 0, callout, 0))
+        ok = bool(assembly.Extension.SelectByID2("", action["type"], x, y, z, bool(action["append"]), 0, callout, 0))
     except TypeError:
-        return bool(assembly.Extension.SelectByID2("", action["type"], x, y, z, bool(action["append"]), 0, None, 0))
+        ok = bool(assembly.Extension.SelectByID2("", action["type"], x, y, z, bool(action["append"]), 0, None, 0))
+    action["method"] = "SelectByID2"
+    return {"ok": ok, "method": "SelectByID2", "native_attempt": native}
 
 
 def selected_count(assembly: Any) -> int:
@@ -137,16 +373,19 @@ def execute_manifest(manifest: dict[str, Any], assembly: Any) -> dict[str, Any]:
             continue
         if hasattr(assembly, "ClearSelection2"):
             assembly.ClearSelection2(True)
-        select_results = [select_with_action(assembly, action) for action in plan["selection_actions"]]
+        if hasattr(assembly, "_native_selected_count"):
+            assembly._native_selected_count = 0
+        select_reports = [select_with_action(assembly, action) for action in plan["selection_actions"]]
         count = selected_count(assembly)
         guard = {
             "cleared_selection_count": 0,
             "selection_count_before_mate": count,
             "component_pair": item.get("components", []),
             "select_by_id_calls": plan["selection_actions"],
-            "select_results": select_results,
+            "select_results": [bool(report.get("ok")) for report in select_reports],
+            "selection_reports": select_reports,
         }
-        if count != 2 or not all(select_results):
+        if count != 2 or not all(report.get("ok") for report in select_reports):
             findings["blocking"].append({
                 "kind": "selection_failed",
                 "mate": item.get("expected_mate_name"),

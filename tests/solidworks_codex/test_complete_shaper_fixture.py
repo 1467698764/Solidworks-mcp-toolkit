@@ -103,6 +103,7 @@ class CompleteShaperSpecTests(unittest.TestCase):
         self.assertIn("dovetail_rail", features_by_part["right_dovetail_way"])
         self.assertIn("long_slot_cut", features_by_part["slotted_rocker_arm"])
         self.assertIn("pin_bore", features_by_part["slotted_rocker_arm"])
+        self.assertIn("gear_tooth_profile", features_by_part["bull_gear_crank_disk"])
         self.assertIn("eccentric_pin_hole", features_by_part["bull_gear_crank_disk"])
         self.assertIn("lightening_hole_pattern", features_by_part["bull_gear_crank_disk"])
         self.assertIn("bolt_hole_pattern", features_by_part["clapper_tool_head"])
@@ -120,6 +121,7 @@ class CompleteShaperSpecTests(unittest.TestCase):
         self.assertGreaterEqual(manifest["feature_counts"]["fastener"], 12)
         self.assertIn("no_plain_block_stack", manifest["acceptance_rules"])
         self.assertIn("visible_holes_slots_and_fasteners", manifest["acceptance_rules"])
+        self.assertIn("named_gear_has_tooth_profile", manifest["acceptance_rules"])
         self.assertIn("recognizable_bullhead_shaper_silhouette", manifest["acceptance_rules"])
         self.assertIn("mechanism_profile_blocking_checks", manifest["acceptance_rules"])
 
@@ -136,6 +138,51 @@ class CompleteShaperSpecTests(unittest.TestCase):
         self.assertGreaterEqual(len(detail_placements["washer_set"]), 12)
         self.assertGreaterEqual(len(detail_placements["oil_cups"]), 4)
         self.assertEqual(self.module.expected_assembly_component_minimum(), 55)
+
+    def test_eccentric_pin_contract_matches_solved_readback_origin(self):
+        expected = self.module.expected_shaper_placement_contract()
+        self.assertEqual(expected["eccentric_crank_pin"]["expected_origin_m"], (-0.2093, 0.115, 0.190))
+
+    def test_shaft_washers_clear_eccentric_crank_pin_envelope(self):
+        washers = self.module.detail_instance_placements()["washer_set"]
+        eccentric_washer = washers[1]
+        pin_origin = self.module.placements_for(self.module.build_complete_shaper_spec())["eccentric_crank_pin"]
+        pin_half_depth_m = 0.070 / 2.0
+        washer_half_depth_m = 0.003 / 2.0
+        center_gap = abs(eccentric_washer[2] - pin_origin[2])
+        self.assertGreater(center_gap, pin_half_depth_m + washer_half_depth_m)
+
+    def test_component_face_enumeration_does_not_truncate_tooth_rich_gear_before_bores(self):
+        class Face:
+            def __init__(self, index):
+                self.index = index
+                self.next_face = None
+
+            def GetNextFace(self):
+                return self.next_face
+
+        class Body:
+            def __init__(self, faces):
+                self.faces = faces
+
+            def GetFirstFace(self):
+                return self.faces[0]
+
+        class Component:
+            def __init__(self, faces):
+                self.faces = faces
+
+            def GetBodies2(self, body_type):
+                return [Body(self.faces)]
+
+        faces = [Face(index) for index in range(96)]
+        for left, right in zip(faces, faces[1:]):
+            left.next_face = right
+
+        enumerated = self.module.component_faces(Component(faces))
+
+        self.assertEqual(len(enumerated), 96)
+        self.assertEqual(enumerated[-1].index, 95)
 
     def test_live_feature_contract_covers_non_block_details(self):
         expected = self.module.expected_live_feature_names()
@@ -158,6 +205,7 @@ class CompleteShaperSpecTests(unittest.TestCase):
         self.assertIn("Hex_Socket_Drive", expected["fastener_set_m6"])
         self.assertIn("Angled_Dovetail_Underside_Cut", expected["ram_with_dovetail_and_tool_mount"])
         self.assertIn("Left_Angled_Dovetail_Flank", expected["left_dovetail_way"])
+        self.assertIn("Gear_Tooth_Profile", expected["bull_gear_crank_disk"])
 
     def test_validate_live_result_requires_part_shape_feature_readback(self):
         base = {
@@ -184,6 +232,16 @@ class CompleteShaperSpecTests(unittest.TestCase):
         bad_features["bull_gear_crank_disk"] = {"ok": True, "features": [{"name": "Plain_Disk_Body_Only"}]}
         bad["part_feature_evidence"] = bad_features
         failed = self.module.validate_live_result(bad)["failed"]
+        self.assertIn("part_feature_evidence:bull_gear_crank_disk", failed)
+
+        bad_gear = dict(base)
+        bad_gear_features = sample_part_feature_evidence(self.module)
+        bad_gear_features["bull_gear_crank_disk"] = {
+            "ok": True,
+            "features": [{"name": "Center_Eccentric_And_Lightening_Holes", "type": "Feature"}],
+        }
+        bad_gear["part_feature_evidence"] = bad_gear_features
+        failed = self.module.validate_live_result(bad_gear)["failed"]
         self.assertIn("part_feature_evidence:bull_gear_crank_disk", failed)
 
     def test_live_outputs_are_separate_from_old_failed_fixture(self):
