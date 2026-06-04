@@ -323,6 +323,50 @@ def runtime_budget_plan(intent: str, runtime_budget: str) -> dict[str, Any]:
     }
 
 
+def design_intent(goal: str, intent: str) -> dict[str, Any]:
+    lowered = goal.lower()
+    part_hints = [
+        name
+        for name, keys in (
+            ("bracket", ("bracket", "支架", "mount")),
+            ("plate", ("plate", "板", "盖板")),
+            ("housing", ("housing", "壳体", "箱体")),
+            ("shaft_or_pin", ("shaft", "pin", "轴", "销")),
+            ("fastener", ("bolt", "screw", "螺栓", "螺钉")),
+        )
+        if any(key in lowered for key in keys)
+    ]
+    if not part_hints:
+        part_hints = ["primary_part"]
+    interfaces = ["mounting_faces", "datum_planes_or_axes"]
+    if intent in {"part_to_assembly", "assembly", "mechanism_assembly"}:
+        interfaces.extend(["assembly_mate_interfaces", "clearance_sensitive_neighbors"])
+    motion_pairs: list[str] = []
+    if intent == "mechanism_assembly":
+        motion_pairs.extend(["revolute_pairs", "prismatic_pairs", "limit_positions"])
+    editable_parameters = ["key_dimensions", "feature_depths_or_offsets"]
+    if any(key in lowered for key in ("hole", "孔", "bolt", "螺")):
+        editable_parameters.append("hole_diameter_pattern_or_spacing")
+    validation_profile = "mechanism_assembly" if intent == "mechanism_assembly" else ("assembly" if intent in {"part_to_assembly", "assembly"} else "single_part")
+    return {
+        "artifact": "design_intent",
+        "goal": goal,
+        "scope": intent,
+        "validation_profile": validation_profile,
+        "assumptions_source": "workflow-plan heuristic; refine with inspect/model-understand/worklog before mutation",
+        "parts": part_hints,
+        "subassemblies": ["functional_assembly"] if intent in {"part_to_assembly", "assembly", "mechanism_assembly"} else [],
+        "interfaces": interfaces,
+        "motion_pairs": motion_pairs,
+        "standard_parts": ["fasteners_or_locators_if_named"] if any(key in lowered for key in ("bolt", "screw", "螺", "pin", "销")) else [],
+        "editable_parameters": editable_parameters,
+        "non_goals": [
+            "do not assume exact dimensions not present in goal or inspect evidence",
+            "do not accept broad release-grade engineering claims unless the selected profile or extra_checks requires them",
+        ],
+    }
+
+
 def build_plan(goal: str, intent: str, runtime_budget: str) -> dict[str, Any]:
     normalized_intent = normalize_intent(intent)
     budget = normalize_budget(runtime_budget)
@@ -345,6 +389,7 @@ def build_plan(goal: str, intent: str, runtime_budget: str) -> dict[str, Any]:
         "goal": goal,
         "intent": normalized_intent,
         "runtime_budget": budget,
+        "design_intent": design_intent(goal, normalized_intent),
         "stage_graph": stages,
         "feedback_edges": feedback_edges(normalized_intent),
         "candidate_actions": candidate_actions(normalized_intent),
@@ -361,6 +406,18 @@ def markdown(plan: dict[str, Any]) -> str:
         f"- Intent: `{plan['intent']}`",
         f"- Runtime budget: `{plan['runtime_budget']}`",
         f"- Principle: {plan['principle']}",
+        "",
+        "## Design Intent",
+    ])
+    intent = plan.get("design_intent") or {}
+    lines.extend([
+        f"- Scope: `{intent.get('scope')}`",
+        f"- Validation profile: `{intent.get('validation_profile')}`",
+        f"- Parts: {', '.join(f'`{x}`' for x in intent.get('parts', [])) or '`<none>`'}",
+        f"- Interfaces: {', '.join(f'`{x}`' for x in intent.get('interfaces', [])) or '`<none>`'}",
+        f"- Motion pairs: {', '.join(f'`{x}`' for x in intent.get('motion_pairs', [])) or '`<none>`'}",
+        f"- editable parameters: {', '.join(f'`{x}`' for x in intent.get('editable_parameters', [])) or '`<none>`'}",
+        f"- Non-goals: {'; '.join(intent.get('non_goals', []))}",
         "",
         "## Stages",
     ])
