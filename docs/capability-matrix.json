@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-06-05T02:22:31",
+  "timestamp": "2026-06-05T02:34:06",
   "count": 64,
   "capabilities": [
     {
@@ -570,7 +570,7 @@
         "spec",
         "start"
       ],
-      "description": "Execute a reviewed part feature spec in SolidWorks: fillet, chamfer, linear pattern, circular pattern, or mirror with named feature/entity selectors."
+      "description": "Execute a reviewed part feature spec in SolidWorks: basic holes, slot cuts, pocket cuts, fillet, chamfer, linear pattern, circular pattern, or mirror with named feature/entity selectors."
     },
     {
       "cli": "preflight",

@@ -20,7 +20,16 @@ except ModuleNotFoundError:
     pythoncom = None  # type: ignore[assignment]
     win32com = None  # type: ignore[assignment]
 
-SUPPORTED_OPERATIONS = {"fillet", "chamfer", "linear_pattern", "circular_pattern", "mirror"}
+SUPPORTED_OPERATIONS = {
+    "fillet",
+    "chamfer",
+    "basic_hole",
+    "slot_cut",
+    "pocket_cut",
+    "linear_pattern",
+    "circular_pattern",
+    "mirror",
+}
 SELECT_BY_ID_TYPES = {"EDGE", "FACE", "PLANE", "AXIS", "SKETCH", "EXTSKETCHSEGMENT", "EXTSKETCHPOINT"}
 
 
@@ -142,7 +151,17 @@ def selectors_for(spec: dict[str, Any]) -> list[dict[str, Any]]:
 
 def operation_for(spec: dict[str, Any]) -> str:
     operation = str(spec.get("operation", "")).strip().lower().replace("-", "_")
-    aliases = {"linear": "linear_pattern", "circular": "circular_pattern", "edge_fillet": "fillet", "edge_chamfer": "chamfer"}
+    aliases = {
+        "hole": "basic_hole",
+        "through_hole": "basic_hole",
+        "blind_hole": "basic_hole",
+        "slot": "slot_cut",
+        "pocket": "pocket_cut",
+        "linear": "linear_pattern",
+        "circular": "circular_pattern",
+        "edge_fillet": "fillet",
+        "edge_chamfer": "chamfer",
+    }
     operation = aliases.get(operation, operation)
     if operation not in SUPPORTED_OPERATIONS:
         raise ValueError(f"Unsupported operation {operation!r}; expected one of {sorted(SUPPORTED_OPERATIONS)}")
@@ -196,6 +215,37 @@ def validate_spec(spec: dict[str, Any]) -> dict[str, Any]:
             raise ValueError("chamfer distance must be positive")
         if float(params.get("angle_deg", 45)) <= 0:
             raise ValueError("chamfer angle_deg must be positive")
+    if operation == "basic_hole":
+        diameter_m = float(params.get("diameter_m", mm_to_m(params.get("diameter_mm", 0))))
+        depth_m = float(params.get("depth_m", mm_to_m(params.get("depth_mm", 0))))
+        if diameter_m <= 0:
+            raise ValueError("basic_hole diameter must be positive")
+        if depth_m <= 0 and not bool(params.get("through_all")):
+            raise ValueError("basic_hole depth must be positive unless through_all is true")
+        if not any(s["kind"] == "entity" and s["type"] in {"PLANE", "FACE"} for s in selectors):
+            raise ValueError("basic_hole requires a reviewed sketch plane or planar face selector")
+    if operation == "slot_cut":
+        length_m = float(params.get("length_m", mm_to_m(params.get("length_mm", 0))))
+        width_m = float(params.get("width_m", mm_to_m(params.get("width_mm", 0))))
+        depth_m = float(params.get("depth_m", mm_to_m(params.get("depth_mm", 0))))
+        if length_m <= 0 or width_m <= 0:
+            raise ValueError("slot_cut length and width must be positive")
+        if length_m <= width_m:
+            raise ValueError("slot_cut length must be greater than width")
+        if depth_m <= 0 and not bool(params.get("through_all")):
+            raise ValueError("slot_cut depth must be positive unless through_all is true")
+        if not any(s["kind"] == "entity" and s["type"] in {"PLANE", "FACE"} for s in selectors):
+            raise ValueError("slot_cut requires a reviewed sketch plane or planar face selector")
+    if operation == "pocket_cut":
+        width_m = float(params.get("width_m", mm_to_m(params.get("width_mm", 0))))
+        height_m = float(params.get("height_m", mm_to_m(params.get("height_mm", 0))))
+        depth_m = float(params.get("depth_m", mm_to_m(params.get("depth_mm", 0))))
+        if width_m <= 0 or height_m <= 0:
+            raise ValueError("pocket_cut width and height must be positive")
+        if depth_m <= 0 and not bool(params.get("through_all")):
+            raise ValueError("pocket_cut depth must be positive unless through_all is true")
+        if not any(s["kind"] == "entity" and s["type"] in {"PLANE", "FACE"} for s in selectors):
+            raise ValueError("pocket_cut requires a reviewed sketch plane or planar face selector")
     if operation == "linear_pattern":
         if as_int(params, "count", 2) < 2:
             raise ValueError("linear_pattern count must be at least 2")
@@ -280,6 +330,86 @@ def invoke_first(target: Any, candidates: list[tuple[str, tuple[Any, ...]]]) -> 
     return {"ok": False, "errors": errors}
 
 
+def point_params(params: dict[str, Any]) -> dict[str, float]:
+    center = params.get("center") or {}
+    if not isinstance(center, dict):
+        raise ValueError("center must be an object with x/y/z")
+    return {
+        "x": float(center.get("x", params.get("x", 0.0))),
+        "y": float(center.get("y", params.get("y", 0.0))),
+        "z": float(center.get("z", params.get("z", 0.0))),
+    }
+
+
+def sketch_manager_for(model: Any) -> Any:
+    sketch_manager = read(model, "SketchManager")
+    if sketch_manager is None or isinstance(sketch_manager, dict):
+        raise RuntimeError("Model.SketchManager is unavailable.")
+    return sketch_manager
+
+
+def start_reviewed_sketch(model: Any) -> dict[str, Any]:
+    sketch_manager = sketch_manager_for(model)
+    opened = read(sketch_manager, "InsertSketch", True)
+    return {"sketch_manager": sketch_manager, "opened": opened}
+
+
+def finish_cut(model: Any, sketch_context: dict[str, Any], depth_m: float, through_all: bool = False) -> dict[str, Any]:
+    sketch_manager = sketch_context["sketch_manager"]
+    closed = read(sketch_manager, "InsertSketch", True)
+    feature_manager = read(model, "FeatureManager")
+    if feature_manager is None or isinstance(feature_manager, dict):
+        raise RuntimeError("Model.FeatureManager is unavailable.")
+    end_condition = 1 if through_all else 0
+    cut = invoke_first(feature_manager, [
+        ("FeatureCut3", (True, False, False, end_condition, 0, depth_m, depth_m, False, False, False, False, 0, 0, False, False, False, False, False, True, True, True, True, False, 0, 0, False)),
+        ("FeatureCut2", (True, False, False, end_condition, 0, depth_m, depth_m, False, False, False, False, 0, 0, False, False, False, False, False, True, True, True, True, False, 0, 0)),
+    ])
+    return {"closed_sketch": closed, "cut": cut}
+
+
+def execute_basic_hole(model: Any, params: dict[str, Any]) -> dict[str, Any]:
+    sketch_context = start_reviewed_sketch(model)
+    sketch_manager = sketch_context["sketch_manager"]
+    center = point_params(params)
+    diameter_m = float(params.get("diameter_m", mm_to_m(params.get("diameter_mm", 0))))
+    depth_m = float(params.get("depth_m", mm_to_m(params.get("depth_mm", 0))))
+    circle = read(sketch_manager, "CreateCircleByRadius", center["x"], center["y"], center["z"], diameter_m / 2.0)
+    cut = finish_cut(model, sketch_context, depth_m, bool(params.get("through_all")))
+    return {"ok": bool((cut.get("cut") or {}).get("ok")), "sketch": {"opened": sketch_context["opened"], "circle": circle}, **cut}
+
+
+def execute_slot_cut(model: Any, params: dict[str, Any]) -> dict[str, Any]:
+    sketch_context = start_reviewed_sketch(model)
+    sketch_manager = sketch_context["sketch_manager"]
+    center = point_params(params)
+    length_m = float(params.get("length_m", mm_to_m(params.get("length_mm", 0))))
+    width_m = float(params.get("width_m", mm_to_m(params.get("width_mm", 0))))
+    depth_m = float(params.get("depth_m", mm_to_m(params.get("depth_mm", 0))))
+    half_line = (length_m - width_m) / 2.0
+    slot = invoke_first(sketch_manager, [
+        ("CreateStraightSlot", (center["x"] - half_line, center["y"], center["z"], center["x"] + half_line, center["y"], center["z"], width_m / 2.0)),
+        ("CreateSketchSlot", (0, 0, center["x"] - half_line, center["y"], center["z"], center["x"] + half_line, center["y"], center["z"], width_m / 2.0, 0, 0, 0, 1, False)),
+    ])
+    cut = finish_cut(model, sketch_context, depth_m, bool(params.get("through_all")))
+    return {"ok": bool((cut.get("cut") or {}).get("ok")), "sketch": {"opened": sketch_context["opened"], "slot": slot}, **cut}
+
+
+def execute_pocket_cut(model: Any, params: dict[str, Any]) -> dict[str, Any]:
+    sketch_context = start_reviewed_sketch(model)
+    sketch_manager = sketch_context["sketch_manager"]
+    center = point_params(params)
+    width_m = float(params.get("width_m", mm_to_m(params.get("width_mm", 0))))
+    height_m = float(params.get("height_m", mm_to_m(params.get("height_mm", 0))))
+    depth_m = float(params.get("depth_m", mm_to_m(params.get("depth_mm", 0))))
+    rectangle = invoke_first(sketch_manager, [
+        ("CreateCenterRectangle", (center["x"], center["y"], center["z"], center["x"] + width_m / 2.0, center["y"] + height_m / 2.0, center["z"])),
+        ("CreateCornerRectangle", (center["x"] - width_m / 2.0, center["y"] - height_m / 2.0, center["z"], center["x"] + width_m / 2.0, center["y"] + height_m / 2.0, center["z"])),
+    ])
+    cut = finish_cut(model, sketch_context, depth_m, bool(params.get("through_all")))
+    return {"ok": bool((cut.get("cut") or {}).get("ok")), "sketch": {"opened": sketch_context["opened"], "rectangle": rectangle}, **cut}
+
+
 def execute_operation(model: Any, plan: dict[str, Any]) -> dict[str, Any]:
     feature_manager = read(model, "FeatureManager")
     if feature_manager is None or isinstance(feature_manager, dict):
@@ -301,6 +431,12 @@ def execute_operation(model: Any, plan: dict[str, Any]) -> dict[str, Any]:
             ("FeatureChamfer2", (4, distance_m, angle_rad, 0, 0, True, True)),
             ("InsertFeatureChamfer", (4, distance_m, angle_rad)),
         ])
+    if operation == "basic_hole":
+        return execute_basic_hole(model, params)
+    if operation == "slot_cut":
+        return execute_slot_cut(model, params)
+    if operation == "pocket_cut":
+        return execute_pocket_cut(model, params)
     if operation == "linear_pattern":
         count = as_int(params, "count", 2)
         spacing_m = as_float(params, "spacing_m", mm_to_m(params.get("spacing_mm", 0)))

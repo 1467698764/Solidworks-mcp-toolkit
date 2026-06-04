@@ -54,11 +54,39 @@ class FakeFeatureManager:
         self.calls.append(("InsertMirrorFeature2", args))
         return {"name": "Codex_Mirror"}
 
+    def FeatureCut3(self, *args):
+        self.calls.append(("FeatureCut3", args))
+        return {"name": "Codex_Cut"}
+
+
+class FakeSketchManager:
+    _oleobj_ = True
+
+    def __init__(self):
+        self.calls = []
+
+    def InsertSketch(self, *args):
+        self.calls.append(("InsertSketch", args))
+        return True
+
+    def CreateCircleByRadius(self, *args):
+        self.calls.append(("CreateCircleByRadius", args))
+        return {"name": "Circle"}
+
+    def CreateCenterRectangle(self, *args):
+        self.calls.append(("CreateCenterRectangle", args))
+        return {"name": "CenterRectangle"}
+
+    def CreateStraightSlot(self, *args):
+        self.calls.append(("CreateStraightSlot", args))
+        return {"name": "StraightSlot"}
+
 
 class FakeModel:
     def __init__(self):
         self.Extension = FakeExtension()
         self.FeatureManager = FakeFeatureManager()
+        self.SketchManager = FakeSketchManager()
         self.seed = FakeFeature("SeedCut")
 
     def FirstFeature(self):
@@ -134,6 +162,48 @@ class PartFeatureExecuteTests(unittest.TestCase):
             self.assertTrue(data["dry_run"])
             self.assertEqual(data["operation"], "mirror")
             self.assertEqual(data["execution_plan"]["selectors"][1]["type"], "PLANE")
+
+    def test_executes_basic_hole_cut_from_reviewed_plane(self):
+        model = FakeModel()
+        plan = mod.validate_spec({
+            "operation": "basic_hole",
+            "selectors": [{"kind": "entity", "name": "Front Plane", "type": "PLANE"}],
+            "parameters": {"diameter_mm": 6, "depth_mm": 12, "center": {"x": 0.01, "y": 0.02, "z": 0}},
+        })
+
+        result = mod.execute(model, plan)
+
+        self.assertTrue(result["ok"])
+        self.assertIn(("CreateCircleByRadius", (0.01, 0.02, 0.0, 0.003)), model.SketchManager.calls)
+        self.assertEqual(model.FeatureManager.calls[-1][0], "FeatureCut3")
+
+    def test_executes_slot_cut_from_reviewed_plane(self):
+        model = FakeModel()
+        plan = mod.validate_spec({
+            "operation": "slot_cut",
+            "selectors": [{"kind": "entity", "name": "Top Plane", "type": "PLANE"}],
+            "parameters": {"length_mm": 40, "width_mm": 8, "depth_mm": 5, "center": {"x": 0, "y": 0, "z": 0}},
+        })
+
+        result = mod.execute(model, plan)
+
+        self.assertTrue(result["ok"])
+        self.assertTrue(any(call[0] == "CreateStraightSlot" for call in model.SketchManager.calls))
+        self.assertEqual(model.FeatureManager.calls[-1][0], "FeatureCut3")
+
+    def test_executes_pocket_cut_from_reviewed_plane(self):
+        model = FakeModel()
+        plan = mod.validate_spec({
+            "operation": "pocket_cut",
+            "selectors": [{"kind": "entity", "name": "Top Plane", "type": "PLANE"}],
+            "parameters": {"width_mm": 20, "height_mm": 10, "depth_mm": 4, "center": {"x": 0, "y": 0, "z": 0}},
+        })
+
+        result = mod.execute(model, plan)
+
+        self.assertTrue(result["ok"])
+        self.assertTrue(any(call[0] == "CreateCenterRectangle" for call in model.SketchManager.calls))
+        self.assertEqual(model.FeatureManager.calls[-1][0], "FeatureCut3")
 
 
 if __name__ == "__main__":
