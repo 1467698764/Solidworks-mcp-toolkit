@@ -279,6 +279,50 @@ def assumption_ledger(goal: str, intent: str, runtime_budget: str) -> dict[str, 
     }
 
 
+def runtime_budget_plan(intent: str, runtime_budget: str) -> dict[str, Any]:
+    budget_table = {
+        "fast": {
+            "expected_solidworks_sessions": 1,
+            "memory_ceiling_mb": 2500,
+            "timeout_seconds": 120,
+            "rebuild_scope": "active document or directly changed part/assembly only",
+            "extra_checks_policy": "skip release-like checks unless a blocker needs one focused query",
+        },
+        "standard": {
+            "expected_solidworks_sessions": 1,
+            "memory_ceiling_mb": 3500,
+            "timeout_seconds": 300,
+            "rebuild_scope": "changed native files plus dependent assembly inspect/compare loop",
+            "extra_checks_policy": "run profile blocking checks and selected warnings tied to the goal",
+        },
+        "strict": {
+            "expected_solidworks_sessions": 2,
+            "memory_ceiling_mb": 4500,
+            "timeout_seconds": 600,
+            "rebuild_scope": "full affected assembly plus reopen/readback validation where practical",
+            "extra_checks_policy": "run profile blocking checks, relevant warnings, and documented extra_checks",
+        },
+    }
+    selected = dict(budget_table[runtime_budget])
+    if intent == "mechanism_assembly":
+        selected["expected_solidworks_sessions"] = max(2, selected["expected_solidworks_sessions"])
+        selected["rebuild_scope"] += "; include mechanism DOF/clearance sampling when available"
+    elif intent == "single_part":
+        selected["expected_solidworks_sessions"] = 1
+    return {
+        "artifact": "runtime_budget_plan",
+        "intent": intent,
+        "budget": runtime_budget,
+        "expected_solidworks_sessions": selected["expected_solidworks_sessions"],
+        "rebuild_scope": selected["rebuild_scope"],
+        "memory_ceiling_mb": selected["memory_ceiling_mb"],
+        "timeout_seconds": selected["timeout_seconds"],
+        "cleanup_policy": "scan generated lock files before/after live work, close generated documents, and keep user models out of cleanup scope",
+        "full_rebuild_requires_reason": True,
+        "extra_checks_policy": selected["extra_checks_policy"],
+    }
+
+
 def build_plan(goal: str, intent: str, runtime_budget: str) -> dict[str, Any]:
     normalized_intent = normalize_intent(intent)
     budget = normalize_budget(runtime_budget)
@@ -305,6 +349,7 @@ def build_plan(goal: str, intent: str, runtime_budget: str) -> dict[str, Any]:
         "feedback_edges": feedback_edges(normalized_intent),
         "candidate_actions": candidate_actions(normalized_intent),
         "assumption_ledger": assumption_ledger(goal, normalized_intent, budget),
+        "runtime_budget_plan": runtime_budget_plan(normalized_intent, budget),
         "principle": "Compose small evidence loops: design, model, inspect, adjust, assemble, inspect again.",
     }
 
@@ -340,6 +385,18 @@ def markdown(plan: dict[str, Any]) -> str:
     for item in ledger.get("items", []):
         blocked = f"; blocks `{item['blocks_stage']}`" if item.get("blocks_stage") else ""
         lines.append(f"- `{item['severity']}` `{item['topic']}`: {item['statement']} Resolution: {item['required_resolution']}{blocked}")
+    runtime = plan.get("runtime_budget_plan") or {}
+    lines.extend(["", "## Runtime Budget Plan", ""])
+    lines.extend([
+        f"- Budget: `{runtime.get('budget')}` for `{runtime.get('intent')}`",
+        f"- Expected SolidWorks sessions: `{runtime.get('expected_solidworks_sessions')}`",
+        f"- Rebuild scope: {runtime.get('rebuild_scope')}",
+        f"- memory ceiling: `{runtime.get('memory_ceiling_mb')}` MB",
+        f"- Timeout: `{runtime.get('timeout_seconds')}` seconds",
+        f"- Cleanup policy: {runtime.get('cleanup_policy')}",
+        f"- Full rebuild requires reason: `{runtime.get('full_rebuild_requires_reason')}`",
+        f"- Extra checks policy: {runtime.get('extra_checks_policy')}",
+    ])
     lines.extend(["", "## Candidate Actions", ""])
     for action in plan["candidate_actions"]:
         lines.append(f"- `{action['tool']}`: {action['why']}")
