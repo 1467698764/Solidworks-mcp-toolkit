@@ -76,21 +76,54 @@ class FakeFace:
         return True
 
 
+class FakeCurve:
+    def __init__(self, params):
+        self.params = params
+
+    def IsLine(self):
+        return True
+
+    def LineParams(self):
+        return self.params
+
+
+class FakeEdge:
+    def __init__(self, curve, box):
+        self.curve = curve
+        self.box = box
+        self.select_calls = []
+
+    def GetCurve(self):
+        return self.curve
+
+    def GetBox(self):
+        return self.box
+
+    def Select4(self, append, select_data):
+        self.select_calls.append((append, select_data))
+        return True
+
+
 class FakeBody:
-    def __init__(self, faces):
+    def __init__(self, faces, edges=None):
         self.faces = faces
+        self.edges = edges or []
 
     def GetFaces(self):
         return self.faces
 
+    def GetEdges(self):
+        return self.edges
+
 
 class FakeComponent:
-    def __init__(self, name, faces):
+    def __init__(self, name, faces, edges=None):
         self.Name2 = name
         self.faces = faces
+        self.edges = edges or []
 
     def GetBodies3(self, body_type, visible_only):
-        return [FakeBody(self.faces)]
+        return [FakeBody(self.faces, self.edges)]
 
 
 class FakeSelectionManager:
@@ -285,6 +318,47 @@ class MateGroupExecuteTests(unittest.TestCase):
         self.assertEqual(asm.mates[0][0], mod.MATE_TYPES["concentric"])
         self.assertEqual(shaft_face.select_calls, [(False, {"mark": 0})])
         self.assertEqual(hole_face.select_calls, [(True, {"mark": 0})])
+
+    def test_selects_native_slot_centerline_edges_before_addmate5(self):
+        manifest = self.manifest()
+        manifest["macros"][0]["mate_type"] = "parallel"
+        manifest["macros"][0]["expected_mate_name"] = "MG_slot_guides_01_parallel"
+        manifest["macros"][0]["selection_selectors"] = [
+            {
+                "stable_id": "slot_carrier-1:slot:centerline",
+                "component": "slot_carrier-1",
+                "fallback": {
+                    "type": "slot_centerline",
+                    "axis": [1.0, 0.0, 0.0],
+                    "centerline_m": {"start": [-0.03, 0.0, 0.0], "end": [0.03, 0.0, 0.0]},
+                },
+            },
+            {
+                "stable_id": "rail-1:slot:centerline",
+                "component": "rail-1",
+                "fallback": {
+                    "type": "slot_centerline",
+                    "axis": [1.0, 0.0, 0.0],
+                    "centerline_m": {"start": [-0.03, 0.02, 0.0], "end": [0.03, 0.02, 0.0]},
+                },
+            },
+        ]
+        slot_edge = FakeEdge(FakeCurve([0.0, 0.0, 0.0, 1.0, 0.0, 0.0]), [-0.03, -0.001, -0.001, 0.03, 0.001, 0.001])
+        rail_edge = FakeEdge(FakeCurve([0.0, 0.02, 0.0, 1.0, 0.0, 0.0]), [-0.03, 0.019, -0.001, 0.03, 0.021, 0.001])
+        asm = FakeAssembly([
+            FakeComponent("slot_carrier-1", [], [slot_edge]),
+            FakeComponent("rail-1", [], [rail_edge]),
+        ])
+
+        result = mod.execute_manifest(manifest, asm)
+
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(asm.mates[0][0], mod.MATE_TYPES["parallel"])
+        self.assertEqual(slot_edge.select_calls, [(False, {"mark": 0})])
+        self.assertEqual(rail_edge.select_calls, [(True, {"mark": 0})])
+        guard = result["executed_mates"][0]["selection_guard"]
+        self.assertEqual([call["method"] for call in guard["select_by_id_calls"]], ["Edge.Select4", "Edge.Select4"])
+        self.assertEqual(asm.Extension.calls, [])
 
     def test_executes_tangent_mate_with_native_cylinder_and_plane_faces(self):
         manifest = self.manifest()

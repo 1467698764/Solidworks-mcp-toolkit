@@ -153,11 +153,28 @@ def body_faces(body: Any) -> list[Any]:
         return []
 
 
+def body_edges(body: Any) -> list[Any]:
+    func = getattr(body, "GetEdges", None)
+    if not callable(func):
+        return []
+    try:
+        return as_list(func())
+    except Exception:
+        return []
+
+
 def component_faces(component: Any) -> list[Any]:
     faces: list[Any] = []
     for body in component_bodies(component):
         faces.extend(body_faces(body))
     return faces
+
+
+def component_edges(component: Any) -> list[Any]:
+    edges: list[Any] = []
+    for body in component_bodies(component):
+        edges.extend(body_edges(body))
+    return edges
 
 
 def surface_for_face(face: Any) -> Any | None:
@@ -182,6 +199,36 @@ def surface_bool(surface: Any, method: str) -> bool:
 
 def surface_params(surface: Any, method: str) -> list[float]:
     func = getattr(surface, method, None)
+    if not callable(func):
+        return []
+    try:
+        return [float(item) for item in as_list(func())]
+    except Exception:
+        return []
+
+
+def curve_for_edge(edge: Any) -> Any | None:
+    func = getattr(edge, "GetCurve", None)
+    if not callable(func):
+        return None
+    try:
+        return func()
+    except Exception:
+        return None
+
+
+def curve_bool(curve: Any, method: str) -> bool:
+    func = getattr(curve, method, None)
+    if not callable(func):
+        return False
+    try:
+        return bool(func())
+    except Exception:
+        return False
+
+
+def curve_params(curve: Any, method: str) -> list[float]:
+    func = getattr(curve, method, None)
     if not callable(func):
         return []
     try:
@@ -262,6 +309,40 @@ def best_cylindrical_face(component: Any, fallback: dict[str, Any]) -> Any | Non
     return best[1] if best else None
 
 
+def slot_axis_and_origin(fallback: dict[str, Any]) -> tuple[list[float], list[float]]:
+    axis = vector(fallback.get("axis"), [0.0, 0.0, 0.0])
+    centerline = fallback.get("centerline_m") if isinstance(fallback.get("centerline_m"), dict) else {}
+    start = centerline.get("start")
+    end = centerline.get("end")
+    if isinstance(start, list) and isinstance(end, list) and len(start) == 3 and len(end) == 3:
+        origin = [(float(start[i]) + float(end[i])) / 2.0 for i in range(3)]
+        if not any(axis):
+            axis = [float(end[i]) - float(start[i]) for i in range(3)]
+    else:
+        origin = vector(fallback.get("origin_m"), [0.0, 0.0, 0.0])
+    return axis, origin
+
+
+def best_linear_edge(component: Any, fallback: dict[str, Any]) -> Any | None:
+    expected_axis, expected_origin = slot_axis_and_origin(fallback)
+    best: tuple[float, Any] | None = None
+    for edge in component_edges(component):
+        curve = curve_for_edge(edge)
+        if curve is None or not curve_bool(curve, "IsLine"):
+            continue
+        params = curve_params(curve, "LineParams")
+        origin = params[:3] if len(params) >= 6 else center_from_box(getattr(edge, "GetBox", lambda: [])(), expected_origin)
+        axis = params[3:6] if len(params) >= 6 else expected_axis
+        axis_score = abs(dot(axis, expected_axis)) if any(expected_axis) else 1.0
+        if axis_score < 0.8:
+            continue
+        edge_center = center_from_box(getattr(edge, "GetBox", lambda: [])(), origin)
+        score = distance(edge_center, expected_origin) - axis_score
+        if best is None or score < best[0]:
+            best = (score, edge)
+    return best[1] if best else None
+
+
 def native_select_with_action(assembly: Any, action: dict[str, Any]) -> dict[str, Any]:
     component = find_component(assembly, str(action.get("component") or ""))
     if component is None:
@@ -271,12 +352,15 @@ def native_select_with_action(assembly: Any, action: dict[str, Any]) -> dict[str
         entity = best_planar_face(component, fallback)
     elif action.get("fallback_type") == "cylindrical_axis":
         entity = best_cylindrical_face(component, fallback)
+    elif action.get("fallback_type") == "slot_centerline":
+        entity = best_linear_edge(component, fallback)
     else:
         entity = None
     if entity is None:
         return {"ok": False, "method": "native_component_face", "error": "entity_not_found"}
     ok = select_entity(entity, assembly, bool(action["append"]))
-    return {"ok": ok, "method": "Face.Select4", "component": component_display_name(component), "entity": entity}
+    method = "Edge.Select4" if action.get("fallback_type") == "slot_centerline" else "Face.Select4"
+    return {"ok": ok, "method": method, "component": component_display_name(component), "entity": entity}
 
 
 def selection_action(selector: dict[str, Any], append: bool) -> dict[str, Any]:
