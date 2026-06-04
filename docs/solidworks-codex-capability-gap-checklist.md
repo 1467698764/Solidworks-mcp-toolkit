@@ -163,7 +163,7 @@ Status values:
 | Rollback copies | missing/partial | Preserve original native files before mutation. | Report lists rollback paths. |
 | Selective mate repair | partial/offline-ready | Reviewable mate group macro drafts and live protocols can be generated per actionable group; after-inspect execution checks verify expected named mates; automated live deletion/add/entity selection is still pending. | Untouched components keep file timestamps/transforms unless affected, and each changed group has rebuild/inspect/execution-check evidence. |
 | Selective part repair | missing | Edit only affected feature/sketch; rebuild dependent assembly. | Report lists changed feature and downstream checks. |
-| Full rebuild justification | missing | Record reason: stale base, invalid topology, missing interface, cheaper regeneration. | Full rebuild is a deliberate decision, not default behavior. |
+| Full rebuild justification | present | `workflow-plan` emits `full_rebuild_justification_policy` with local-repair-first default, allowed reasons (`stale_base`, `invalid_topology`, `missing_interface`, `cheaper_regeneration`), required evidence fields, and a blocking rule when no reason is recorded. | Full rebuild is a deliberate decision, not default behavior. |
 
 ### 6.6 Validation And Understanding
 

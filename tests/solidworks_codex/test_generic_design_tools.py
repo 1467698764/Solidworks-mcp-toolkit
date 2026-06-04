@@ -151,7 +151,18 @@ class GenericDesignToolsTests(unittest.TestCase):
             self.assertIn("timeout_seconds", runtime)
             self.assertIn("cleanup_policy", runtime)
             self.assertTrue(runtime["full_rebuild_requires_reason"])
+            justification = runtime["full_rebuild_justification_policy"]
+            self.assertEqual("full_rebuild_justification_policy", justification["artifact"])
+            self.assertEqual("local_repair_first", justification["default_decision"])
+            self.assertIn("stale_base", justification["allowed_reasons"])
+            self.assertIn("invalid_topology", justification["allowed_reasons"])
+            self.assertIn("missing_interface", justification["allowed_reasons"])
+            self.assertIn("cheaper_regeneration", justification["allowed_reasons"])
+            self.assertIn("selected_reason", justification["required_fields"])
+            self.assertIn("rejected_local_repairs", justification["required_fields"])
+            self.assertTrue(justification["blocks_full_rebuild_without_reason"])
             self.assertIn("Runtime Budget Plan", text)
+            self.assertIn("Full Rebuild Justification", text)
             self.assertIn("memory ceiling", text)
             intent = data["design_intent"]
             self.assertEqual("design_intent", intent["artifact"])

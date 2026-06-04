@@ -425,6 +425,25 @@ def runtime_budget_plan(intent: str, runtime_budget: str) -> dict[str, Any]:
         selected["rebuild_scope"] += "; include mechanism DOF/clearance sampling when available"
     elif intent == "single_part":
         selected["expected_solidworks_sessions"] = 1
+    justification_policy = {
+        "artifact": "full_rebuild_justification_policy",
+        "default_decision": "local_repair_first",
+        "allowed_reasons": [
+            "stale_base",
+            "invalid_topology",
+            "missing_interface",
+            "cheaper_regeneration",
+        ],
+        "required_fields": [
+            "selected_reason",
+            "rejected_local_repairs",
+            "affected_files",
+            "expected_validation_reports",
+            "rollback_path",
+        ],
+        "blocks_full_rebuild_without_reason": True,
+        "acceptance_rule": "A full rebuild is allowed only when one allowed reason is selected and local repair options are explicitly rejected with evidence.",
+    }
     return {
         "artifact": "runtime_budget_plan",
         "intent": intent,
@@ -435,6 +454,7 @@ def runtime_budget_plan(intent: str, runtime_budget: str) -> dict[str, Any]:
         "timeout_seconds": selected["timeout_seconds"],
         "cleanup_policy": "scan generated lock files before/after live work, close generated documents, and keep user models out of cleanup scope",
         "full_rebuild_requires_reason": True,
+        "full_rebuild_justification_policy": justification_policy,
         "extra_checks_policy": selected["extra_checks_policy"],
     }
 
@@ -595,6 +615,15 @@ def markdown(plan: dict[str, Any]) -> str:
         f"- Cleanup policy: {runtime.get('cleanup_policy')}",
         f"- Full rebuild requires reason: `{runtime.get('full_rebuild_requires_reason')}`",
         f"- Extra checks policy: {runtime.get('extra_checks_policy')}",
+    ])
+    justification = runtime.get("full_rebuild_justification_policy") or {}
+    lines.extend(["", "## Full Rebuild Justification", ""])
+    lines.extend([
+        f"- Default decision: `{justification.get('default_decision')}`",
+        f"- Allowed reasons: {', '.join(f'`{x}`' for x in justification.get('allowed_reasons', [])) or '`<none>`'}",
+        f"- Required fields: {', '.join(f'`{x}`' for x in justification.get('required_fields', [])) or '`<none>`'}",
+        f"- Blocks without reason: `{justification.get('blocks_full_rebuild_without_reason')}`",
+        f"- Acceptance rule: {justification.get('acceptance_rule', '')}",
     ])
     lines.extend(["", "## Candidate Actions", ""])
     for action in plan["candidate_actions"]:
