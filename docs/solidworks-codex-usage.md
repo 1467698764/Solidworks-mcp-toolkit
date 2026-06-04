@@ -41,8 +41,15 @@ This keeps validation proportional: simple work remains usable, while complex wo
 cd <repo>
 .\tools\solidworks_codex\swctl.ps1 inspect -Out tools\solidworks_codex\reports\assembly_before.json
 .\tools\solidworks_codex\swctl.ps1 summary -Report tools\solidworks_codex\reports\assembly_before.json -Out tools\solidworks_codex\reports\assembly_before.md
+.\tools\solidworks_codex\swctl.ps1 interface-index -Report tools\solidworks_codex\reports\assembly_before.json -Out tools\solidworks_codex\reports\interface_index.json
 .\tools\solidworks_codex\swctl.ps1 model-understand -Report tools\solidworks_codex\reports\assembly_before.json -View spatial-assembly -Target "locating interfaces, editable dimensions, floating components, clearance, mate semantics, and manufacturing evidence" -Out tools\solidworks_codex\reports\understanding.md -JsonOut tools\solidworks_codex\reports\understanding.json
 ```
+
+`interface-index` records bbox-derived component proximity, standard-part hints,
+and `planar_interfaces` with stable ids such as
+`base_plate-1:plane:z_max`, normals, local frames, role, confidence, and source
+evidence. Treat these as reviewable selection targets until live face/axis
+selection confirms exact SolidWorks entities.
 
 Allowing the command to launch SolidWorks is explicit:
 

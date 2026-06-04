@@ -130,7 +130,7 @@ Status values:
 
 | Capability | Status | Detail required | Acceptance |
 | --- | --- | --- | --- |
-| Named planar interfaces | missing | Mounting face, contact face, guide face, stop face, datum face. | Interface id maps to face evidence and local frame. |
+| Named planar interfaces | present | `interface-index` emits bbox-derived planar interface candidates for datum, mounting, and contact faces, including stable interface ids, normals, local frames, confidence, and source evidence; live face identity remains a later refinement. | Interface id maps to face evidence and local frame. |
 | Named cylindrical interfaces | partial | Shaft axis, hole axis, pin bore, bearing bore, screw hole. | Axis candidates scored by radius, role, location, direction, source feature. |
 | Slot/path interfaces | missing | Slider slot, cam path, rail path, path endpoints. | Path can drive slot/path/cam mate or validation. |
 | Coordinate systems/datums | missing/partial | Part origin role, assembly origin, principal axes, local frames. | Downstream drawing/CAM/assembly checks know orientation. |

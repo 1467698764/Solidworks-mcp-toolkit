@@ -55,6 +55,40 @@ class InterfaceIndexTests(unittest.TestCase):
             self.assertGreater(by_name["remote_handle-1"]["nearest_gap_m"], 1.0)
             self.assertIn("heuristic_bbox_only", data["operator_notes"])
 
+    def test_indexes_named_planar_interfaces_with_local_frames(self):
+        report = {
+            "active_document": {
+                "type": "assembly",
+                "title": "planar_fixture.SLDASM",
+                "components": [
+                    {"name2": "base_plate-1", "path": "C:/m/base_plate.SLDPRT", "fixed": True, "bbox_m": [0.0, 0.0, 0.0, 0.20, 0.10, 0.012]},
+                    {"name2": "cover_plate-1", "path": "C:/m/cover_plate.SLDPRT", "fixed": False, "bbox_m": [0.0, 0.0, 0.012, 0.20, 0.10, 0.024]},
+                ],
+            }
+        }
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            src = root / "inspect.json"
+            out = root / "interface_index.json"
+            src.write_text(json.dumps(report), encoding="utf-8")
+
+            proc = run_py("--report", str(src), "--out", str(out), "--near-tolerance-m", "0.001")
+
+            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+            data = json.loads(out.read_text(encoding="utf-8-sig"))
+            planes = {item["interface_id"]: item for item in data["planar_interfaces"]}
+            self.assertIn("base_plate-1:plane:z_max", planes)
+            self.assertIn("cover_plate-1:plane:z_min", planes)
+            base_top = planes["base_plate-1:plane:z_max"]
+            self.assertEqual(base_top["component"], "base_plate-1")
+            self.assertEqual(base_top["role"], "contact_face")
+            self.assertEqual(base_top["normal"], [0.0, 0.0, 1.0])
+            self.assertEqual(base_top["local_frame"]["origin_m"], [0.1, 0.05, 0.012])
+            self.assertEqual(base_top["source"], "axis_aligned_bbox_face")
+            contact = data["interfaces"][0]
+            self.assertEqual(contact["planar_interface_ids"]["a"], "base_plate-1:plane:z_max")
+            self.assertEqual(contact["planar_interface_ids"]["b"], "cover_plate-1:plane:z_min")
+
     def test_swctl_routes_interface_index(self):
         report = {
             "active_document": {

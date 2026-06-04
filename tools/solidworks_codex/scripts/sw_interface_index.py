@@ -53,6 +53,67 @@ def size_from_bbox(box: list[float] | None) -> list[float] | None:
     return [max(0.0, box[i + 3] - box[i]) for i in range(3)]
 
 
+def planar_face(component: str, box: list[float], axis: int, side: str) -> dict[str, Any]:
+    axis_names = ("x", "y", "z")
+    sign = -1.0 if side == "min" else 1.0
+    center = [(box[i] + box[i + 3]) / 2.0 for i in range(3)]
+    center[axis] = box[axis] if side == "min" else box[axis + 3]
+    normal = [0.0, 0.0, 0.0]
+    normal[axis] = sign
+    tangent_axes = [i for i in range(3) if i != axis]
+    u_axis = [0.0, 0.0, 0.0]
+    v_axis = [0.0, 0.0, 0.0]
+    u_axis[tangent_axes[0]] = 1.0
+    v_axis[tangent_axes[1]] = 1.0
+    face_name = f"{axis_names[axis]}_{side}"
+    return {
+        "interface_id": f"{component}:plane:{face_name}",
+        "component": component,
+        "kind": "planar",
+        "role": "datum_face",
+        "face": face_name,
+        "normal": normal,
+        "local_frame": {
+            "origin_m": center,
+            "normal": normal,
+            "u_axis": u_axis,
+            "v_axis": v_axis,
+        },
+        "confidence": 0.45,
+        "source": "axis_aligned_bbox_face",
+    }
+
+
+def planar_faces_for_component(component: str, box: list[float] | None) -> list[dict[str, Any]]:
+    if box is None:
+        return []
+    return [
+        planar_face(component, box, axis, side)
+        for axis in range(3)
+        for side in ("min", "max")
+    ]
+
+
+def overlapping_on_other_axes(a: list[float], b: list[float], axis: int) -> bool:
+    for other in range(3):
+        if other == axis:
+            continue
+        if a[other + 3] < b[other] or b[other + 3] < a[other]:
+            return False
+    return True
+
+
+def contact_planar_interface_ids(a: str, box_a: list[float], b: str, box_b: list[float], tolerance: float) -> dict[str, str] | None:
+    for axis, axis_name in enumerate(("x", "y", "z")):
+        if not overlapping_on_other_axes(box_a, box_b, axis):
+            continue
+        if abs(box_a[axis + 3] - box_b[axis]) <= tolerance:
+            return {"a": f"{a}:plane:{axis_name}_max", "b": f"{b}:plane:{axis_name}_min"}
+        if abs(box_b[axis + 3] - box_a[axis]) <= tolerance:
+            return {"a": f"{a}:plane:{axis_name}_min", "b": f"{b}:plane:{axis_name}_max"}
+    return None
+
+
 def role_hints(component: dict[str, Any], standard_re: re.Pattern[str]) -> list[str]:
     name = component_name(component)
     path = str(component.get("path", ""))
@@ -75,6 +136,7 @@ def build_index(report: dict[str, Any], *, near_tolerance_m: float, standard_par
     boxes = {component_name(c): bbox(c) for c in components}
 
     interfaces: list[dict[str, Any]] = []
+    contact_plane_ids: set[str] = set()
     nearest: dict[str, tuple[str | None, float | None]] = {component_name(c): (None, None) for c in components}
     for a, b in combinations([component_name(c) for c in components], 2):
         box_a = boxes.get(a)
@@ -87,24 +149,39 @@ def build_index(report: dict[str, Any], *, near_tolerance_m: float, standard_par
             if old_gap is None or gap < old_gap or (gap == old_gap and dst < (old_name or "")):
                 nearest[src] = (dst, gap)
         if gap <= near_tolerance_m:
-            interfaces.append({
+            item = {
                 "a": min(a, b),
                 "b": max(a, b),
                 "gap_m": gap,
                 "relation": "touching_or_overlapping_bbox" if gap == 0 else "near_bbox",
                 "evidence": "axis_aligned_bbox_gap",
-            })
+            }
+            planar_ids = contact_planar_interface_ids(a, box_a, b, box_b, near_tolerance_m)
+            if planar_ids is not None:
+                item["planar_interface_ids"] = planar_ids
+                contact_plane_ids.update(planar_ids.values())
+            interfaces.append(item)
 
     indexed_components = []
+    planar_interfaces: list[dict[str, Any]] = []
     for c in components:
         name = component_name(c)
         near_name, near_gap = nearest.get(name, (None, None))
+        component_roles = role_hints(c, standard_re)
+        for face in planar_faces_for_component(name, boxes.get(name)):
+            if face["interface_id"] in contact_plane_ids:
+                face["role"] = "contact_face"
+                face["confidence"] = 0.7
+            elif "fixed_root" in component_roles and face["face"] == "z_min":
+                face["role"] = "mounting_face"
+                face["confidence"] = 0.6
+            planar_interfaces.append(face)
         indexed_components.append({
             "component": name,
             "path": c.get("path"),
             "bbox_m": boxes.get(name),
             "size_m": size_from_bbox(boxes.get(name)),
-            "role_hints": role_hints(c, standard_re),
+            "role_hints": component_roles,
             "nearest_component": near_name,
             "nearest_gap_m": near_gap,
         })
@@ -114,6 +191,7 @@ def build_index(report: dict[str, Any], *, near_tolerance_m: float, standard_par
         "ok": True,
         "document": {"type": doc.get("type"), "title": doc.get("title") or doc.get("name")},
         "components": sorted(indexed_components, key=lambda item: item["component"]),
+        "planar_interfaces": sorted(planar_interfaces, key=lambda item: item["interface_id"]),
         "interfaces": sorted(interfaces, key=lambda item: (item["gap_m"], item["a"], item["b"])),
         "parameters": {"near_tolerance_m": near_tolerance_m, "standard_part_regex": standard_part_regex},
         "operator_notes": [
