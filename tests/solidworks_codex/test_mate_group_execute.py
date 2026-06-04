@@ -356,8 +356,47 @@ class MateGroupExecuteTests(unittest.TestCase):
         self.assertTrue(angle_result["ok"], angle_result)
         self.assertEqual(angle_asm.mates[0][0], mod.MATE_TYPES["angle"])
         self.assertTrue(angle_asm.mates[0][2])
-        self.assertAlmostEqual(angle_asm.mates[0][6], math.radians(30.0))
+        self.assertEqual(angle_asm.mates[0][6], 0)
+        self.assertEqual(angle_asm.mates[0][7], 0)
+        self.assertAlmostEqual(angle_asm.mates[0][8], math.radians(30.0))
         self.assertAlmostEqual(angle_result["executed_mates"][0]["angle_rad"], math.radians(30.0))
+
+    def test_executes_limit_distance_and_angle_bounds_in_addmate5_parameter_slots(self):
+        distance_manifest = self.manifest()
+        distance_manifest["macros"][0]["mate_type"] = "limit_distance"
+        distance_manifest["macros"][0]["distance_m"] = 0.02
+        distance_manifest["macros"][0]["distance_min_m"] = 0.01
+        distance_manifest["macros"][0]["distance_max_m"] = 0.03
+        distance_asm = FakeAssembly()
+
+        distance_result = mod.execute_manifest(distance_manifest, distance_asm)
+
+        self.assertTrue(distance_result["ok"], distance_result)
+        self.assertEqual(distance_asm.mates[0][0], mod.MATE_TYPES["limit_distance"])
+        self.assertEqual(distance_asm.mates[0][3], 0.02)
+        self.assertEqual(distance_asm.mates[0][4], 0.03)
+        self.assertEqual(distance_asm.mates[0][5], 0.01)
+        self.assertEqual(distance_result["executed_mates"][0]["distance_max_m"], 0.03)
+        self.assertEqual(distance_result["executed_mates"][0]["distance_min_m"], 0.01)
+
+        angle_manifest = self.manifest()
+        angle_manifest["macros"][0]["mate_type"] = "limit_angle"
+        angle_manifest["macros"][0]["angle_deg"] = 45.0
+        angle_manifest["macros"][0]["angle_min_deg"] = 15.0
+        angle_manifest["macros"][0]["angle_max_deg"] = 75.0
+        angle_asm = FakeAssembly()
+
+        angle_result = mod.execute_manifest(angle_manifest, angle_asm)
+
+        self.assertTrue(angle_result["ok"], angle_result)
+        self.assertEqual(angle_asm.mates[0][0], mod.MATE_TYPES["limit_angle"])
+        self.assertEqual(angle_asm.mates[0][6], 0)
+        self.assertEqual(angle_asm.mates[0][7], 0)
+        self.assertAlmostEqual(angle_asm.mates[0][8], math.radians(45.0))
+        self.assertAlmostEqual(angle_asm.mates[0][9], math.radians(75.0))
+        self.assertAlmostEqual(angle_asm.mates[0][10], math.radians(15.0))
+        self.assertAlmostEqual(angle_result["executed_mates"][0]["angle_max_rad"], math.radians(75.0))
+        self.assertAlmostEqual(angle_result["executed_mates"][0]["angle_min_rad"], math.radians(15.0))
 
     def test_dry_run_reports_repair_actions_without_solidworks(self):
         manifest = self.manifest()

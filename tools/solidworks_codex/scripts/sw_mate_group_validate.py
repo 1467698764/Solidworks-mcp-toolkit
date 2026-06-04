@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 
-SUPPORTED_MATES = {"coincident", "concentric", "tangent", "distance", "angle", "parallel", "perpendicular", "recreate_from_current_interfaces"}
+SUPPORTED_MATES = {"coincident", "concentric", "tangent", "distance", "limit_distance", "angle", "limit_angle", "parallel", "perpendicular", "recreate_from_current_interfaces"}
 REQUIRED_VERIFICATION = {"rebuild", "mate_errors"}
 AXIAL_LOCATOR_MATES = {"coincident", "distance"}
 AXIAL_LOCATOR_ROLES = {"axial_seating_locator", "axial_offset_locator"}

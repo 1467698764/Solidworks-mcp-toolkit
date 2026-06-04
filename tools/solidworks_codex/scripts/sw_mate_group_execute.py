@@ -15,7 +15,9 @@ MATE_TYPES = {
     "parallel": 3,
     "tangent": 4,
     "distance": 5,
+    "limit_distance": 5,
     "angle": 6,
+    "limit_angle": 6,
 }
 
 FALLBACK_SELECT_TYPES = {
@@ -296,7 +298,11 @@ def planned_mate(item: dict[str, Any]) -> dict[str, Any]:
         "expected_mate_name": item.get("expected_mate_name"),
         "components": item.get("components", []),
         "distance_m": float(item.get("distance_m", 0.0) or 0.0),
+        "distance_min_m": optional_float(item.get("distance_min_m")),
+        "distance_max_m": optional_float(item.get("distance_max_m")),
         "angle_rad": mate_angle_rad(item),
+        "angle_min_rad": optional_angle_rad(item, "angle_min_rad", "angle_min_deg"),
+        "angle_max_rad": optional_angle_rad(item, "angle_max_rad", "angle_max_deg"),
         "flip": bool(item.get("flip", False)),
         "selection_actions": [selection_action(selector, append=index > 0) for index, selector in enumerate(selectors)],
     }
@@ -508,25 +514,62 @@ def mate_angle_rad(item: dict[str, Any]) -> float:
     return 0.0
 
 
+def optional_float(value: Any) -> float | None:
+    if value in (None, ""):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def optional_angle_rad(item: dict[str, Any], rad_key: str, deg_key: str) -> float | None:
+    raw_rad = item.get(rad_key)
+    if raw_rad not in (None, ""):
+        try:
+            return float(raw_rad)
+        except (TypeError, ValueError):
+            return None
+    raw_deg = item.get(deg_key)
+    if raw_deg not in (None, ""):
+        try:
+            return math.radians(float(raw_deg))
+        except (TypeError, ValueError):
+            return None
+    return None
+
+
 def add_selected_mate(assembly: Any, item: dict[str, Any]) -> dict[str, Any]:
     mate_type = str(item.get("mate_type", "")).casefold()
     if mate_type not in MATE_TYPES:
         return {"ok": False, "error": "unsupported_mate_type", "mate_type": mate_type}
     distance = float(item.get("distance_m", 0.0) or 0.0)
+    distance_upper = optional_float(item.get("distance_max_m"))
+    distance_lower = optional_float(item.get("distance_min_m"))
+    if distance_upper is None:
+        distance_upper = distance
+    if distance_lower is None:
+        distance_lower = distance
     angle = mate_angle_rad(item)
+    angle_upper = optional_angle_rad(item, "angle_max_rad", "angle_max_deg")
+    angle_lower = optional_angle_rad(item, "angle_min_rad", "angle_min_deg")
+    if angle_upper is None:
+        angle_upper = angle
+    if angle_lower is None:
+        angle_lower = angle
     mate_error = 0
     feature = assembly.AddMate5(
         MATE_TYPES[mate_type],
         -1,
         bool(item.get("flip", False)),
         distance,
-        distance,
-        distance,
-        angle,
-        angle,
-        angle,
+        distance_upper,
+        distance_lower,
         0,
         0,
+        angle,
+        angle_upper,
+        angle_lower,
         0,
         False,
         False,
@@ -544,7 +587,11 @@ def add_selected_mate(assembly: Any, item: dict[str, Any]) -> dict[str, Any]:
         "mate_type": mate_type,
         "expected_mate_name": item.get("expected_mate_name"),
         "distance_m": distance,
+        "distance_max_m": distance_upper,
+        "distance_min_m": distance_lower,
         "angle_rad": angle,
+        "angle_max_rad": angle_upper,
+        "angle_min_rad": angle_lower,
         "mate_error": mate_error,
     }
 

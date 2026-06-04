@@ -126,6 +126,28 @@ class MateGroupValidateTests(unittest.TestCase):
             data = json.loads(out.read_text(encoding="utf-8-sig"))
             self.assertTrue(data["ok"], data)
 
+    def test_accepts_limit_distance_and_limit_angle_groups(self):
+        plan = self.good_plan()
+        plan["mate_groups"][0]["suggested_mates"] = [
+            {"type": "limit_distance", "distance_min_m": 0.005, "distance_max_m": 0.04},
+            {"type": "limit_angle", "angle_min_deg": 10.0, "angle_max_deg": 70.0},
+        ]
+        plan["mate_groups"][0]["dof_expectation"] = {
+            "intent": "bounded_slider_or_hinge",
+            "remaining_dof": ["bounded_translation_or_rotation"],
+        }
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            plan_path = root / "mate_group_plan.json"
+            out = root / "validation.json"
+            plan_path.write_text(json.dumps(plan), encoding="utf-8")
+
+            proc = run_py("--mate-group-plan", str(plan_path), "--out", str(out))
+
+            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+            data = json.loads(out.read_text(encoding="utf-8-sig"))
+            self.assertTrue(data["ok"], data)
+
     def test_swctl_routes_mate_group_validate(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)

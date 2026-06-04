@@ -54,8 +54,13 @@ class ToolCatalogTests(unittest.TestCase):
             self.assertIn("solidworks_mate_group_live_protocol", names)
             self.assertIn("mate", by_name["solidworks_mate_macro"]["properties"])
             schemas = {tool["name"]: tool for tool in sw_tool_catalog.list_tools_via_node()}
-            mate_enum = schemas["solidworks_mate_macro"]["inputSchema"]["properties"]["mate"]["enum"]
+            mate_schema = schemas["solidworks_mate_macro"]["inputSchema"]["properties"]
+            mate_enum = mate_schema["mate"]["enum"]
             self.assertIn("tangent", mate_enum)
+            self.assertIn("limit_distance", mate_enum)
+            self.assertIn("limit_angle", mate_enum)
+            self.assertIn("distance_min_mm", mate_schema)
+            self.assertIn("angle_max_deg", mate_schema)
             self.assertIn("read_only", data["groups"])
             self.assertIn("handoff", data["groups"])
             self.assertGreaterEqual(data["count"], 29)
