@@ -71,6 +71,7 @@ def build_macros(plan: dict[str, Any], *, out_dir: Path) -> dict[str, Any]:
                 "macro": str(path.resolve()),
                 "components": group.get("components", []),
                 "selection_intent": mate.get("selection_intent", ""),
+                "selection_selectors": mate.get("selection_selectors", []),
                 "verification": group.get("verification", []),
             })
     return {

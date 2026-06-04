@@ -21,28 +21,82 @@ def component_index(interface_index: dict[str, Any]) -> dict[str, dict[str, Any]
     return {str(item.get("component")): item for item in interface_index.get("components", [])}
 
 
+def selector_index(interface_index: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    result: dict[str, dict[str, Any]] = {}
+    for collection in ("planar_interfaces", "cylindrical_interfaces", "slot_path_interfaces", "coordinate_systems"):
+        for item in interface_index.get(collection, []) or []:
+            if not isinstance(item, dict):
+                continue
+            stable_id = str(item.get("interface_id") or item.get("coordinate_system_id") or "")
+            selector = item.get("selector")
+            if stable_id and isinstance(selector, dict):
+                result[stable_id] = selector
+    return result
+
+
 def group_id(prefix: str, target: str) -> str:
     return f"{prefix}_{target}".replace(" ", "_")
 
 
-def standard_mates(component: str, host: str | None) -> list[dict[str, Any]]:
+def contact_selector_pair(component: str, host: str, interface_index: dict[str, Any], selectors: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+    for item in interface_index.get("interfaces", []) or []:
+        if not isinstance(item, dict):
+            continue
+        if {item.get("a"), item.get("b")} != {component, host}:
+            continue
+        refs = item.get("selector_refs") if isinstance(item.get("selector_refs"), dict) else {}
+        selected = [selectors[ref] for ref in refs.values() if ref in selectors]
+        if len(selected) == 2:
+            return selected
+    return []
+
+
+def cylindrical_selector_pair(component: str, host: str, selectors: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+    result: list[dict[str, Any]] = []
+    for selector in selectors.values():
+        fallback = selector.get("fallback") if isinstance(selector.get("fallback"), dict) else {}
+        if fallback.get("type") != "cylindrical_axis":
+            continue
+        if selector.get("component") in {component, host}:
+            result.append(selector)
+    ordered = sorted(result, key=lambda item: (0 if item.get("component") == component else 1, str(item.get("stable_id"))))
+    return ordered[:2] if len(ordered) >= 2 else []
+
+
+def standard_mates(component: str, host: str | None, interface_index: dict[str, Any], selectors: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
     if not host:
         return []
+    cylindrical_selectors = cylindrical_selector_pair(component, host, selectors)
+    contact_selectors = contact_selector_pair(component, host, interface_index, selectors)
     return [
         {
             "type": "concentric",
+            "dof_role": "radial_axis_alignment",
             "selection_intent": "component cylindrical axis to host hole or boss axis",
+            "selection_selectors": cylindrical_selectors,
             "lock_rotation": True,
         },
         {
             "type": "coincident",
+            "dof_role": "axial_seating_locator",
             "selection_intent": "component seating face to host seating/contact face",
+            "selection_selectors": contact_selectors,
         },
     ]
 
 
+def standard_dof_expectation() -> dict[str, Any]:
+    return {
+        "intent": "fully_located_attachment",
+        "remaining_dof": [],
+        "rotation_about_axis": "locked",
+        "required_roles": ["radial_axis_alignment", "axial_seating_locator"],
+    }
+
+
 def build_plan(repair_plan: dict[str, Any], interface_index: dict[str, Any]) -> dict[str, Any]:
     components = component_index(interface_index)
+    selectors = selector_index(interface_index)
     groups: list[dict[str, Any]] = []
 
     for action in repair_plan.get("actions", []):
@@ -73,7 +127,8 @@ def build_plan(repair_plan: dict[str, Any], interface_index: dict[str, Any]) -> 
                     "source_action": kind,
                     "priority": action.get("priority", "P1"),
                     "components": [target, host] if host else [target],
-                    "suggested_mates": standard_mates(target, host),
+                    "suggested_mates": standard_mates(target, host, interface_index, selectors),
+                    "dof_expectation": standard_dof_expectation() if host else {},
                     "evidence": {
                         "suggested_host": host,
                         "target_role_hints": components.get(target, {}).get("role_hints", []),

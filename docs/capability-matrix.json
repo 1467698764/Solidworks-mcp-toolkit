@@ -1,6 +1,6 @@
 {
-  "timestamp": "2026-06-03T21:08:56",
-  "count": 59,
+  "timestamp": "2026-06-04T18:03:42",
+  "count": 60,
   "capabilities": [
     {
       "cli": "assembly-contract",
@@ -344,6 +344,22 @@
         "out"
       ],
       "description": "Report mass properties for active or specified SolidWorks document."
+    },
+    {
+      "cli": "mate-group-execute",
+      "mcp": "solidworks_mate_group_execute",
+      "workflow": "guarded_edit",
+      "safety": "guarded_write",
+      "solidworks_required": true,
+      "required": [
+        "macro_manifest"
+      ],
+      "properties": [
+        "dry_run",
+        "macro_manifest",
+        "out"
+      ],
+      "description": "Execute reviewed mate group selector evidence in the active SolidWorks assembly using SelectByID2, AddMate5, and immediate rebuild. dry_run only plans selector actions."
     },
     {
       "cli": "mate-group-execution-check",
@@ -872,9 +888,9 @@
     }
   ],
   "coverage": {
-    "cli_commands": 59,
-    "mcp_tools": 45,
-    "mapped_mcp_tools": 45,
+    "cli_commands": 60,
+    "mcp_tools": 46,
+    "mapped_mcp_tools": 46,
     "has_cli_for_every_local_mcp": true,
     "has_safety_for_every_capability": true,
     "has_workflow_for_every_capability": true,

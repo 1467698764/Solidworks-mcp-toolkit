@@ -30,6 +30,11 @@ class MateGroupValidateTests(unittest.TestCase):
                     "group_id": "standard_bolt_m6-1",
                     "components": ["bolt_m6-1", "cover_plate-1"],
                     "suggested_mates": [{"type": "concentric"}, {"type": "coincident"}],
+                    "dof_expectation": {
+                        "intent": "fully_located_attachment",
+                        "remaining_dof": [],
+                        "rotation_about_axis": "locked",
+                    },
                     "verification": ["rebuild", "mate_errors", "minimum_clearance"],
                 },
                 {
@@ -60,6 +65,7 @@ class MateGroupValidateTests(unittest.TestCase):
         bad = self.good_plan()
         bad["mate_groups"][0]["components"] = ["bolt_m6-1"]
         bad["mate_groups"][0]["suggested_mates"] = [{"type": "gear"}]
+        bad["mate_groups"][0].pop("dof_expectation")
         bad["mate_groups"][0]["verification"] = ["visual_only"]
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
@@ -75,7 +81,30 @@ class MateGroupValidateTests(unittest.TestCase):
             kinds = {item["kind"] for item in data["findings"]["blocking"]}
             self.assertIn("mate_group_component_count", kinds)
             self.assertIn("unsupported_mate_type", kinds)
+            self.assertIn("missing_dof_expectation", kinds)
             self.assertIn("missing_group_verification", kinds)
+
+    def test_blocks_decorative_concentric_without_axial_locator_or_intended_rotation(self):
+        bad = self.good_plan()
+        bad["mate_groups"][0]["suggested_mates"] = [{"type": "concentric"}]
+        bad["mate_groups"][0]["dof_expectation"] = {
+            "intent": "fully_located_attachment",
+            "remaining_dof": [],
+            "rotation_about_axis": "locked",
+        }
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            plan = root / "mate_group_plan.json"
+            out = root / "validation.json"
+            plan.write_text(json.dumps(bad), encoding="utf-8")
+
+            proc = run_py("--mate-group-plan", str(plan), "--out", str(out))
+
+            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+            data = json.loads(out.read_text(encoding="utf-8-sig"))
+            self.assertFalse(data["ok"], data)
+            kinds = {item["kind"] for item in data["findings"]["blocking"]}
+            self.assertIn("concentric_without_axial_locator", kinds)
 
     def test_swctl_routes_mate_group_validate(self):
         with tempfile.TemporaryDirectory() as d:

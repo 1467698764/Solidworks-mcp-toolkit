@@ -19,6 +19,10 @@ fs.writeFileSync(mateGroupManifest, JSON.stringify({
     expected_mate_name: 'MG_mcp_fixture_joint_01_concentric',
     macro: 'tools/solidworks_codex/macros/mcp_fixture_joint.swp.vba',
     components: ['shaft-1', 'bearing-1'],
+    selection_selectors: [
+      { stable_id: 'shaft-1:cylinder:axis', component: 'shaft-1', strategy: 'stable_id_then_feature_dimension_bbox_fallback', fallback: { type: 'cylindrical_axis', origin_m: [0, 0, 0] } },
+      { stable_id: 'bearing-1:cylinder:bore', component: 'bearing-1', strategy: 'stable_id_then_feature_dimension_bbox_fallback', fallback: { type: 'cylindrical_axis', origin_m: [0, 0, 0] } }
+    ],
     verification: ['rebuild', 'mate_errors']
   }]
 }, null, 2));
@@ -91,6 +95,7 @@ child.stderr.on('data', (d) => { stderr += d.toString(); });
   const issue = await send('tools/call', { name: 'solidworks_issue_report', arguments: { report: 'tools/solidworks_codex/sandbox/report_after.json', out: 'tools/solidworks_codex/reports/mcp_issue_fixture.md', json_out: 'tools/solidworks_codex/reports/mcp_issue_fixture.json' } });
   const mate = await send('tools/call', { name: 'solidworks_mate_macro', arguments: { mate: 'concentric', out: 'tools/solidworks_codex/macros/mcp_mate_concentric.swp.vba', manifest: 'tools/solidworks_codex/reports/mcp_mate_concentric_manifest.json' } });
   const mateSelectionCheck = await send('tools/call', { name: 'solidworks_mate_selection_check', arguments: { macro_manifest: 'tools/solidworks_codex/sandbox/mcp_mate_group_manifest.json', selection_report: 'tools/solidworks_codex/sandbox/mcp_mate_selection_report.json', expected_mate_name: 'MG_mcp_fixture_joint_01_concentric', out: 'tools/solidworks_codex/reports/mcp_mate_selection_check.json' } });
+  const mateGroupExecute = await send('tools/call', { name: 'solidworks_mate_group_execute', arguments: { macro_manifest: 'tools/solidworks_codex/sandbox/mcp_mate_group_manifest.json', dry_run: true, out: 'tools/solidworks_codex/reports/mcp_mate_group_execute.json' } });
   const mateGroupLiveProtocol = await send('tools/call', { name: 'solidworks_mate_group_live_protocol', arguments: { macro_manifest: 'tools/solidworks_codex/sandbox/mcp_mate_group_manifest.json', validation_report: 'tools/solidworks_codex/sandbox/mcp_mate_group_validation.json', model: 'C:/models/mcp_fixture.SLDASM', out: 'tools/solidworks_codex/reports/mcp_mate_group_live_protocol.json', markdown_out: 'tools/solidworks_codex/reports/mcp_mate_group_live_protocol.md' } });
   const designReview = await send('tools/call', { name: 'solidworks_design_review', arguments: { report: 'tools/solidworks_codex/sandbox/report_after.json', intent: 'locating interfaces, floating components, editable dimensions, and manufacturability evidence', out: 'tools/solidworks_codex/reports/mcp_design_review.md', json_out: 'tools/solidworks_codex/reports/mcp_design_review.json' } });
   const changePlan = await send('tools/call', { name: 'solidworks_change_plan', arguments: { report: 'tools/solidworks_codex/sandbox/report_after.json', goal: 'adjust a critical mounting dimension and verify assembly, clearance, and manufacturing evidence', session_name: 'mcp-change', out: 'tools/solidworks_codex/reports/mcp_change_plan.md', json_out: 'tools/solidworks_codex/reports/mcp_change_plan.json' } });
@@ -118,6 +123,7 @@ child.stderr.on('data', (d) => { stderr += d.toString(); });
     issue_is_error: issue.isError === true,
     mate_is_error: mate.isError === true,
     mateSelectionCheck_is_error: mateSelectionCheck.isError === true,
+    mateGroupExecute_is_error: mateGroupExecute.isError === true,
     mateGroupLiveProtocol_is_error: mateGroupLiveProtocol.isError === true,
     designReview_is_error: designReview.isError === true,
     changePlan_is_error: changePlan.isError === true,
@@ -138,6 +144,7 @@ child.stderr.on('data', (d) => { stderr += d.toString(); });
     issue_text_head: issue.content?.[0]?.text?.slice(0, 500),
     mate_text_head: mate.content?.[0]?.text?.slice(0, 500),
     mateSelectionCheck_text_head: mateSelectionCheck.content?.[0]?.text?.slice(0, 500),
+    mateGroupExecute_text_head: mateGroupExecute.content?.[0]?.text?.slice(0, 500),
     mateGroupLiveProtocol_text_head: mateGroupLiveProtocol.content?.[0]?.text?.slice(0, 500),
     designReview_text_head: designReview.content?.[0]?.text?.slice(0, 500),
     changePlan_text_head: changePlan.content?.[0]?.text?.slice(0, 500),

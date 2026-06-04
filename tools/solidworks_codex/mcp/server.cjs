@@ -188,6 +188,11 @@ const toolSchemas = [
     name: 'solidworks_mate_group_macro',
     description: 'Generate reviewable preselect VBA macro drafts from a mate group plan. Each macro still requires live entity preselection and review before running.',
     inputSchema: { type: 'object', properties: { mate_group_plan: { type: 'string' }, out_dir: { type: 'string' }, manifest: { type: 'string' } }, required: ['mate_group_plan'], additionalProperties: false }
+  },
+  {
+    name: 'solidworks_mate_group_execute',
+    description: 'Execute reviewed mate group selector evidence in the active SolidWorks assembly using SelectByID2, AddMate5, and immediate rebuild. dry_run only plans selector actions.',
+    inputSchema: { type: 'object', properties: { macro_manifest: { type: 'string' }, dry_run: { type: 'boolean' }, out: { type: 'string' } }, required: ['macro_manifest'], additionalProperties: false }
   },  {
     name: 'solidworks_selection_report',
     description: 'Report current SolidWorks selection set for safe preselected-entity mate workflows.',
@@ -495,6 +500,11 @@ async function callTool(name, input) {
       args.push('mate-group-macro', '-Report', input.mate_group_plan);
       if (input?.out_dir) args.push('-OutDir', input.out_dir);
       if (input?.manifest) args.push('-Out', input.manifest);
+      break;
+    case 'solidworks_mate_group_execute':
+      args.push('mate-group-execute', '-Report', input.macro_manifest);
+      if (input?.dry_run) args.push('-ValidateOnly');
+      if (input?.out) args.push('-Out', input.out);
       break;    case 'solidworks_selection_report':
       args.push(input?.start ? 'start-selection-report' : 'selection-report');
       if (input?.out) args.push('-Out', input.out);

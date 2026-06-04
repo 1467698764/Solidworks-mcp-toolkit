@@ -39,6 +39,14 @@ class MateGroupPlanTests(unittest.TestCase):
                     {"name": "Base_Cover_Coincident", "type": "MateCoincident", "components": ["base_plate-1", "cover_plate-1"], "suppressed": False},
                     {"name": "Broken_Bolt_Mate", "type": "MateConcentric", "components": ["bolt_m6-1", "cover_plate-1"], "suppressed": True, "status": "unsolved", "mate_error": 4},
                 ],
+                "features": [
+                    {"name": "Bolt_Dia6_Z_Shaft", "type": "Boss-Extrude", "components": ["bolt_m6-1"]},
+                    {"name": "Cover_Dia6_Z_Hole", "type": "Cut-Extrude", "components": ["cover_plate-1"]},
+                ],
+                "dimensions": [
+                    {"full_name": "D1@Bolt_Dia6_Z_Shaft@bolt_m6.SLDPRT", "feature": "Bolt_Dia6_Z_Shaft", "system_value_m": 0.006},
+                    {"full_name": "D1@Cover_Dia6_Z_Hole@cover_plate.SLDPRT", "feature": "Cover_Dia6_Z_Hole", "system_value_m": 0.006},
+                ],
             }
         }
 
@@ -70,7 +78,13 @@ class MateGroupPlanTests(unittest.TestCase):
             self.assertIn("standard_bolt_m6-1", groups)
             self.assertEqual(groups["standard_bolt_m6-1"]["components"], ["bolt_m6-1", "cover_plate-1"])
             self.assertEqual(groups["standard_bolt_m6-1"]["suggested_mates"][0]["type"], "concentric")
+            self.assertEqual(groups["standard_bolt_m6-1"]["suggested_mates"][0]["dof_role"], "radial_axis_alignment")
+            self.assertEqual(len(groups["standard_bolt_m6-1"]["suggested_mates"][0]["selection_selectors"]), 2)
             self.assertEqual(groups["standard_bolt_m6-1"]["suggested_mates"][1]["type"], "coincident")
+            self.assertEqual(groups["standard_bolt_m6-1"]["suggested_mates"][1]["dof_role"], "axial_seating_locator")
+            self.assertEqual(len(groups["standard_bolt_m6-1"]["suggested_mates"][1]["selection_selectors"]), 2)
+            self.assertEqual(groups["standard_bolt_m6-1"]["dof_expectation"]["intent"], "fully_located_attachment")
+            self.assertEqual(groups["standard_bolt_m6-1"]["dof_expectation"]["rotation_about_axis"], "locked")
             self.assertIn("classify_loose_handle-1", groups)
             self.assertEqual(groups["classify_loose_handle-1"]["suggested_mates"], [])
             self.assertIn("requires_live_selection", data["operator_notes"])

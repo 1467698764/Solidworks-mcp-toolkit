@@ -32,8 +32,23 @@ class MateGroupMacroTests(unittest.TestCase):
                     "priority": "P1",
                     "components": ["bolt_m6-1", "cover_plate-1"],
                     "suggested_mates": [
-                        {"type": "concentric", "selection_intent": "bolt axis to cover hole axis", "lock_rotation": True},
-                        {"type": "coincident", "selection_intent": "bolt head underside to cover top face"},
+                        {
+                            "type": "concentric",
+                            "selection_intent": "bolt axis to cover hole axis",
+                            "selection_selectors": [
+                                {"stable_id": "bolt_m6-1:cylinder:shaft", "fallback": {"type": "cylindrical_axis", "origin_m": [0, 0, 0]}},
+                                {"stable_id": "cover_plate-1:cylinder:hole", "fallback": {"type": "cylindrical_axis", "origin_m": [0, 0, 0]}},
+                            ],
+                            "lock_rotation": True,
+                        },
+                        {
+                            "type": "coincident",
+                            "selection_intent": "bolt head underside to cover top face",
+                            "selection_selectors": [
+                                {"stable_id": "bolt_m6-1:plane:z_min", "fallback": {"type": "bbox_planar_face", "origin_m": [0, 0, 0]}},
+                                {"stable_id": "cover_plate-1:plane:z_max", "fallback": {"type": "bbox_planar_face", "origin_m": [0, 0, 0]}},
+                            ],
+                        },
                     ],
                     "verification": ["rebuild", "mate_errors"],
                 },
@@ -64,6 +79,7 @@ class MateGroupMacroTests(unittest.TestCase):
             self.assertEqual(data["document"]["title"], "macro_fixture.SLDASM")
             self.assertEqual(len(data["macros"]), 2)
             self.assertEqual(data["macros"][0]["expected_mate_name"], "MG_standard_bolt_m6_1_01_concentric")
+            self.assertEqual(len(data["macros"][0]["selection_selectors"]), 2)
             self.assertEqual(data["skipped"][0]["group_id"], "classify_handle-1")
             first_macro = Path(data["macros"][0]["macro"])
             self.assertTrue(first_macro.exists())

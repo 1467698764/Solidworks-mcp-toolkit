@@ -10,6 +10,8 @@ from typing import Any
 
 SUPPORTED_MATES = {"coincident", "concentric", "distance", "angle", "parallel", "perpendicular", "recreate_from_current_interfaces"}
 REQUIRED_VERIFICATION = {"rebuild", "mate_errors"}
+AXIAL_LOCATOR_MATES = {"coincident", "distance"}
+AXIAL_LOCATOR_ROLES = {"axial_seating_locator", "axial_offset_locator"}
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -37,6 +39,9 @@ def validate(plan: dict[str, Any]) -> dict[str, Any]:
         components = [str(c) for c in group.get("components", []) if c]
         mates = [m for m in group.get("suggested_mates", []) if isinstance(m, dict)]
         verification = {str(v) for v in group.get("verification", [])}
+        dof = group.get("dof_expectation") if isinstance(group.get("dof_expectation"), dict) else {}
+        mate_types = {str(mate.get("type", "")).casefold() for mate in mates}
+        mate_roles = {str(mate.get("dof_role", "")).casefold() for mate in mates if mate.get("dof_role")}
 
         if mates and len(components) < 2:
             add(findings, "blocking", "mate_group_component_count", group_id, components, "actionable mate groups need at least two components")
@@ -44,6 +49,26 @@ def validate(plan: dict[str, Any]) -> dict[str, Any]:
             mate_type = str(mate.get("type", "")).casefold()
             if mate_type not in SUPPORTED_MATES:
                 add(findings, "blocking", "unsupported_mate_type", group_id, mate_type, "mate type is not supported by current macro/live planning")
+        if mates and not dof:
+            add(findings, "blocking", "missing_dof_expectation", group_id, {}, "actionable mate groups must state intended remaining degrees of freedom")
+        if dof:
+            remaining = dof.get("remaining_dof", [])
+            if not isinstance(remaining, list):
+                add(findings, "blocking", "invalid_dof_expectation", group_id, dof, "remaining_dof must be a list")
+            if not dof.get("intent"):
+                add(findings, "blocking", "invalid_dof_expectation", group_id, dof, "dof expectation must name the connection intent")
+        if "concentric" in mate_types:
+            has_axial_locator = bool(mate_types & AXIAL_LOCATOR_MATES) or bool(mate_roles & AXIAL_LOCATOR_ROLES)
+            intended_rotation = str(dof.get("rotation_about_axis", "")).casefold() in {"free", "intended_free"}
+            if not has_axial_locator and not intended_rotation:
+                add(
+                    findings,
+                    "blocking",
+                    "concentric_without_axial_locator",
+                    group_id,
+                    {"mate_types": sorted(mate_types), "dof_expectation": dof},
+                    "concentric mates need axial locator evidence unless axial rotation/freedom is the stated mechanism intent",
+                )
         if mates and not REQUIRED_VERIFICATION.issubset(verification):
             add(findings, "blocking", "missing_group_verification", group_id, sorted(verification), "actionable mate groups must require rebuild and mate error checks")
         if not mates and not any(v.startswith("design_intent") for v in verification):
