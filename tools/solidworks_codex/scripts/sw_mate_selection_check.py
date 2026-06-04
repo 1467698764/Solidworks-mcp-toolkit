@@ -15,6 +15,9 @@ SUPPORTED_SELECTION_TYPES = {
     "DATUMPLANES",
     "SKETCHSEGS",
     "EXTSKETCHSEGS",
+    "VERTICES",
+    "SKETCHPOINTS",
+    "EXTSKETCHPOINTS",
 }
 
 
@@ -76,7 +79,7 @@ def check(manifest: dict[str, Any], selection_report: dict[str, Any], expected_m
     for item in selections:
         typ = str(item.get("type", "")).upper()
         if typ not in SUPPORTED_SELECTION_TYPES:
-            add(findings, "blocking", "unsupported_selection_type", "selection is not a face/edge/axis/plane style entity suitable for reviewed mate macros", {"index": item.get("index"), "type": typ})
+            add(findings, "blocking", "unsupported_selection_type", "selection is not a face/edge/axis/plane/point style entity suitable for reviewed mate macros", {"index": item.get("index"), "type": typ})
             continue
         accepted += 1
         add(findings, "accepted", "selection_entity_supported", "selection entity type is suitable for a reviewed mate macro", {"index": item.get("index"), "type": typ, "component": component_name(item)})

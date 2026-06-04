@@ -60,6 +60,34 @@ class MateSelectionCheckTests(unittest.TestCase):
             self.assertEqual(data["macro"]["expected_mate_name"], "MG_crank_shaft_01_concentric")
             self.assertEqual(data["counts"]["accepted_selections"], 2)
 
+    def test_accepts_path_vertex_and_edge_selections(self):
+        manifest = self.manifest()
+        manifest["macros"][0]["mate_type"] = "path"
+        manifest["macros"][0]["expected_mate_name"] = "MG_follower_guide_01_path"
+        manifest["macros"][0]["components"] = ["follower-1", "guide-1"]
+        selection = {
+            "document_title": "shaper.SLDASM",
+            "selection_count": 2,
+            "selections": [
+                {"index": 1, "type": "VERTICES", "component": {"Name2": "follower-1"}},
+                {"index": 2, "type": "EDGES", "component": {"Name2": "guide-1"}},
+            ],
+        }
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            manifest_path = root / "manifest.json"
+            selection_path = root / "selection.json"
+            out = root / "check.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            selection_path.write_text(json.dumps(selection), encoding="utf-8")
+
+            proc = run_py("--macro-manifest", str(manifest_path), "--selection-report", str(selection_path), "--expected-mate-name", "MG_follower_guide_01_path", "--out", str(out))
+
+            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+            data = json.loads(out.read_text(encoding="utf-8-sig"))
+            self.assertTrue(data["ok"], data)
+            self.assertEqual(data["counts"]["accepted_selections"], 2)
+
     def test_blocks_wrong_count_wrong_component_and_component_level_selection(self):
         selection = self.selection_report()
         selection["selection_count"] = 3
