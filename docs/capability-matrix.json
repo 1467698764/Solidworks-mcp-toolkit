@@ -1,6 +1,6 @@
 {
-  "timestamp": "2026-06-04T21:28:15",
-  "count": 62,
+  "timestamp": "2026-06-05T02:22:31",
+  "count": 64,
   "capabilities": [
     {
       "cli": "assembly-contract",
@@ -236,12 +236,14 @@
       ],
       "properties": [
         "action",
+        "dimension",
         "feature",
         "model",
         "out",
-        "save"
+        "save",
+        "value_m"
       ],
-      "description": "Change part or assembly feature state by feature name: suppress/unsuppress/delete, then rebuild and report before/after evidence."
+      "description": "Change part or assembly feature state by feature name: suppress/unsuppress/delete or set a feature-scoped dimension, then rebuild and report before/after evidence."
     },
     {
       "cli": "finalize",
@@ -476,11 +478,20 @@
       ],
       "properties": [
         "angle_deg",
+        "angle_max_deg",
+        "angle_min_deg",
+        "distance_max_mm",
+        "distance_min_mm",
         "distance_mm",
         "flip",
+        "gear_ratio_denominator",
+        "gear_ratio_numerator",
         "manifest",
         "mate",
-        "out"
+        "out",
+        "slot_constraint_type",
+        "slot_distance_mm",
+        "slot_percent"
       ],
       "description": "Generate reviewable VBA macro for adding a mate between two preselected entities."
     },
@@ -541,6 +552,25 @@
         "out_dir"
       ],
       "description": "Generate a 5-minute offline demo bundle for GitHub readers without requiring SolidWorks to be open."
+    },
+    {
+      "cli": "part-feature-execute",
+      "mcp": "solidworks_part_feature_execute",
+      "workflow": "guarded_edit",
+      "safety": "guarded_write",
+      "solidworks_required": true,
+      "required": [
+        "spec"
+      ],
+      "properties": [
+        "dry_run",
+        "model",
+        "out",
+        "save",
+        "spec",
+        "start"
+      ],
+      "description": "Execute a reviewed part feature spec in SolidWorks: fillet, chamfer, linear pattern, circular pattern, or mirror with named feature/entity selectors."
     },
     {
       "cli": "preflight",
@@ -784,6 +814,16 @@
       "description": "CLI-only support command."
     },
     {
+      "cli": "start-part-feature-execute",
+      "mcp": null,
+      "workflow": "guarded_edit",
+      "safety": "guarded_write",
+      "solidworks_required": true,
+      "required": [],
+      "properties": [],
+      "description": "CLI-only support command."
+    },
+    {
       "cli": "start-probe",
       "mcp": "solidworks_start_probe",
       "workflow": "discover",
@@ -917,9 +957,9 @@
     }
   ],
   "coverage": {
-    "cli_commands": 62,
-    "mcp_tools": 47,
-    "mapped_mcp_tools": 47,
+    "cli_commands": 64,
+    "mcp_tools": 48,
+    "mapped_mcp_tools": 48,
     "has_cli_for_every_local_mcp": true,
     "has_safety_for_every_capability": true,
     "has_workflow_for_every_capability": true,

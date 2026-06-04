@@ -172,6 +172,11 @@ const toolSchemas = [
     inputSchema: { type: 'object', properties: { feature: { type: 'string' }, action: { type: 'string', enum: ['suppress','unsuppress','delete','set-dimension'] }, dimension: { type: 'string' }, value_m: { type: 'number' }, model: { type: 'string' }, save: { type: 'boolean' }, out: { type: 'string' } }, required: ['feature','action'], additionalProperties: false }
   },
   {
+    name: 'solidworks_part_feature_execute',
+    description: 'Execute a reviewed part feature spec in SolidWorks: fillet, chamfer, linear pattern, circular pattern, or mirror with named feature/entity selectors.',
+    inputSchema: { type: 'object', properties: { spec: { type: 'string', description: 'JSON spec with operation, selectors, and parameters.' }, model: { type: 'string' }, start: { type: 'boolean' }, save: { type: 'boolean' }, dry_run: { type: 'boolean' }, out: { type: 'string' } }, required: ['spec'], additionalProperties: false }
+  },
+  {
     name: 'solidworks_interference_check',
     description: 'Run conservative SolidWorks assembly interference detection and emit JSON.',
     inputSchema: { type: 'object', properties: { out: { type: 'string' } }, additionalProperties: false }
@@ -473,6 +478,13 @@ async function callTool(name, input) {
       if (input?.value_m !== undefined) args.push('-ValueM', String(input.value_m));
       if (input?.model) args.push('-Model', input.model);
       if (input?.save) args.push('-Save');
+      if (input?.out) args.push('-Out', input.out);
+      break;
+    case 'solidworks_part_feature_execute':
+      args.push(input?.start ? 'start-part-feature-execute' : 'part-feature-execute', '-Report', input.spec);
+      if (input?.model) args.push('-Model', input.model);
+      if (input?.save) args.push('-Save');
+      if (input?.dry_run) args.push('-ValidateOnly');
       if (input?.out) args.push('-Out', input.out);
       break;
     case 'solidworks_interference_check':
