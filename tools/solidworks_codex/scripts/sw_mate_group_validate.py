@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 
-SUPPORTED_MATES = {"coincident", "concentric", "tangent", "distance", "limit_distance", "angle", "limit_angle", "parallel", "perpendicular", "symmetry", "width", "recreate_from_current_interfaces"}
+SUPPORTED_MATES = {"coincident", "concentric", "tangent", "distance", "limit_distance", "angle", "limit_angle", "parallel", "perpendicular", "symmetry", "gear", "width", "recreate_from_current_interfaces"}
 REQUIRED_VERIFICATION = {"rebuild", "mate_errors"}
 AXIAL_LOCATOR_MATES = {"coincident", "distance"}
 AXIAL_LOCATOR_ROLES = {"axial_seating_locator", "axial_offset_locator"}
@@ -54,6 +54,17 @@ def validate(plan: dict[str, Any]) -> dict[str, Any]:
                 add(findings, "blocking", "width_selector_count", group_id, {"count": len(selectors), "selectors": selectors}, "width mates require four reviewed face selectors: two width faces and two tab faces")
             if mate_type == "symmetry" and selectors and len(selectors) != 3:
                 add(findings, "blocking", "symmetry_selector_count", group_id, {"count": len(selectors), "selectors": selectors}, "symmetry mates require three reviewed selectors: two symmetric entities and one symmetry plane")
+            if mate_type == "gear":
+                numerator = mate.get("gear_ratio_numerator")
+                denominator = mate.get("gear_ratio_denominator")
+                if selectors and len(selectors) != 2:
+                    add(findings, "blocking", "gear_selector_count", group_id, {"count": len(selectors), "selectors": selectors}, "gear mates require two reviewed cylindrical/axis selectors")
+                try:
+                    ratio_ok = float(numerator) > 0 and float(denominator) > 0
+                except (TypeError, ValueError):
+                    ratio_ok = False
+                if not ratio_ok:
+                    add(findings, "blocking", "gear_ratio_required", group_id, {"gear_ratio_numerator": numerator, "gear_ratio_denominator": denominator}, "gear mates require positive gear_ratio_numerator and gear_ratio_denominator")
         if mates and not dof:
             add(findings, "blocking", "missing_dof_expectation", group_id, {}, "actionable mate groups must state intended remaining degrees of freedom")
         if dof:

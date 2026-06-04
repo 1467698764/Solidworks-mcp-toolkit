@@ -64,7 +64,7 @@ class MateGroupValidateTests(unittest.TestCase):
     def test_invalid_plan_reports_blockers(self):
         bad = self.good_plan()
         bad["mate_groups"][0]["components"] = ["bolt_m6-1"]
-        bad["mate_groups"][0]["suggested_mates"] = [{"type": "gear"}]
+        bad["mate_groups"][0]["suggested_mates"] = [{"type": "cam"}]
         bad["mate_groups"][0].pop("dof_expectation")
         bad["mate_groups"][0]["verification"] = ["visual_only"]
         with tempfile.TemporaryDirectory() as d:
@@ -230,6 +230,63 @@ class MateGroupValidateTests(unittest.TestCase):
             data = json.loads(out.read_text(encoding="utf-8-sig"))
             kinds = {item["kind"] for item in data["findings"]["blocking"]}
             self.assertIn("symmetry_selector_count", kinds)
+
+    def test_accepts_gear_group_with_two_selectors_and_blocks_missing_ratio(self):
+        plan = self.good_plan()
+        gear_mate = {
+            "type": "gear",
+            "gear_ratio_numerator": 18,
+            "gear_ratio_denominator": 54,
+            "selection_selectors": [
+                {"stable_id": "pinion:axis", "fallback": {"type": "cylindrical_axis"}},
+                {"stable_id": "spur_gear:axis", "fallback": {"type": "cylindrical_axis"}},
+            ],
+        }
+        plan["mate_groups"][0]["suggested_mates"] = [gear_mate]
+        plan["mate_groups"][0]["dof_expectation"] = {
+            "intent": "gear_rotation_coupling",
+            "remaining_dof": ["coupled_rotation"],
+        }
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            plan_path = root / "mate_group_plan.json"
+            out = root / "validation.json"
+            plan_path.write_text(json.dumps(plan), encoding="utf-8")
+
+            proc = run_py("--mate-group-plan", str(plan_path), "--out", str(out))
+
+            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+            data = json.loads(out.read_text(encoding="utf-8-sig"))
+            self.assertTrue(data["ok"], data)
+
+        plan["mate_groups"][0]["suggested_mates"][0].pop("gear_ratio_denominator")
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            plan_path = root / "mate_group_plan.json"
+            out = root / "validation.json"
+            plan_path.write_text(json.dumps(plan), encoding="utf-8")
+
+            proc = run_py("--mate-group-plan", str(plan_path), "--out", str(out))
+
+            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+            data = json.loads(out.read_text(encoding="utf-8-sig"))
+            kinds = {item["kind"] for item in data["findings"]["blocking"]}
+            self.assertIn("gear_ratio_required", kinds)
+
+        plan["mate_groups"][0]["suggested_mates"][0]["gear_ratio_denominator"] = 54
+        plan["mate_groups"][0]["suggested_mates"][0]["selection_selectors"] = gear_mate["selection_selectors"][:1]
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            plan_path = root / "mate_group_plan.json"
+            out = root / "validation.json"
+            plan_path.write_text(json.dumps(plan), encoding="utf-8")
+
+            proc = run_py("--mate-group-plan", str(plan_path), "--out", str(out))
+
+            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+            data = json.loads(out.read_text(encoding="utf-8-sig"))
+            kinds = {item["kind"] for item in data["findings"]["blocking"]}
+            self.assertIn("gear_selector_count", kinds)
 
     def test_swctl_routes_mate_group_validate(self):
         with tempfile.TemporaryDirectory() as d:

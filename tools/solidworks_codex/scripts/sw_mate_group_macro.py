@@ -12,7 +12,7 @@ from typing import Any
 from sw_mate_macro import MATE_TYPES, macro
 
 
-SUPPORTED_TYPES = {"coincident", "concentric", "tangent", "distance", "limit_distance", "angle", "limit_angle", "parallel", "perpendicular", "symmetry", "width"}
+SUPPORTED_TYPES = {"coincident", "concentric", "tangent", "distance", "limit_distance", "angle", "limit_angle", "parallel", "perpendicular", "symmetry", "gear", "width"}
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -52,6 +52,8 @@ def annotated_macro(group: dict[str, Any], mate: dict[str, Any], mate_name: str)
             float(mate["distance_max_m"]) if mate.get("distance_max_m") not in (None, "") else None,
             angle_degrees(mate, "angle_min_deg", "angle_min_rad"),
             angle_degrees(mate, "angle_max_deg", "angle_max_rad"),
+            float(mate.get("gear_ratio_numerator", 1.0) or 1.0),
+            float(mate.get("gear_ratio_denominator", 1.0) or 1.0),
         )
     base = base.replace(
         "    Part.ForceRebuild3 False",
@@ -152,6 +154,8 @@ def build_macros(plan: dict[str, Any], *, out_dir: Path) -> dict[str, Any]:
                 "angle_max_deg": angle_degrees(mate, "angle_max_deg", "angle_max_rad"),
                 "angle_min_rad": float(mate["angle_min_rad"]) if mate.get("angle_min_rad") not in (None, "") else None,
                 "angle_max_rad": float(mate["angle_max_rad"]) if mate.get("angle_max_rad") not in (None, "") else None,
+                "gear_ratio_numerator": float(mate.get("gear_ratio_numerator", 1.0) or 1.0),
+                "gear_ratio_denominator": float(mate.get("gear_ratio_denominator", 1.0) or 1.0),
                 "width_constraint_type": int(mate.get("width_constraint_type", mate.get("constraint_type", 0)) or 0),
                 "width_distance_m": float(mate["width_distance_m"]) if mate.get("width_distance_m") not in (None, "") else None,
                 "flip": bool(mate.get("flip", False)),

@@ -510,6 +510,56 @@ class MateGroupExecuteTests(unittest.TestCase):
         self.assertEqual(right_face.select_calls, [(True, {"mark": 0})])
         self.assertEqual(center_plane.select_calls, [(True, {"mark": 0})])
 
+    def test_executes_gear_mate_with_native_cylindrical_faces_and_ratio(self):
+        manifest = self.manifest()
+        manifest["macros"][0]["mate_type"] = "gear"
+        manifest["macros"][0]["expected_mate_name"] = "MG_pinion_spur_01_gear"
+        manifest["macros"][0]["gear_ratio_numerator"] = 18
+        manifest["macros"][0]["gear_ratio_denominator"] = 54
+        manifest["macros"][0]["selection_selectors"] = [
+            {
+                "stable_id": "pinion-1:cylinder:pitch_axis",
+                "component": "pinion-1",
+                "fallback": {
+                    "type": "cylindrical_axis",
+                    "axis": [0.0, 0.0, 1.0],
+                    "origin_m": [0.0, 0.0, 0.0],
+                    "radius_m": 0.018,
+                },
+            },
+            {
+                "stable_id": "spur_gear-1:cylinder:pitch_axis",
+                "component": "spur_gear-1",
+                "fallback": {
+                    "type": "cylindrical_axis",
+                    "axis": [0.0, 0.0, 1.0],
+                    "origin_m": [0.07, 0.0, 0.0],
+                    "radius_m": 0.054,
+                },
+            },
+        ]
+        pinion_face = FakeFace(
+            FakeSurface("cylinder", [0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.018]),
+            [-0.018, -0.018, -0.01, 0.018, 0.018, 0.01],
+        )
+        gear_face = FakeFace(
+            FakeSurface("cylinder", [0.07, 0.0, 0.0, 0.0, 0.0, 1.0, 0.054]),
+            [0.016, -0.054, -0.01, 0.124, 0.054, 0.01],
+        )
+        asm = FakeAssembly([FakeComponent("pinion-1", [pinion_face]), FakeComponent("spur_gear-1", [gear_face])])
+
+        result = mod.execute_manifest(manifest, asm)
+
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(asm.mates[0][0], mod.MATE_TYPES["gear"])
+        self.assertEqual(asm.mates[0][6], 18.0)
+        self.assertEqual(asm.mates[0][7], 54.0)
+        self.assertEqual(result["executed_mates"][0]["mate_type"], "gear")
+        self.assertEqual(result["executed_mates"][0]["gear_ratio_numerator"], 18.0)
+        self.assertEqual(result["executed_mates"][0]["gear_ratio_denominator"], 54.0)
+        self.assertEqual(pinion_face.select_calls, [(False, {"mark": 0})])
+        self.assertEqual(gear_face.select_calls, [(True, {"mark": 0})])
+
     def test_dry_run_reports_repair_actions_without_solidworks(self):
         manifest = self.manifest()
         manifest["execution_actions"] = [{"action": "suppress_mate", "target_mate": "Broken_Bolt_Mate"}]

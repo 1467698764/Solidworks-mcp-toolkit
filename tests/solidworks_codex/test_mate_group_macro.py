@@ -138,6 +138,16 @@ class MateGroupMacroTests(unittest.TestCase):
                                 {"stable_id": "frame-1:plane:center", "symmetry_role": "symmetry_plane", "fallback": {"type": "bbox_planar_face", "origin_m": [0, 0, 0]}},
                             ],
                         },
+                        {
+                            "type": "gear",
+                            "selection_intent": "couple pinion and spur gear pitch axes",
+                            "gear_ratio_numerator": 18,
+                            "gear_ratio_denominator": 54,
+                            "selection_selectors": [
+                                {"stable_id": "pinion-1:cylinder:pitch_axis", "fallback": {"type": "cylindrical_axis", "origin_m": [0, 0, 0], "radius_m": 0.018}},
+                                {"stable_id": "spur_gear-1:cylinder:pitch_axis", "fallback": {"type": "cylindrical_axis", "origin_m": [0.07, 0, 0], "radius_m": 0.054}},
+                            ],
+                        },
                     ],
                     "verification": ["rebuild", "mate_errors"],
                 },
@@ -168,7 +178,7 @@ class MateGroupMacroTests(unittest.TestCase):
             self.assertEqual(data["document"]["title"], "macro_fixture.SLDASM")
             self.assertEqual(data["execution_actions"][0]["action"], "suppress_mate")
             self.assertEqual(data["execution_actions"][0]["target_mate"], "Broken_Bolt_Mate")
-            self.assertEqual(len(data["macros"]), 9)
+            self.assertEqual(len(data["macros"]), 10)
             self.assertEqual(data["macros"][0]["expected_mate_name"], "MG_standard_bolt_m6_1_01_concentric")
             self.assertEqual(len(data["macros"][0]["selection_selectors"]), 2)
             distance_macro = next(item for item in data["macros"] if item["mate_type"] == "distance")
@@ -178,6 +188,7 @@ class MateGroupMacroTests(unittest.TestCase):
             limit_angle_macro = next(item for item in data["macros"] if item["mate_type"] == "limit_angle")
             width_macro = next(item for item in data["macros"] if item["mate_type"] == "width")
             symmetry_macro = next(item for item in data["macros"] if item["mate_type"] == "symmetry")
+            gear_macro = next(item for item in data["macros"] if item["mate_type"] == "gear")
             self.assertEqual(distance_macro["distance_m"], 0.0125)
             self.assertEqual(angle_macro["angle_deg"], 30.0)
             self.assertTrue(angle_macro["flip"])
@@ -196,6 +207,12 @@ class MateGroupMacroTests(unittest.TestCase):
             symmetry_text = Path(symmetry_macro["macro"]).read_text(encoding="utf-8")
             self.assertIn("Preselect exactly three mate entities", symmetry_text)
             self.assertIn("Mate type: symmetry", symmetry_text)
+            self.assertEqual(gear_macro["gear_ratio_numerator"], 18.0)
+            self.assertEqual(gear_macro["gear_ratio_denominator"], 54.0)
+            gear_text = Path(gear_macro["macro"]).read_text(encoding="utf-8")
+            self.assertIn("Mate type: gear", gear_text)
+            self.assertIn("18.000000000", gear_text)
+            self.assertIn("54.000000000", gear_text)
             skipped_groups = {item["group_id"] for item in data["skipped"]}
             self.assertIn("classify_handle-1", skipped_groups)
             self.assertIn("repair_Broken_Bolt_Mate", skipped_groups)
@@ -234,7 +251,7 @@ class MateGroupMacroTests(unittest.TestCase):
 
             self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
             data = json.loads(manifest.read_text(encoding="utf-8-sig"))
-            self.assertEqual(len(data["macros"]), 9)
+            self.assertEqual(len(data["macros"]), 10)
 
     def test_swctl_routes_limit_mate_macro_parameters(self):
         with tempfile.TemporaryDirectory() as d:
@@ -269,6 +286,39 @@ class MateGroupMacroTests(unittest.TestCase):
             self.assertEqual(data["angle_max_deg"], 70.0)
             self.assertIn("0.785398163", text)
             self.assertIn("1.221730476", text)
+
+    def test_swctl_routes_gear_mate_macro_parameters(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            macro_path = root / "gear.swp.vba"
+            manifest = root / "gear_manifest.json"
+
+            proc = subprocess.run(
+                [
+                    "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass",
+                    "-File", str(ROOT / "tools/solidworks_codex/swctl.ps1"),
+                    "mate-macro",
+                    "-Mate", "gear",
+                    "-GearRatioNumerator", "18",
+                    "-GearRatioDenominator", "54",
+                    "-Out", str(macro_path),
+                    "-Manifest", str(manifest),
+                ],
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+            )
+
+            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+            data = json.loads(manifest.read_text(encoding="utf-8-sig"))
+            text = macro_path.read_text(encoding="utf-8")
+            self.assertEqual(data["mate"], "gear")
+            self.assertEqual(data["gear_ratio_numerator"], 18.0)
+            self.assertEqual(data["gear_ratio_denominator"], 54.0)
+            self.assertIn("18.000000000", text)
+            self.assertIn("54.000000000", text)
 
 
 if __name__ == "__main__":

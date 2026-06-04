@@ -19,6 +19,7 @@ MATE_TYPES = {
     "angle": 6,
     "limit_angle": 6,
     "symmetry": 8,
+    "gear": 10,
     "width": 11,
 }
 
@@ -308,6 +309,8 @@ def planned_mate(item: dict[str, Any]) -> dict[str, Any]:
         "angle_max_rad": optional_angle_rad(item, "angle_max_rad", "angle_max_deg"),
         "width_constraint_type": int(item.get("width_constraint_type", item.get("constraint_type", 0)) or 0),
         "width_distance_m": optional_float(item.get("width_distance_m")),
+        "gear_ratio_numerator": float(item.get("gear_ratio_numerator", 1.0) or 1.0),
+        "gear_ratio_denominator": float(item.get("gear_ratio_denominator", 1.0) or 1.0),
         "flip": bool(item.get("flip", False)),
         "selection_actions": [selection_action(selector, append=index > 0) for index, selector in enumerate(selectors)],
     }
@@ -574,6 +577,8 @@ def add_selected_mate(assembly: Any, item: dict[str, Any]) -> dict[str, Any]:
         angle_upper = angle
     if angle_lower is None:
         angle_lower = angle
+    gear_numerator = float(item.get("gear_ratio_numerator", 1.0) or 1.0)
+    gear_denominator = float(item.get("gear_ratio_denominator", 1.0) or 1.0)
     mate_error = 0
     feature = assembly.AddMate5(
         MATE_TYPES[mate_type],
@@ -582,8 +587,8 @@ def add_selected_mate(assembly: Any, item: dict[str, Any]) -> dict[str, Any]:
         distance,
         distance_upper,
         distance_lower,
-        0,
-        0,
+        gear_numerator if mate_type == "gear" else 0,
+        gear_denominator if mate_type == "gear" else 0,
         angle,
         angle_upper,
         angle_lower,
@@ -609,6 +614,8 @@ def add_selected_mate(assembly: Any, item: dict[str, Any]) -> dict[str, Any]:
         "angle_rad": angle,
         "angle_max_rad": angle_upper,
         "angle_min_rad": angle_lower,
+        "gear_ratio_numerator": gear_numerator if mate_type == "gear" else None,
+        "gear_ratio_denominator": gear_denominator if mate_type == "gear" else None,
         "mate_error": mate_error,
     }
 
