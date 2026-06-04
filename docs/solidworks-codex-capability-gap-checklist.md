@@ -134,7 +134,7 @@ Status values:
 | Named cylindrical interfaces | partial | Shaft axis, hole axis, pin bore, bearing bore, screw hole. | Axis candidates scored by radius, role, location, direction, source feature. |
 | Slot/path interfaces | missing | Slider slot, cam path, rail path, path endpoints. | Path can drive slot/path/cam mate or validation. |
 | Coordinate systems/datums | present | `interface-index` emits per-component `coordinate_systems` from bbox evidence with stable ids, origin role, axes, size, confidence, and source; live/native coordinate systems remain a refinement layer. | Downstream drawing/CAM/assembly checks know orientation. |
-| Interface confidence scoring | partial | Bbox/nearest-neighbor and role-hint evidence is indexed; live face/axis confidence is still pending. | Low confidence blocks or asks for alternative, not silent mate creation. |
+| Interface confidence scoring | present | `interface-index` assigns confidence levels and selection policies to bbox-derived planar interfaces and coordinate systems; weak bbox-only candidates block automatic selection until live/native evidence is supplied. | Low confidence blocks or asks for alternative, not silent mate creation. |
 | Interface persistence | present | `interface-index` emits per-interface and coordinate-system selectors with stable ids, component path, bbox fallback data, strategy, and review tags; native entity ids remain a future refinement. | Reopen/repair can find the same interface. |
 
 ### 6.4 Assembly Planning And Mates

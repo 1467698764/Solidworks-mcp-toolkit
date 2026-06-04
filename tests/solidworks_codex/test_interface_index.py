@@ -157,6 +157,39 @@ class InterfaceIndexTests(unittest.TestCase):
             self.assertEqual(data["interfaces"][0]["selector_refs"]["a"], "base_plate-1:plane:z_max")
             self.assertEqual(data["interfaces"][0]["selector_refs"]["b"], "cover_plate-1:plane:z_min")
 
+    def test_scores_interface_confidence_and_blocks_weak_bbox_only_targets(self):
+        report = {
+            "active_document": {
+                "type": "assembly",
+                "title": "confidence_fixture.SLDASM",
+                "components": [
+                    {"name2": "base_plate-1", "path": "C:/m/base_plate.SLDPRT", "fixed": True, "bbox_m": [0.0, 0.0, 0.0, 0.20, 0.10, 0.012]},
+                    {"name2": "cover_plate-1", "path": "C:/m/cover_plate.SLDPRT", "fixed": False, "bbox_m": [0.0, 0.0, 0.012, 0.20, 0.10, 0.024]},
+                    {"name2": "remote_bracket-1", "path": "C:/m/remote_bracket.SLDPRT", "fixed": False, "bbox_m": [0.50, 0.50, 0.0, 0.60, 0.60, 0.10]},
+                ],
+            }
+        }
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            src = root / "inspect.json"
+            out = root / "interface_index.json"
+            src.write_text(json.dumps(report), encoding="utf-8")
+
+            proc = run_py("--report", str(src), "--out", str(out), "--near-tolerance-m", "0.001")
+
+            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+            data = json.loads(out.read_text(encoding="utf-8-sig"))
+            planes = {item["interface_id"]: item for item in data["planar_interfaces"]}
+            contact_face = planes["base_plate-1:plane:z_max"]
+            weak_face = planes["remote_bracket-1:plane:z_max"]
+            self.assertEqual(contact_face["confidence_level"], "reviewable")
+            self.assertTrue(contact_face["selection_policy"]["allow_reviewed_selection"])
+            self.assertEqual(contact_face["selection_policy"]["block_automatic_selection"], False)
+            self.assertEqual(weak_face["confidence_level"], "blocked")
+            self.assertTrue(weak_face["selection_policy"]["block_automatic_selection"])
+            self.assertIn("live_face_axis_selection_required", weak_face["selection_policy"]["required_evidence"])
+            self.assertIn("interface_confidence_scoring_blocks_weak_bbox_only_targets", data["operator_notes"])
+
     def test_swctl_routes_interface_index(self):
         report = {
             "active_document": {

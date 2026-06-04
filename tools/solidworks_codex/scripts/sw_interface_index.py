@@ -114,6 +114,45 @@ def planar_faces_for_component(component: str, component_path: str | None, box: 
     ]
 
 
+def confidence_level(confidence: float) -> str:
+    if confidence >= 0.65:
+        return "reviewable"
+    if confidence >= 0.55:
+        return "needs_corroboration"
+    return "blocked"
+
+
+def selection_policy_for_candidate(candidate: dict[str, Any]) -> dict[str, Any]:
+    level = confidence_level(float(candidate.get("confidence", 0.0)))
+    if level == "reviewable":
+        return {
+            "confidence_level": level,
+            "allow_reviewed_selection": True,
+            "block_automatic_selection": False,
+            "required_evidence": ["operator_review", "live_face_axis_selection_before_mate"],
+        }
+    if level == "needs_corroboration":
+        return {
+            "confidence_level": level,
+            "allow_reviewed_selection": False,
+            "block_automatic_selection": True,
+            "required_evidence": ["corroborating_feature_or_mate_evidence", "live_face_axis_selection_required"],
+        }
+    return {
+        "confidence_level": level,
+        "allow_reviewed_selection": False,
+        "block_automatic_selection": True,
+        "required_evidence": ["live_face_axis_selection_required"],
+    }
+
+
+def apply_confidence_policy(candidate: dict[str, Any]) -> dict[str, Any]:
+    policy = selection_policy_for_candidate(candidate)
+    candidate["confidence_level"] = policy["confidence_level"]
+    candidate["selection_policy"] = policy
+    return candidate
+
+
 def coordinate_system_selector(component: str, component_path: str | None, coordinate_system: dict[str, Any]) -> dict[str, Any]:
     return {
         "stable_id": coordinate_system["coordinate_system_id"],
@@ -149,7 +188,7 @@ def coordinate_system_for_component(component: str, component_path: str | None, 
         "source": "axis_aligned_bbox",
     }
     coordinate_system["selector"] = coordinate_system_selector(component, component_path, coordinate_system)
-    return coordinate_system
+    return apply_confidence_policy(coordinate_system)
 
 
 def overlapping_on_other_axes(a: list[float], b: list[float], axis: int) -> bool:
@@ -239,6 +278,7 @@ def build_index(report: dict[str, Any], *, near_tolerance_m: float, standard_par
             elif "fixed_root" in component_roles and face["face"] == "z_min":
                 face["role"] = "mounting_face"
                 face["confidence"] = 0.6
+            apply_confidence_policy(face)
             planar_interfaces.append(face)
         indexed_components.append({
             "component": name,
@@ -262,8 +302,9 @@ def build_index(report: dict[str, Any], *, near_tolerance_m: float, standard_par
         "operator_notes": [
             "heuristic_bbox_only",
             "use_live_face_axis_selection_before_applying_mates",
-        "standard_part_role_is_name_based_and_may_require_confirmation",
-        "selectors_are_stable_ids_with_bbox_fallbacks_not_native_entity_ids",
+            "standard_part_role_is_name_based_and_may_require_confirmation",
+            "selectors_are_stable_ids_with_bbox_fallbacks_not_native_entity_ids",
+            "interface_confidence_scoring_blocks_weak_bbox_only_targets",
         ],
     }
 
