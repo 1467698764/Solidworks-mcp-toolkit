@@ -319,6 +319,174 @@ def selected_count(assembly: Any) -> int:
         return 0
 
 
+def call_member(obj: Any, name: str, *args: Any) -> Any:
+    value = getattr(obj, name, None)
+    if callable(value):
+        return value(*args)
+    return value
+
+
+def feature_name(feature: Any) -> str:
+    for attr in ("Name", "name"):
+        value = getattr(feature, attr, None)
+        if value:
+            return str(value)
+    for method in ("GetName", "GetNameForSelection"):
+        func = getattr(feature, method, None)
+        if callable(func):
+            try:
+                value = func()
+            except Exception:
+                value = None
+            if value:
+                return str(value)
+    return ""
+
+
+def iter_sibling_features(first: Any) -> list[Any]:
+    result: list[Any] = []
+    feature = first
+    seen: set[int] = set()
+    while feature is not None and id(feature) not in seen:
+        seen.add(id(feature))
+        result.append(feature)
+        try:
+            feature = call_member(feature, "GetNextFeature")
+        except Exception:
+            feature = None
+    return result
+
+
+def iter_sub_features(feature: Any) -> list[Any]:
+    try:
+        first = call_member(feature, "GetFirstSubFeature")
+    except Exception:
+        first = None
+    return iter_sibling_features(first)
+
+
+def iter_document_features(assembly: Any) -> list[Any]:
+    try:
+        first = call_member(assembly, "FirstFeature")
+    except Exception:
+        first = None
+    result: list[Any] = []
+    stack = list(reversed(iter_sibling_features(first)))
+    seen: set[int] = set()
+    while stack:
+        feature = stack.pop()
+        if id(feature) in seen:
+            continue
+        seen.add(id(feature))
+        result.append(feature)
+        stack.extend(reversed(iter_sub_features(feature)))
+    return result
+
+
+def find_feature_by_name(assembly: Any, name: str) -> Any | None:
+    for method in ("FeatureByName", "GetFeatureByName"):
+        func = getattr(assembly, method, None)
+        if callable(func):
+            try:
+                feature = func(name)
+            except Exception:
+                feature = None
+            if feature is not None:
+                return feature
+    for feature in iter_document_features(assembly):
+        if feature_name(feature) == name:
+            return feature
+    return None
+
+
+def select_feature(assembly: Any, feature: Any, name: str) -> bool:
+    if hasattr(assembly, "ClearSelection2"):
+        assembly.ClearSelection2(True)
+    for args in ((False, 0), (False,)):
+        func = getattr(feature, "Select2", None)
+        if callable(func):
+            try:
+                if bool(func(*args)):
+                    return True
+            except Exception:
+                pass
+    try:
+        return bool(assembly.Extension.SelectByID2(name, "MATE", 0, 0, 0, False, 0, None, 0))
+    except Exception:
+        return False
+
+
+def suppress_selected_feature(assembly: Any, feature: Any) -> bool:
+    for method, args in (
+        ("SetSuppression2", (0, 2, None)),
+        ("SetSuppression2", (0,)),
+        ("SetSuppression", (0,)),
+    ):
+        func = getattr(feature, method, None)
+        if callable(func):
+            try:
+                if bool(func(*args)) or getattr(feature, "suppressed", False):
+                    return True
+            except Exception:
+                pass
+    for method in ("EditSuppress2", "EditSuppress"):
+        func = getattr(assembly, method, None)
+        if callable(func):
+            try:
+                result = func()
+                return True if result is None else bool(result)
+            except Exception:
+                pass
+    return False
+
+
+def delete_selected_feature(assembly: Any) -> bool:
+    extension = getattr(assembly, "Extension", None)
+    for method, args in (("DeleteSelection2", (0,)), ("DeleteSelection2", (1,))):
+        func = getattr(extension, method, None)
+        if callable(func):
+            try:
+                if bool(func(*args)):
+                    return True
+            except Exception:
+                pass
+    for method in ("EditDelete", "DeleteSelection"):
+        func = getattr(assembly, method, None)
+        if callable(func):
+            try:
+                result = func()
+                return True if result is None else bool(result)
+            except Exception:
+                pass
+    return False
+
+
+def execute_repair_action(assembly: Any, action: dict[str, Any]) -> dict[str, Any]:
+    action_type = str(action.get("action") or "").casefold()
+    target = str(action.get("target_mate") or action.get("mate") or action.get("target") or "")
+    if action_type not in {"suppress_mate", "delete_mate"}:
+        return {"ok": False, "action": action_type, "target_mate": target, "error": "unsupported_execution_action"}
+    if not target:
+        return {"ok": False, "action": action_type, "target_mate": target, "error": "missing_target_mate"}
+    feature = find_feature_by_name(assembly, target)
+    if feature is None:
+        return {"ok": False, "action": action_type, "target_mate": target, "error": "mate_feature_not_found"}
+    selected = select_feature(assembly, feature, target)
+    if not selected:
+        return {"ok": False, "action": action_type, "target_mate": target, "error": "mate_feature_not_selected"}
+    ok = delete_selected_feature(assembly) if action_type == "delete_mate" else suppress_selected_feature(assembly, feature)
+    if ok and hasattr(assembly, "ForceRebuild3"):
+        assembly.ForceRebuild3(False)
+    return {
+        "ok": ok,
+        "action": action_type,
+        "target_mate": target,
+        "feature_name": feature_name(feature),
+        "selected": selected,
+        "api": "DeleteSelection2" if action_type == "delete_mate" else "EditSuppress2",
+    }
+
+
 def add_selected_mate(assembly: Any, item: dict[str, Any]) -> dict[str, Any]:
     mate_type = str(item.get("mate_type", "")).casefold()
     if mate_type not in MATE_TYPES:
@@ -360,8 +528,50 @@ def add_selected_mate(assembly: Any, item: dict[str, Any]) -> dict[str, Any]:
 
 def execute_manifest(manifest: dict[str, Any], assembly: Any) -> dict[str, Any]:
     findings: dict[str, list[dict[str, Any]]] = {"blocking": [], "warning": [], "accepted": []}
+    executed_actions: list[dict[str, Any]] = []
     executed: list[dict[str, Any]] = []
+    seen_actions: set[tuple[str, str]] = set()
+    for action in [item for item in manifest.get("execution_actions", []) if isinstance(item, dict)]:
+        key = (str(action.get("action")), str(action.get("target_mate") or action.get("target") or action.get("mate")))
+        if key in seen_actions:
+            continue
+        seen_actions.add(key)
+        result = execute_repair_action(assembly, action)
+        executed_actions.append(result)
+        if result.get("ok"):
+            findings["accepted"].append({
+                "kind": "repair_action_executed",
+                "mate": result.get("target_mate"),
+                "reason": f"{result.get('action')} completed before mate creation",
+            })
+        else:
+            findings["blocking"].append({
+                "kind": "repair_action_failed",
+                "mate": result.get("target_mate"),
+                "reason": result.get("error", "repair action failed"),
+                "detail": result,
+            })
     for item in [macro for macro in manifest.get("macros", []) if isinstance(macro, dict)]:
+        for action in [a for a in item.get("execution_actions", []) if isinstance(a, dict)]:
+            key = (str(action.get("action")), str(action.get("target_mate") or action.get("target") or action.get("mate")))
+            if key in seen_actions:
+                continue
+            seen_actions.add(key)
+            result = execute_repair_action(assembly, action)
+            executed_actions.append(result)
+            if result.get("ok"):
+                findings["accepted"].append({
+                    "kind": "repair_action_executed",
+                    "mate": result.get("target_mate"),
+                    "reason": f"{result.get('action')} completed before mate creation",
+                })
+            else:
+                findings["blocking"].append({
+                    "kind": "repair_action_failed",
+                    "mate": result.get("target_mate"),
+                    "reason": result.get("error", "repair action failed"),
+                    "detail": result,
+                })
         plan = planned_mate(item)
         if len(plan["selection_actions"]) != 2:
             findings["blocking"].append({
@@ -419,9 +629,11 @@ def execute_manifest(manifest: dict[str, Any], assembly: Any) -> dict[str, Any]:
         "document": manifest.get("document", {}),
         "counts": {
             "planned_mates": len([m for m in manifest.get("macros", []) if isinstance(m, dict)]),
+            "executed_actions": len([action for action in executed_actions if action.get("ok")]),
             "executed_mates": len([m for m in executed if m.get("ok")]),
             "blocking_findings": len(findings["blocking"]),
         },
+        "executed_actions": executed_actions,
         "executed_mates": executed,
         "findings": findings,
     }
@@ -429,6 +641,7 @@ def execute_manifest(manifest: dict[str, Any], assembly: Any) -> dict[str, Any]:
 
 def dry_run_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
     planned = [planned_mate(item) for item in manifest.get("macros", []) if isinstance(item, dict)]
+    planned_actions = [item for item in manifest.get("execution_actions", []) if isinstance(item, dict)]
     blockers = []
     for item in planned:
         if len(item["selection_actions"]) != 2:
@@ -445,10 +658,12 @@ def dry_run_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
         "dry_run": True,
         "document": manifest.get("document", {}),
         "counts": {
+            "planned_actions": len(planned_actions),
             "planned_mates": len(planned),
             "executable_mates": len(planned) - len(blockers),
             "blocking_findings": len(blockers),
         },
+        "planned_actions": planned_actions,
         "planned_mates": planned,
         "findings": {"blocking": blockers, "warning": [], "accepted": []},
     }

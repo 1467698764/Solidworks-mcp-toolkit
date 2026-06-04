@@ -109,6 +109,13 @@ def build_plan(repair_plan: dict[str, Any], interface_index: dict[str, Any]) -> 
                     "source_action": kind,
                     "priority": action.get("priority", "P0"),
                     "components": [],
+                    "execution_actions": [
+                        {
+                            "action": "suppress_mate",
+                            "target_mate": target,
+                            "reason": "remove stale or bad mate from solve graph before recreating reviewed interface mates",
+                        }
+                    ],
                     "suggested_mates": [
                         {
                             "type": "recreate_from_current_interfaces",

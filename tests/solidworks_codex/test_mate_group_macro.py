@@ -27,6 +27,26 @@ class MateGroupMacroTests(unittest.TestCase):
             "document": {"title": "macro_fixture.SLDASM"},
             "mate_groups": [
                 {
+                    "group_id": "repair_Broken_Bolt_Mate",
+                    "source_action": "resolve_bad_mate",
+                    "priority": "P0",
+                    "components": [],
+                    "execution_actions": [
+                        {
+                            "action": "suppress_mate",
+                            "target_mate": "Broken_Bolt_Mate",
+                            "reason": "remove bad mate before recreation",
+                        }
+                    ],
+                    "suggested_mates": [
+                        {
+                            "type": "recreate_from_current_interfaces",
+                            "selection_intent": "recreate after suppressing stale mate",
+                        }
+                    ],
+                    "verification": ["rebuild", "mate_errors"],
+                },
+                {
                     "group_id": "standard_bolt_m6-1",
                     "source_action": "attach_hostless_standard_part",
                     "priority": "P1",
@@ -77,10 +97,14 @@ class MateGroupMacroTests(unittest.TestCase):
             data = json.loads(manifest.read_text(encoding="utf-8-sig"))
             self.assertEqual(data["mode"], "reviewable_mate_group_macros")
             self.assertEqual(data["document"]["title"], "macro_fixture.SLDASM")
+            self.assertEqual(data["execution_actions"][0]["action"], "suppress_mate")
+            self.assertEqual(data["execution_actions"][0]["target_mate"], "Broken_Bolt_Mate")
             self.assertEqual(len(data["macros"]), 2)
             self.assertEqual(data["macros"][0]["expected_mate_name"], "MG_standard_bolt_m6_1_01_concentric")
             self.assertEqual(len(data["macros"][0]["selection_selectors"]), 2)
-            self.assertEqual(data["skipped"][0]["group_id"], "classify_handle-1")
+            skipped_groups = {item["group_id"] for item in data["skipped"]}
+            self.assertIn("classify_handle-1", skipped_groups)
+            self.assertIn("repair_Broken_Bolt_Mate", skipped_groups)
             first_macro = Path(data["macros"][0]["macro"])
             self.assertTrue(first_macro.exists())
             text = first_macro.read_text(encoding="utf-8")

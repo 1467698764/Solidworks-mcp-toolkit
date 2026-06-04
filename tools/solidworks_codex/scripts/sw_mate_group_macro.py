@@ -49,8 +49,14 @@ def annotated_macro(group: dict[str, Any], mate: dict[str, Any], mate_name: str)
 def build_macros(plan: dict[str, Any], *, out_dir: Path) -> dict[str, Any]:
     macros: list[dict[str, Any]] = []
     skipped: list[dict[str, Any]] = []
+    execution_actions: list[dict[str, Any]] = []
     for group in plan.get("mate_groups", []):
         group_id = str(group.get("group_id", "group"))
+        for action in group.get("execution_actions", []) or []:
+            if isinstance(action, dict):
+                copied = dict(action)
+                copied.setdefault("group_id", group_id)
+                execution_actions.append(copied)
         mates = group.get("suggested_mates") or []
         if not mates:
             skipped.append({"group_id": group_id, "reason": "no_suggested_mates"})
@@ -72,6 +78,7 @@ def build_macros(plan: dict[str, Any], *, out_dir: Path) -> dict[str, Any]:
                 "components": group.get("components", []),
                 "selection_intent": mate.get("selection_intent", ""),
                 "selection_selectors": mate.get("selection_selectors", []),
+                "execution_actions": group.get("execution_actions", []),
                 "verification": group.get("verification", []),
             })
     return {
@@ -79,6 +86,7 @@ def build_macros(plan: dict[str, Any], *, out_dir: Path) -> dict[str, Any]:
         "mode": "reviewable_mate_group_macros",
         "ok": True,
         "document": plan.get("document", {}),
+        "execution_actions": execution_actions,
         "macros": macros,
         "skipped": skipped,
         "preselect_required": True,

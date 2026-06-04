@@ -108,16 +108,29 @@ class FakeSelectionManager:
 
 
 class FakeFeature:
-    def __init__(self):
-        self.Name = ""
+    def __init__(self, name=""):
+        self.Name = name
+        self.select_calls = []
+        self.suppression_calls = []
+        self.suppressed = False
+
+    def Select2(self, append, mark):
+        self.select_calls.append((append, mark))
+        return True
+
+    def SetSuppression2(self, state, option=None, components=None):
+        self.suppression_calls.append((state, option, components))
+        self.suppressed = True
+        return True
 
 
 class FakeAssembly:
-    def __init__(self, components=None):
+    def __init__(self, components=None, features=None):
         self._native_selected_count = 0
         self.Extension = FakeExtension()
         self.SelectionManager = FakeSelectionManager(self, self.Extension)
         self.components = components or []
+        self.features = {feature.Name: feature for feature in (features or [])}
         self.cleared = []
         self.mates = []
         self.rebuilds = []
@@ -137,6 +150,9 @@ class FakeAssembly:
 
     def GetComponents(self, top_level_only):
         return self.components
+
+    def FeatureByName(self, name):
+        return self.features.get(name)
 
 
 class MateGroupExecuteTests(unittest.TestCase):
@@ -249,6 +265,44 @@ class MateGroupExecuteTests(unittest.TestCase):
         self.assertEqual(asm.mates[0][0], mod.MATE_TYPES["concentric"])
         self.assertEqual(shaft_face.select_calls, [(False, {"mark": 0})])
         self.assertEqual(hole_face.select_calls, [(True, {"mark": 0})])
+
+    def test_executes_bad_mate_suppression_actions_before_addmate5(self):
+        manifest = self.manifest()
+        manifest["execution_actions"] = [
+            {
+                "action": "suppress_mate",
+                "target_mate": "Broken_Bolt_Mate",
+                "reason": "remove stale mate before adding replacement",
+            }
+        ]
+        bad_mate = FakeFeature("Broken_Bolt_Mate")
+        asm = FakeAssembly(features=[bad_mate])
+
+        result = mod.execute_manifest(manifest, asm)
+
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(result["counts"]["executed_actions"], 1)
+        self.assertEqual(result["executed_actions"][0]["action"], "suppress_mate")
+        self.assertEqual(result["executed_actions"][0]["target_mate"], "Broken_Bolt_Mate")
+        self.assertEqual(bad_mate.select_calls, [(False, 0)])
+        self.assertEqual(bad_mate.suppression_calls[0][0], 0)
+        self.assertEqual(asm.rebuilds[0], False)
+
+    def test_dry_run_reports_repair_actions_without_solidworks(self):
+        manifest = self.manifest()
+        manifest["execution_actions"] = [{"action": "suppress_mate", "target_mate": "Broken_Bolt_Mate"}]
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            manifest_path = root / "manifest.json"
+            out = root / "execute.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+            proc = run_py("--macro-manifest", str(manifest_path), "--out", str(out), "--dry-run")
+
+            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+            data = json.loads(out.read_text(encoding="utf-8-sig"))
+            self.assertEqual(data["counts"]["planned_actions"], 1)
+            self.assertEqual(data["planned_actions"][0]["target_mate"], "Broken_Bolt_Mate")
 
     def test_dry_run_reports_selector_actions_without_solidworks(self):
         with tempfile.TemporaryDirectory() as d:

@@ -75,6 +75,8 @@ class MateGroupPlanTests(unittest.TestCase):
             self.assertEqual(data["document"]["title"], "mate_group_fixture.SLDASM")
             groups = {item["group_id"]: item for item in data["mate_groups"]}
             self.assertIn("repair_Broken_Bolt_Mate", groups)
+            self.assertEqual(groups["repair_Broken_Bolt_Mate"]["execution_actions"][0]["action"], "suppress_mate")
+            self.assertEqual(groups["repair_Broken_Bolt_Mate"]["execution_actions"][0]["target_mate"], "Broken_Bolt_Mate")
             self.assertIn("standard_bolt_m6-1", groups)
             self.assertEqual(groups["standard_bolt_m6-1"]["components"], ["bolt_m6-1", "cover_plate-1"])
             self.assertEqual(groups["standard_bolt_m6-1"]["suggested_mates"][0]["type"], "concentric")
