@@ -1,13 +1,13 @@
 # SolidWorks Codex Capability Matrix
 
-- Timestamp: `2026-06-05T02:34:06`
-- Capability count: `64`
+- Timestamp: `2026-06-05T02:49:46`
+- Capability count: `66`
 
 ## Coverage
 
-- CLI commands: `64`
-- MCP tools: `48`
-- MCP tools mapped to CLI: `48`
+- CLI commands: `66`
+- MCP tools: `49`
+- MCP tools mapped to CLI: `49`
 - CLI for every local MCP tool: `True`
 - Safety label for every capability: `True`
 - Workflow label for every capability: `True`
@@ -33,6 +33,7 @@
 | `change-plan` | `solidworks_change_plan` | `analysis` | `read_only` | `False` | `report, goal` |
 | `change-verify` | `solidworks_change_verify` | `verify_export` | `verification_or_export` | `False` | `delta` |
 | `compare` | `solidworks_compare_reports` | `verify_export` | `verification_or_export` | `False` | `before, after` |
+| `component-insert` | `solidworks_component_insert` | `guarded_edit` | `guarded_write` | `True` | `spec` |
 | `component-state` | `solidworks_component_state` | `guarded_edit` | `guarded_write` | `True` | `component, action` |
 | `design-review` | `solidworks_design_review` | `analysis` | `read_only` | `False` | `report` |
 | `export` | `solidworks_export` | `verify_export` | `verification_or_export` | `True` | `target` |
@@ -71,6 +72,7 @@
 | `selection-report` | `solidworks_selection_report` | `discover` | `read_only` | `True` | `-` |
 | `session-snapshot` | `solidworks_session_snapshot` | `handoff` | `offline_or_read_only` | `False` | `-` |
 | `set-dimension` | `solidworks_set_dimension` | `guarded_edit` | `guarded_write` | `True` | `dimension, value_m` |
+| `start-component-insert` | `-` | `guarded_edit` | `guarded_write` | `True` | `-` |
 | `start-component-state` | `-` | `guarded_edit` | `guarded_write` | `True` | `-` |
 | `start-feature-state` | `-` | `guarded_edit` | `guarded_write` | `True` | `-` |
 | `start-inspect` | `solidworks_start_inspect` | `discover` | `read_only` | `True` | `-` |

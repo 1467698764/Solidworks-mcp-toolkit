@@ -167,6 +167,11 @@ const toolSchemas = [
     inputSchema: { type: 'object', properties: { component: { type: 'string' }, action: { type: 'string', enum: ['hide','show','suppress','unsuppress','fix','float'] }, save: { type: 'boolean' }, out: { type: 'string' } }, required: ['component','action'], additionalProperties: false }
   },
   {
+    name: 'solidworks_component_insert',
+    description: 'Insert a reviewed .SLDPRT/.SLDASM component into the active or specified assembly with origin/config/fixed-state evidence.',
+    inputSchema: { type: 'object', properties: { spec: { type: 'string', description: 'JSON spec with part_path, origin_m, optional configuration and fixed.' }, model: { type: 'string' }, start: { type: 'boolean' }, save: { type: 'boolean' }, dry_run: { type: 'boolean' }, out: { type: 'string' } }, required: ['spec'], additionalProperties: false }
+  },
+  {
     name: 'solidworks_feature_state',
     description: 'Change part or assembly feature state by feature name: suppress/unsuppress/delete or set a feature-scoped dimension, then rebuild and report before/after evidence.',
     inputSchema: { type: 'object', properties: { feature: { type: 'string' }, action: { type: 'string', enum: ['suppress','unsuppress','delete','set-dimension'] }, dimension: { type: 'string' }, value_m: { type: 'number' }, model: { type: 'string' }, save: { type: 'boolean' }, out: { type: 'string' } }, required: ['feature','action'], additionalProperties: false }
@@ -470,6 +475,13 @@ async function callTool(name, input) {
     case 'solidworks_component_state':
       args.push('component-state', '-Component', input.component, '-Action', input.action);
       if (input?.save) args.push('-Save');
+      if (input?.out) args.push('-Out', input.out);
+      break;
+    case 'solidworks_component_insert':
+      args.push(input?.start ? 'start-component-insert' : 'component-insert', '-Report', input.spec);
+      if (input?.model) args.push('-Model', input.model);
+      if (input?.save) args.push('-Save');
+      if (input?.dry_run) args.push('-ValidateOnly');
       if (input?.out) args.push('-Out', input.out);
       break;
     case 'solidworks_feature_state':

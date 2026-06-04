@@ -12,6 +12,7 @@ const mateGroupManifest = path.join(workspace, 'tools', 'solidworks_codex', 'san
 const mateSelectionReport = path.join(workspace, 'tools', 'solidworks_codex', 'sandbox', 'mcp_mate_selection_report.json');
 const mateGroupValidation = path.join(workspace, 'tools', 'solidworks_codex', 'sandbox', 'mcp_mate_group_validation.json');
 const partFeatureSpec = path.join(workspace, 'tools', 'solidworks_codex', 'sandbox', 'mcp_part_feature_spec.json');
+const componentInsertSpec = path.join(workspace, 'tools', 'solidworks_codex', 'sandbox', 'mcp_component_insert_spec.json');
 fs.writeFileSync(mateGroupManifest, JSON.stringify({
   mode: 'reviewable_mate_group_macros',
   macros: [{
@@ -46,6 +47,11 @@ fs.writeFileSync(partFeatureSpec, JSON.stringify({
     { kind: 'entity', name: 'Edge<1>@mcp_sample.SLDPRT', type: 'EDGE', point: { x: 0, y: 0, z: 0 } }
   ],
   parameters: { radius_mm: 1.5 }
+}, null, 2));
+fs.writeFileSync(componentInsertSpec, JSON.stringify({
+  part_path: 'C:/parts/mcp_bolt.SLDPRT',
+  origin_m: [0, 0.01, 0.02],
+  fixed: false
 }, null, 2));
 
 const child = spawn(process.execPath, [serverPath], { cwd: workspace, stdio: ['pipe', 'pipe', 'pipe'] });
@@ -100,6 +106,7 @@ child.stderr.on('data', (d) => { stderr += d.toString(); });
   const compare = await send('tools/call', { name: 'solidworks_compare_reports', arguments: { before: 'tools/solidworks_codex/sandbox/report_before.json', after: 'tools/solidworks_codex/sandbox/report_after.json', out: 'tools/solidworks_codex/reports/mcp_compare_fixture.md', json_out: 'tools/solidworks_codex/reports/mcp_compare_fixture.json' } });
   const changeVerify = await send('tools/call', { name: 'solidworks_change_verify', arguments: { delta: 'tools/solidworks_codex/reports/mcp_compare_fixture.json', allow_dimension: ['D1@Sketch1@plate.SLDPRT'], allow_component: ['support_bushing-1:suppressed','drive_unit-1:fixed'], allow_component_added: ['reference_sensor-1'], allow_feature_type: ['Fillet'], out: 'tools/solidworks_codex/reports/mcp_change_verify.json' } });
   const template = await send('tools/call', { name: 'solidworks_template_macro', arguments: { template: 'flange', outer_diameter_mm: 50, thickness_mm: 6, center_bore_mm: 16, hole_count: 4, hole_pcd_mm: 38, hole_diameter_mm: 4.5, out: 'tools/solidworks_codex/macros/mcp_flange.swp.vba', manifest: 'tools/solidworks_codex/reports/mcp_flange_manifest.json' } });
+  const componentInsert = await send('tools/call', { name: 'solidworks_component_insert', arguments: { spec: 'tools/solidworks_codex/sandbox/mcp_component_insert_spec.json', dry_run: true, out: 'tools/solidworks_codex/reports/mcp_component_insert.json' } });
   const partFeatureExecute = await send('tools/call', { name: 'solidworks_part_feature_execute', arguments: { spec: 'tools/solidworks_codex/sandbox/mcp_part_feature_spec.json', dry_run: true, out: 'tools/solidworks_codex/reports/mcp_part_feature_execute.json' } });
   const issue = await send('tools/call', { name: 'solidworks_issue_report', arguments: { report: 'tools/solidworks_codex/sandbox/report_after.json', out: 'tools/solidworks_codex/reports/mcp_issue_fixture.md', json_out: 'tools/solidworks_codex/reports/mcp_issue_fixture.json' } });
   const mate = await send('tools/call', { name: 'solidworks_mate_macro', arguments: { mate: 'concentric', out: 'tools/solidworks_codex/macros/mcp_mate_concentric.swp.vba', manifest: 'tools/solidworks_codex/reports/mcp_mate_concentric_manifest.json' } });
@@ -129,6 +136,7 @@ child.stderr.on('data', (d) => { stderr += d.toString(); });
     changeVerify_is_error: changeVerify.isError === true,
     has_safe_set_dimension: listed.tools.some(t => t.name === 'solidworks_safe_set_dimension'),
     template_is_error: template.isError === true,
+    componentInsert_is_error: componentInsert.isError === true,
     partFeatureExecute_is_error: partFeatureExecute.isError === true,
     issue_is_error: issue.isError === true,
     mate_is_error: mate.isError === true,
@@ -151,6 +159,7 @@ child.stderr.on('data', (d) => { stderr += d.toString(); });
     compare_text_head: compare.content?.[0]?.text?.slice(0, 500),
     changeVerify_text_head: changeVerify.content?.[0]?.text?.slice(0, 500),
     template_text_head: template.content?.[0]?.text?.slice(0, 500),
+    componentInsert_text_head: componentInsert.content?.[0]?.text?.slice(0, 500),
     partFeatureExecute_text_head: partFeatureExecute.content?.[0]?.text?.slice(0, 500),
     issue_text_head: issue.content?.[0]?.text?.slice(0, 500),
     mate_text_head: mate.content?.[0]?.text?.slice(0, 500),
