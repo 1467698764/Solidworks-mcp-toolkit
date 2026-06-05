@@ -295,6 +295,71 @@ def dimension_value_for_feature(dimensions: list[dict[str, Any]], tokens: tuple[
     return None
 
 
+def edge_treatment_role(feature: dict[str, Any]) -> str | None:
+    text = " ".join(str(feature.get(key, "")) for key in ("name", "type", "description", "kind")).lower()
+    if "fillet" in text or "round" in text or "圆角" in text:
+        return "edge_rounding"
+    if "chamfer" in text or "bevel" in text or "倒角" in text:
+        return "edge_break"
+    return None
+
+
+def edge_treatment_selector(component: str, component_path: str | None, interface: dict[str, Any]) -> dict[str, Any]:
+    geometry_signature = {
+        "type": "edge_treatment_feature",
+        "source_feature": interface.get("source_feature"),
+        "role": interface.get("role"),
+        "radius_m": interface.get("radius_m"),
+        "distance_m": interface.get("distance_m"),
+        "source": interface.get("source"),
+    }
+    return {
+        "stable_id": interface["interface_id"],
+        "component": component,
+        "component_path": component_path,
+        "strategy": "native_identity_then_stable_id_then_feature_dimension_fallback",
+        "native_identity": native_identity_envelope(component, component_path, interface["interface_id"], "edge_or_face", geometry_signature),
+        "live_identity_capture_protocol": live_identity_capture_protocol(component, component_path, interface["interface_id"], "edge_or_face", geometry_signature),
+        "fallback": geometry_signature,
+        "tags": ["edge_treatment_selector", "review_before_live_selection", "native_identity_envelope", "capture_protocol"],
+    }
+
+
+def edge_treatment_interfaces_for_component(
+    component: dict[str, Any],
+    component_names: list[str],
+    features: list[dict[str, Any]],
+    dims_by_feature: dict[str, list[dict[str, Any]]],
+) -> list[dict[str, Any]]:
+    name = component_name(component)
+    result: list[dict[str, Any]] = []
+    for feature in features:
+        refs = feature_component_refs(feature, component_names)
+        if name not in refs:
+            continue
+        role = edge_treatment_role(feature)
+        if role is None:
+            continue
+        feature_name = item_name(feature)
+        feature_dims = dims_by_feature.get(feature_name, [])
+        radius_m = dimension_value_for_feature(feature_dims, ("radius", "r@")) if role == "edge_rounding" else None
+        distance_m = dimension_value_for_feature(feature_dims, ("distance", "d1@", "chamfer")) if role == "edge_break" else None
+        interface = {
+            "interface_id": f"{name}:edge_treatment:{feature_name}",
+            "component": name,
+            "kind": "edge_treatment",
+            "role": role,
+            "radius_m": radius_m,
+            "distance_m": distance_m,
+            "source_feature": feature_name,
+            "source": "feature_dimension_evidence",
+            "confidence": 0.67 if radius_m is not None or distance_m is not None else 0.57,
+        }
+        interface["selector"] = edge_treatment_selector(name, component.get("path"), interface)
+        result.append(apply_confidence_policy(interface))
+    return result
+
+
 def cylinder_role(feature: dict[str, Any], component: str) -> str | None:
     text = " ".join(str(feature.get(key, "")) for key in ("name", "type", "description", "kind")).lower()
     comp = component.lower()
@@ -679,6 +744,7 @@ def build_index(report: dict[str, Any], *, near_tolerance_m: float, standard_par
     planar_interfaces: list[dict[str, Any]] = []
     cylindrical_interfaces: list[dict[str, Any]] = []
     slot_path_interfaces: list[dict[str, Any]] = []
+    edge_treatment_interfaces: list[dict[str, Any]] = []
     coordinate_systems: list[dict[str, Any]] = []
     for c in components:
         name = component_name(c)
@@ -699,6 +765,7 @@ def build_index(report: dict[str, Any], *, near_tolerance_m: float, standard_par
             planar_interfaces.append(face)
         cylindrical_interfaces.extend(cylindrical_interfaces_for_component(c, component_names, features, diameter_by_feature, boxes.get(name)))
         slot_path_interfaces.extend(slot_path_interfaces_for_component(c, component_names, features, dims_by_feature, boxes.get(name)))
+        edge_treatment_interfaces.extend(edge_treatment_interfaces_for_component(c, component_names, features, dims_by_feature))
         indexed_components.append({
             "component": name,
             "path": c.get("path"),
@@ -718,6 +785,7 @@ def build_index(report: dict[str, Any], *, near_tolerance_m: float, standard_par
         "planar_interfaces": sorted(planar_interfaces, key=lambda item: item["interface_id"]),
         "cylindrical_interfaces": sorted(cylindrical_interfaces, key=lambda item: item["interface_id"]),
         "slot_path_interfaces": sorted(slot_path_interfaces, key=lambda item: item["interface_id"]),
+        "edge_treatment_interfaces": sorted(edge_treatment_interfaces, key=lambda item: item["interface_id"]),
         "interfaces": sorted(interfaces, key=lambda item: (item["gap_m"], item["a"], item["b"])),
         "parameters": {"near_tolerance_m": near_tolerance_m, "standard_part_regex": standard_part_regex},
         "operator_notes": [
@@ -729,6 +797,7 @@ def build_index(report: dict[str, Any], *, near_tolerance_m: float, standard_par
             "interface_confidence_scoring_blocks_weak_bbox_only_targets",
             "named_cylindrical_interfaces_from_feature_and_dimension_evidence",
             "slot_path_interfaces_from_feature_dimension_bbox_evidence",
+            "edge_treatment_selectors_from_feature_dimension_evidence",
         ],
     }
 

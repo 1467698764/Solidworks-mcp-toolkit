@@ -341,6 +341,45 @@ class InterfaceIndexTests(unittest.TestCase):
             self.assertEqual(slot["slot_boundary_selectors"]["end_a"]["native_identity"]["kind"], "edge_or_face")
             self.assertIn("slot_path_interfaces_from_feature_dimension_bbox_evidence", data["operator_notes"])
 
+    def test_indexes_edge_treatment_selectors_from_fillet_and_chamfer_features(self):
+        report = {
+            "active_document": {
+                "type": "assembly",
+                "title": "edge_treatment_fixture.SLDASM",
+                "components": [
+                    {"name2": "cover_plate-1", "path": "C:/m/cover_plate.SLDPRT", "bbox_m": [0.0, 0.0, 0.0, 0.20, 0.10, 0.012]},
+                ],
+                "features": [
+                    {"name": "EdgeFillet_R3_top_outer", "type": "Fillet", "components": ["cover_plate-1"]},
+                    {"name": "Chamfer_C1p5_bottom_front", "type": "Chamfer", "components": ["cover_plate-1"]},
+                ],
+                "dimensions": [
+                    {"full_name": "R@EdgeFillet_R3_top_outer@cover_plate.SLDPRT", "system_value_m": 0.003, "feature": "EdgeFillet_R3_top_outer"},
+                    {"full_name": "D1@Chamfer_C1p5_bottom_front@cover_plate.SLDPRT", "system_value_m": 0.0015, "feature": "Chamfer_C1p5_bottom_front"},
+                ],
+            }
+        }
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            src = root / "inspect.json"
+            out = root / "interface_index.json"
+            src.write_text(json.dumps(report), encoding="utf-8")
+
+            proc = run_py("--report", str(src), "--out", str(out))
+
+            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+            data = json.loads(out.read_text(encoding="utf-8-sig"))
+            treatments = {item["interface_id"]: item for item in data["edge_treatment_interfaces"]}
+            fillet = treatments["cover_plate-1:edge_treatment:EdgeFillet_R3_top_outer"]
+            chamfer = treatments["cover_plate-1:edge_treatment:Chamfer_C1p5_bottom_front"]
+            self.assertEqual(fillet["role"], "edge_rounding")
+            self.assertEqual(fillet["radius_m"], 0.003)
+            self.assertEqual(fillet["selector"]["fallback"]["type"], "edge_treatment_feature")
+            self.assertEqual(fillet["selector"]["native_identity"]["kind"], "edge_or_face")
+            self.assertEqual(chamfer["role"], "edge_break")
+            self.assertEqual(chamfer["distance_m"], 0.0015)
+            self.assertIn("edge_treatment_selectors_from_feature_dimension_evidence", data["operator_notes"])
+
     def test_swctl_routes_interface_index(self):
         report = {
             "active_document": {
