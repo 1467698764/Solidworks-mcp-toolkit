@@ -60,6 +60,45 @@ class MateSelectionCheckTests(unittest.TestCase):
             self.assertEqual(data["macro"]["expected_mate_name"], "MG_crank_shaft_01_concentric")
             self.assertEqual(data["counts"]["accepted_selections"], 2)
 
+    def test_accepted_selection_exports_native_identity_selector_patches(self):
+        selection = self.selection_report()
+        selection["selections"][0]["native_identity"] = {
+            "persistent_reference": [1, 2, 3],
+            "tracking_id": 42,
+            "select_name": "Face<1>@crank_disk-1",
+            "component": "crank_disk-1",
+            "component_path": "C:/m/crank_disk.SLDPRT",
+            "object_type": "FACE",
+            "resolution_order": ["persistent_reference", "tracking_id", "select_name", "geometry_signature_fallback"],
+        }
+        selection["selections"][1]["native_identity"] = {
+            "tracking_id": 99,
+            "select_name": "Axis1@crank_shaft-1",
+            "component": "crank_shaft-1",
+            "component_path": "C:/m/crank_shaft.SLDPRT",
+            "object_type": "DATUMAXIS",
+        }
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            manifest = root / "manifest.json"
+            selection_path = root / "selection.json"
+            out = root / "check.json"
+            manifest.write_text(json.dumps(self.manifest()), encoding="utf-8")
+            selection_path.write_text(json.dumps(selection), encoding="utf-8")
+
+            proc = run_py("--macro-manifest", str(manifest), "--selection-report", str(selection_path), "--out", str(out))
+
+            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+            data = json.loads(out.read_text(encoding="utf-8-sig"))
+            self.assertTrue(data["ok"], data)
+            patches = data["selector_patches"]
+            self.assertEqual(len(patches), 2)
+            self.assertEqual(patches[0]["component"], "crank_disk-1")
+            self.assertEqual(patches[0]["native_identity"]["persistent_reference"], [1, 2, 3])
+            self.assertEqual(patches[0]["native_identity"]["tracking_id"], 42)
+            self.assertEqual(patches[0]["selection_type"], "FACES")
+            self.assertEqual(patches[1]["native_identity"]["select_name"], "Axis1@crank_shaft-1")
+
     def test_accepts_path_vertex_and_edge_selections(self):
         manifest = self.manifest()
         manifest["macros"][0]["mate_type"] = "path"

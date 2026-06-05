@@ -46,6 +46,17 @@ def component_name(selection: dict[str, Any]) -> str:
     return ""
 
 
+def selector_patch(selection: dict[str, Any]) -> dict[str, Any]:
+    native_identity = selection.get("native_identity") if isinstance(selection.get("native_identity"), dict) else {}
+    return {
+        "index": selection.get("index"),
+        "selection_type": str(selection.get("type", "")).upper(),
+        "component": component_name(selection) or native_identity.get("component"),
+        "native_identity": native_identity,
+        "usage": "copy native_identity into the matching mate group selection selector before execution",
+    }
+
+
 def choose_macro(manifest: dict[str, Any], expected_mate_name: str) -> dict[str, Any] | None:
     macros = [item for item in manifest.get("macros", []) if isinstance(item, dict)]
     if expected_mate_name:
@@ -76,12 +87,14 @@ def check(manifest: dict[str, Any], selection_report: dict[str, Any], expected_m
         add(findings, "warning", "selection_component_coverage", "selection report does not prove both expected components", {"expected": sorted(expected_components), "selected": sorted(selected_components)})
 
     accepted = 0
+    selector_patches: list[dict[str, Any]] = []
     for item in selections:
         typ = str(item.get("type", "")).upper()
         if typ not in SUPPORTED_SELECTION_TYPES:
             add(findings, "blocking", "unsupported_selection_type", "selection is not a face/edge/axis/plane/point style entity suitable for reviewed mate macros", {"index": item.get("index"), "type": typ})
             continue
         accepted += 1
+        selector_patches.append(selector_patch(item))
         add(findings, "accepted", "selection_entity_supported", "selection entity type is suitable for a reviewed mate macro", {"index": item.get("index"), "type": typ, "component": component_name(item)})
 
     return {
@@ -105,6 +118,7 @@ def check(manifest: dict[str, Any], selection_report: dict[str, Any], expected_m
             "blocking_findings": len(findings["blocking"]),
             "warning_findings": len(findings["warning"]),
         },
+        "selector_patches": selector_patches,
         "findings": findings,
     }
 
