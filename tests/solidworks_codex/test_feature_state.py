@@ -12,6 +12,8 @@ class FakeFeature:
         self.next = None
         self.sub = None
         self.selected = []
+        self.definition = FakeDefinition()
+        self.modified_definition = None
 
     def GetNameForSelection(self):
         return self.Name
@@ -30,6 +32,31 @@ class FakeFeature:
 
     def Select2(self, append, mark):
         self.selected.append((append, mark))
+        return True
+
+    def GetDefinition(self):
+        return self.definition
+
+    def ModifyDefinition(self, definition, model, component):
+        self.modified_definition = (definition, model, component)
+        return True
+
+
+class FakeDefinition:
+    _oleobj_ = True
+
+    def __init__(self):
+        self.Depth = 0.008
+        self.ReverseDirection = False
+        self.access_calls = []
+        self.released = False
+
+    def AccessSelections(self, model, component):
+        self.access_calls.append((model, component))
+        return True
+
+    def ReleaseSelectionAccess(self):
+        self.released = True
         return True
 
 
@@ -70,6 +97,36 @@ class FakeModel:
 
 
 class FeatureStateTests(unittest.TestCase):
+    def test_edits_feature_definition_properties_and_reports_reviewed_scope(self):
+        model = FakeModel(["BaseBoss", "PocketCut"])
+        feature = mod.find_feature(model, "PocketCut")
+        spec = {
+            "edits": [
+                {"property": "Depth", "value": 0.012},
+                {"property": "ReverseDirection", "value": True},
+            ]
+        }
+
+        result = mod.apply_action(model, feature, "edit-definition", definition_spec=spec)
+        evidence = mod.action_evidence(
+            action="edit-definition",
+            before=mod.snapshot(feature),
+            after=mod.snapshot(feature),
+            before_feature_count=2,
+            after_feature_count=2,
+            action_result=result,
+        )
+
+        self.assertTrue(result["definition"]["modify_definition"]["ok"])
+        self.assertEqual(feature.definition.Depth, 0.012)
+        self.assertTrue(feature.definition.ReverseDirection)
+        self.assertTrue(feature.definition.released)
+        self.assertEqual(evidence["operation_role"], "feature_definition_edit")
+        self.assertEqual(evidence["change_scope"], "feature_definition")
+        self.assertEqual(evidence["changed_definition_properties"], ["Depth", "ReverseDirection"])
+        self.assertEqual(evidence["definition_before"]["Depth"], 0.008)
+        self.assertEqual(evidence["definition_after"]["Depth"], 0.012)
+
     def test_reorders_feature_before_reviewed_target_and_reports_order_delta(self):
         model = FakeModel(["BaseBoss", "PocketCut", "MountFillet"])
         feature = mod.find_feature(model, "MountFillet")

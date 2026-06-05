@@ -1,6 +1,6 @@
 """Change SolidWorks feature state or feature-scoped dimensions and emit JSON evidence.
 
-Supported actions: suppress, unsuppress, delete, set-dimension, reorder.
+Supported actions: suppress, unsuppress, delete, set-dimension, reorder, edit-definition.
 Works on the active part/assembly document, or opens a provided model path.
 """
 from __future__ import annotations
@@ -219,6 +219,56 @@ def set_feature_dimension(model: Any, feature: Any, dimension_query: str, value_
     return {"name": resolved, "before_m": before, "after_m": after, "target_m": float(value_m)}
 
 
+def load_definition_spec(path: str) -> dict[str, Any]:
+    if not path:
+        raise ValueError("edit-definition requires --definition-spec")
+    data = json.loads(Path(path).read_text(encoding="utf-8-sig"))
+    if not isinstance(data, dict):
+        raise ValueError("definition spec must be a JSON object")
+    edits = data.get("edits")
+    if not isinstance(edits, list) or not edits:
+        raise ValueError("definition spec requires non-empty edits list")
+    for edit in edits:
+        if not isinstance(edit, dict) or not isinstance(edit.get("property"), str) or "value" not in edit:
+            raise ValueError("each definition edit requires property and value")
+        prop = edit["property"]
+        if not prop.replace("_", "").isalnum() or prop.startswith("_"):
+            raise ValueError(f"unsupported definition property name: {prop}")
+        if not isinstance(edit["value"], (str, int, float, bool)) and edit["value"] is not None:
+            raise ValueError(f"unsupported definition value for {prop}")
+    return data
+
+
+def definition_value(definition: Any, prop: str) -> Any:
+    try:
+        return val(getattr(definition, prop))
+    except Exception as exc:
+        return {"error": f"{type(exc).__name__}: {exc}"}
+
+
+def edit_feature_definition(model: Any, feature: Any, spec: dict[str, Any]) -> dict[str, Any]:
+    definition = read(feature, "GetDefinition")
+    if definition is None or isinstance(definition, dict):
+        raise RuntimeError("Feature.GetDefinition is unavailable; cannot edit definition object")
+    edits = [item for item in spec.get("edits", []) if isinstance(item, dict)]
+    before = {str(edit["property"]): definition_value(definition, str(edit["property"])) for edit in edits}
+    access = read(definition, "AccessSelections", model, None)
+    for edit in edits:
+        setattr(definition, str(edit["property"]), edit["value"])
+    modify = read(feature, "ModifyDefinition", definition, model, None)
+    release = read(definition, "ReleaseSelectionAccess")
+    after = {str(edit["property"]): definition_value(definition, str(edit["property"])) for edit in edits}
+    return {
+        "ok": bool(modify) and not isinstance(modify, dict),
+        "properties": [str(edit["property"]) for edit in edits],
+        "before": before,
+        "after": after,
+        "access_selections": {"ok": bool(access) and not isinstance(access, dict), "raw": access},
+        "modify_definition": {"ok": bool(modify) and not isinstance(modify, dict), "raw": modify},
+        "release_selection_access": {"ok": bool(release) and not isinstance(release, dict), "raw": release},
+    }
+
+
 def operation_role(action: str) -> str:
     return {
         "suppress": "feature_deactivation",
@@ -226,6 +276,7 @@ def operation_role(action: str) -> str:
         "delete": "feature_removal",
         "set-dimension": "feature_parameter_adjustment",
         "reorder": "feature_reorder",
+        "edit-definition": "feature_definition_edit",
     }.get(action, "feature_state_change")
 
 
@@ -258,6 +309,7 @@ def action_evidence(
         "delete": "feature_tree",
         "set-dimension": "feature_dimension",
         "reorder": "feature_tree_order",
+        "edit-definition": "feature_definition",
     }.get(action, "feature")
     evidence = {
         "operation_role": operation_role(action),
@@ -284,6 +336,18 @@ def action_evidence(
                 "reorder_position": reorder.get("position"),
                 "feature_order_before": before_order,
                 "feature_order_after": after_order,
+            }
+        )
+    definition = action_result.get("definition") if isinstance(action_result, dict) else None
+    if isinstance(definition, dict):
+        evidence.update(
+            {
+                "changed_definition_properties": definition.get("properties", []),
+                "definition_before": definition.get("before", {}),
+                "definition_after": definition.get("after", {}),
+                "definition_access": definition.get("access_selections"),
+                "definition_modify": definition.get("modify_definition"),
+                "definition_release": definition.get("release_selection_access"),
             }
         )
     return evidence
@@ -322,6 +386,7 @@ def apply_action(
     value_m: float | None = None,
     target_feature: str = "",
     reorder_position: str = "after",
+    definition_spec: dict[str, Any] | None = None,
 ) -> Any:
     selection_result = select_feature(feature)
     if action == "suppress":
@@ -336,6 +401,10 @@ def apply_action(
         return {"select": selection_result, "dimension": set_feature_dimension(model, feature, dimension, value_m)}
     if action == "reorder":
         return {"select": selection_result, "reorder": reorder_feature(model, feature, target_feature, reorder_position)}
+    if action == "edit-definition":
+        if definition_spec is None:
+            raise ValueError("edit-definition requires definition_spec")
+        return {"select": selection_result, "definition": edit_feature_definition(model, feature, definition_spec)}
     raise ValueError(f"Unsupported action: {action}")
 
 
@@ -350,11 +419,12 @@ def save_model(model: Any) -> dict[str, Any]:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--feature", required=True, help="Feature name exact or unique substring")
-    parser.add_argument("--action", required=True, choices=["suppress", "unsuppress", "delete", "set-dimension", "reorder"])
+    parser.add_argument("--action", required=True, choices=["suppress", "unsuppress", "delete", "set-dimension", "reorder", "edit-definition"])
     parser.add_argument("--dimension", default="", help="Exact dimension full name or feature-local token such as D1")
     parser.add_argument("--value-m", type=float, default=None)
     parser.add_argument("--target-feature", default="", help="Feature name exact or unique substring used by reorder")
     parser.add_argument("--reorder-position", default="after", choices=["before", "after"])
+    parser.add_argument("--definition-spec", default="", help="JSON spec with reviewed feature definition edits")
     parser.add_argument("--model", default=None)
     parser.add_argument("--start", action="store_true")
     parser.add_argument("--save", action="store_true")
@@ -368,6 +438,7 @@ def main() -> None:
     before_order = feature_order(model)
     feature = find_feature(model, args.feature)
     before = snapshot(feature)
+    definition_spec = load_definition_spec(args.definition_spec) if args.action == "edit-definition" else None
     action_result = apply_action(
         model,
         feature,
@@ -376,6 +447,7 @@ def main() -> None:
         value_m=args.value_m,
         target_feature=args.target_feature,
         reorder_position=args.reorder_position,
+        definition_spec=definition_spec,
     )
     rebuild_result = read(model, "ForceRebuild3", False)
     after = None if args.action == "delete" else snapshot(find_feature(model, args.feature))
@@ -404,6 +476,7 @@ def main() -> None:
         "value_m": args.value_m,
         "target_feature_query": args.target_feature,
         "reorder_position": args.reorder_position,
+        "definition_spec": definition_spec,
         "before_feature_count": before_features,
         "after_feature_count": after_features,
         "feature_order_before": before_order,

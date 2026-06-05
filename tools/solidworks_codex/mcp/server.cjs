@@ -173,8 +173,8 @@ const toolSchemas = [
   },
   {
     name: 'solidworks_feature_state',
-    description: 'Change part or assembly feature state by feature name: suppress/unsuppress/delete, set a feature-scoped dimension, or reorder a feature before/after a reviewed target, then rebuild and report before/after evidence.',
-    inputSchema: { type: 'object', properties: { feature: { type: 'string' }, action: { type: 'string', enum: ['suppress','unsuppress','delete','set-dimension','reorder'] }, dimension: { type: 'string' }, value_m: { type: 'number' }, target_feature: { type: 'string' }, reorder_position: { type: 'string', enum: ['before','after'] }, model: { type: 'string' }, save: { type: 'boolean' }, out: { type: 'string' } }, required: ['feature','action'], additionalProperties: false }
+    description: 'Change part or assembly feature state by feature name: suppress/unsuppress/delete, set a feature-scoped dimension, reorder a feature, or apply reviewed Feature Definition property edits, then rebuild and report before/after evidence.',
+    inputSchema: { type: 'object', properties: { feature: { type: 'string' }, action: { type: 'string', enum: ['suppress','unsuppress','delete','set-dimension','reorder','edit-definition'] }, dimension: { type: 'string' }, value_m: { type: 'number' }, target_feature: { type: 'string' }, reorder_position: { type: 'string', enum: ['before','after'] }, definition_spec: { type: 'string', description: 'JSON spec file with reviewed definition edits.' }, model: { type: 'string' }, save: { type: 'boolean' }, out: { type: 'string' } }, required: ['feature','action'], additionalProperties: false }
   },
   {
     name: 'solidworks_part_feature_execute',
@@ -510,6 +510,7 @@ async function callTool(name, input) {
       if (input?.value_m !== undefined) args.push('-ValueM', String(input.value_m));
       if (input?.target_feature) args.push('-TargetFeature', input.target_feature);
       if (input?.reorder_position) args.push('-ReorderPosition', input.reorder_position);
+      if (input?.definition_spec) args.push('-Manifest', input.definition_spec);
       if (input?.model) args.push('-Model', input.model);
       if (input?.save) args.push('-Save');
       if (input?.out) args.push('-Out', input.out);
