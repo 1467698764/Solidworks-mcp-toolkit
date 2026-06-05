@@ -58,6 +58,13 @@ class EngineeringLiteTests(unittest.TestCase):
         self.assertFalse(data["ok"])
         bom = {(row["part_key"], row["configuration"]): row for row in data["bom"]["rows"]}
         self.assertEqual(bom[("C:/cad/bolt_m6.SLDPRT", "M6x20")]["quantity"], 2)
+        drawing_bom = data["drawing_bom"]
+        self.assertEqual(drawing_bom["status"], "ready")
+        self.assertEqual(drawing_bom["columns"], ["item", "part_number", "configuration", "quantity", "material", "description", "instances"])
+        bolt_row = next(row for row in drawing_bom["rows"] if row["part_number"] == "bolt_m6")
+        self.assertEqual(bolt_row["item"], 2)
+        self.assertEqual(bolt_row["quantity"], 2)
+        self.assertEqual(bolt_row["instances"], ["bolt_m6-1", "bolt_m6-2"])
         blocking = {item["kind"] for item in data["findings"]["blocking"]}
         warnings = {item["kind"] for item in data["findings"]["warning"]}
         self.assertIn("missing_material", blocking)
@@ -71,13 +78,17 @@ class EngineeringLiteTests(unittest.TestCase):
             report = root / "inspect.json"
             out = root / "engineering.md"
             json_out = root / "engineering.json"
+            bom_csv = root / "drawing_bom.csv"
             report.write_text(json.dumps(self.inspect_report()), encoding="utf-8")
 
-            proc = run_py("--report", str(report), "--out", str(out), "--json-out", str(json_out))
+            proc = run_py("--report", str(report), "--out", str(out), "--json-out", str(json_out), "--bom-csv-out", str(bom_csv))
 
             self.assertEqual(proc.returncode, 1, proc.stderr + proc.stdout)
             self.assertIn("Engineering Lite Review", out.read_text(encoding="utf-8-sig"))
-            self.assertEqual(json.loads(json_out.read_text(encoding="utf-8-sig"))["mode"], "engineering_lite")
+            data = json.loads(json_out.read_text(encoding="utf-8-sig"))
+            self.assertEqual(data["mode"], "engineering_lite")
+            self.assertEqual(data["artifacts"]["drawing_bom_csv"], str(bom_csv))
+            self.assertIn("item,part_number,configuration,quantity,material,description,instances", bom_csv.read_text(encoding="utf-8-sig"))
 
     def test_swctl_routes_engineering_lite(self):
         with tempfile.TemporaryDirectory() as d:
@@ -85,6 +96,7 @@ class EngineeringLiteTests(unittest.TestCase):
             report = root / "inspect.json"
             out = root / "engineering.md"
             json_out = root / "engineering.json"
+            artifact_dir = root / "artifacts"
             report.write_text(json.dumps(self.inspect_report()), encoding="utf-8")
 
             proc = subprocess.run(
@@ -95,6 +107,7 @@ class EngineeringLiteTests(unittest.TestCase):
                     "-Report", str(report),
                     "-Out", str(out),
                     "-JsonOut", str(json_out),
+                    "-OutDir", str(artifact_dir),
                 ],
                 cwd=ROOT,
                 capture_output=True,
@@ -105,6 +118,7 @@ class EngineeringLiteTests(unittest.TestCase):
 
             self.assertEqual(proc.returncode, 1, proc.stderr + proc.stdout)
             self.assertTrue(json_out.exists())
+            self.assertTrue((artifact_dir / "drawing_bom.csv").exists())
 
 
 if __name__ == "__main__":

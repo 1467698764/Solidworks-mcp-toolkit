@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 from collections import defaultdict
 from datetime import datetime
@@ -78,6 +79,55 @@ def build_bom(components: list[dict[str, Any]]) -> dict[str, Any]:
     return {"rows": rows_out, "count": len(rows_out), "quantity_total": sum(row["quantity"] for row in rows_out)}
 
 
+def part_number(part_key: str) -> str:
+    name = Path(part_key.replace("\\", "/")).name
+    stem = Path(name).stem
+    return stem or part_key
+
+
+def description_of(items: list[dict[str, Any]]) -> str:
+    descriptions = sorted({str(item.get("description") or item.get("title") or "") for item in items if item.get("description") or item.get("title")})
+    return descriptions[0] if len(descriptions) == 1 else ""
+
+
+def build_drawing_bom(components: list[dict[str, Any]], bom: dict[str, Any]) -> dict[str, Any]:
+    grouped: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
+    for component in components:
+        if component.get("suppressed") is True:
+            continue
+        grouped[component_key(component)].append(component)
+    rows_out = []
+    for item_number, row in enumerate(bom["rows"], start=1):
+        key = (row["part_key"], row["configuration"])
+        items = grouped.get(key, [])
+        rows_out.append({
+            "item": item_number,
+            "part_number": part_number(row["part_key"]),
+            "configuration": row["configuration"],
+            "quantity": row["quantity"],
+            "material": row.get("material") or "",
+            "description": description_of(items),
+            "instances": row["instances"],
+        })
+    return {
+        "status": "ready" if rows_out else "empty",
+        "source": "inspect_component_rollup",
+        "columns": ["item", "part_number", "configuration", "quantity", "material", "description", "instances"],
+        "rows": rows_out,
+        "count": len(rows_out),
+        "quantity_total": sum(row["quantity"] for row in rows_out),
+    }
+
+
+def write_drawing_bom_csv(path: Path, drawing_bom: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8-sig", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=drawing_bom["columns"])
+        writer.writeheader()
+        for row in drawing_bom["rows"]:
+            writer.writerow({**row, "instances": ";".join(row["instances"])})
+
+
 def is_standard_part(component: dict[str, Any]) -> bool:
     text = " ".join(str(component.get(key, "")) for key in ("name2", "name", "path", "description")).casefold()
     return any(hint in text for hint in STANDARD_PART_HINTS)
@@ -123,6 +173,7 @@ def analyze(report: dict[str, Any]) -> dict[str, Any]:
     features = rows(doc.get("features"))
     findings: dict[str, list[dict[str, Any]]] = {"blocking": [], "warning": [], "accepted": []}
     bom = build_bom(components)
+    drawing_bom = build_drawing_bom(components, bom)
 
     for row in bom["rows"]:
         if not row.get("material"):
@@ -143,6 +194,7 @@ def analyze(report: dict[str, Any]) -> dict[str, Any]:
     analyze_dfm(features, findings)
     if bom["rows"]:
         add(findings, "accepted", "bom_generated", "BOM rows were grouped by part path and configuration", {"rows": bom["count"], "quantity_total": bom["quantity_total"]})
+        add(findings, "accepted", "drawing_bom_ready", "Drawing BOM rows were normalized for export", {"rows": drawing_bom["count"], "quantity_total": drawing_bom["quantity_total"]})
 
     return {
         "timestamp": datetime.now().isoformat(timespec="seconds"),
@@ -158,6 +210,7 @@ def analyze(report: dict[str, Any]) -> dict[str, Any]:
             "warning_findings": len(findings["warning"]),
         },
         "bom": bom,
+        "drawing_bom": drawing_bom,
         "findings": findings,
     }
 
@@ -177,6 +230,15 @@ def markdown(data: dict[str, Any]) -> str:
     ]
     for row in data["bom"]["rows"]:
         lines.append(f"| `{row['part_key']}` / `{row['configuration']}` | {row['quantity']} | `{row.get('material') or '<missing>'}` | {', '.join(f'`{name}`' for name in row['instances'])} |")
+    lines += [
+        "",
+        "## Drawing BOM Export",
+        "",
+        "| Item | Part number | Configuration | Quantity | Material | Description | Instances |",
+        "| ---: | --- | --- | ---: | --- | --- | --- |",
+    ]
+    for row in data["drawing_bom"]["rows"]:
+        lines.append(f"| {row['item']} | `{row['part_number']}` | `{row['configuration']}` | {row['quantity']} | `{row.get('material') or '<missing>'}` | {row.get('description') or ''} | {', '.join(f'`{name}`' for name in row['instances'])} |")
     lines += ["", "## Findings", ""]
     for severity in ("blocking", "warning", "accepted"):
         lines.append(f"### {severity}")
@@ -191,6 +253,7 @@ def main() -> None:
     parser.add_argument("--report", required=True)
     parser.add_argument("--out", default="tools/solidworks_codex/reports/engineering_lite.md")
     parser.add_argument("--json-out", default="tools/solidworks_codex/reports/engineering_lite.json")
+    parser.add_argument("--bom-csv-out", default="")
     args = parser.parse_args()
 
     result = analyze(load_json(resolve(args.report)))
@@ -198,9 +261,14 @@ def main() -> None:
     json_out = resolve(args.json_out)
     out.parent.mkdir(parents=True, exist_ok=True)
     json_out.parent.mkdir(parents=True, exist_ok=True)
+    result["artifacts"] = {}
+    if args.bom_csv_out:
+        bom_csv_out = resolve(args.bom_csv_out)
+        write_drawing_bom_csv(bom_csv_out, result["drawing_bom"])
+        result["artifacts"]["drawing_bom_csv"] = str(bom_csv_out)
     out.write_text(markdown(result), encoding="utf-8")
     json_out.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(json.dumps({"ok": result["ok"], "out": str(out), "json_out": str(json_out), "blocking_findings": result["counts"]["blocking_findings"]}, ensure_ascii=False, indent=2))
+    print(json.dumps({"ok": result["ok"], "out": str(out), "json_out": str(json_out), "artifacts": result["artifacts"], "blocking_findings": result["counts"]["blocking_findings"]}, ensure_ascii=False, indent=2))
     raise SystemExit(0 if result["ok"] else 1)
 
 

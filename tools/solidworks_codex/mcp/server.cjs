@@ -299,8 +299,8 @@ const toolSchemas = [
   },
   {
     name: 'solidworks_engineering_lite',
-    description: 'Generate a read-only engineering-lite BOM, material, DFM, and DFA review from inspect evidence.',
-    inputSchema: { type: 'object', properties: { report: { type: 'string' }, out: { type: 'string' }, json_out: { type: 'string' } }, required: ['report'], additionalProperties: false }
+    description: 'Generate a read-only engineering-lite BOM, drawing-BOM CSV, material, DFM, and DFA review from inspect evidence.',
+    inputSchema: { type: 'object', properties: { report: { type: 'string' }, out: { type: 'string' }, json_out: { type: 'string' }, out_dir: { type: 'string', description: 'Optional artifact directory for drawing_bom.csv.' } }, required: ['report'], additionalProperties: false }
   },
   {
     name: 'solidworks_part_geometry_validate',
@@ -670,6 +670,7 @@ async function callTool(name, input) {
       args.push('engineering-lite', '-Report', input.report);
       if (input?.out) args.push('-Out', input.out);
       if (input?.json_out) args.push('-JsonOut', input.json_out);
+      if (input?.out_dir) args.push('-OutDir', input.out_dir);
       break;
     case 'solidworks_part_geometry_validate':
       args.push('part-geometry-validate', '-Report', input.report, '-Manifest', input.contract);
