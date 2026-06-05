@@ -207,7 +207,7 @@
     {
       "name": "solidworks_feature_state",
       "group": "write_guarded",
-      "description": "Change part or assembly feature state by feature name: suppress/unsuppress/delete or set a feature-scoped dimension, then rebuild and report before/after evidence.",
+      "description": "Change part or assembly feature state by feature name: suppress/unsuppress/delete, set a feature-scoped dimension, or reorder a feature before/after a reviewed target, then rebuild and report before/after evidence.",
       "required": [
         "feature",
         "action"

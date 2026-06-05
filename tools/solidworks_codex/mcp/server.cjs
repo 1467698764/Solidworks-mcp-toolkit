@@ -173,8 +173,8 @@ const toolSchemas = [
   },
   {
     name: 'solidworks_feature_state',
-    description: 'Change part or assembly feature state by feature name: suppress/unsuppress/delete or set a feature-scoped dimension, then rebuild and report before/after evidence.',
-    inputSchema: { type: 'object', properties: { feature: { type: 'string' }, action: { type: 'string', enum: ['suppress','unsuppress','delete','set-dimension'] }, dimension: { type: 'string' }, value_m: { type: 'number' }, model: { type: 'string' }, save: { type: 'boolean' }, out: { type: 'string' } }, required: ['feature','action'], additionalProperties: false }
+    description: 'Change part or assembly feature state by feature name: suppress/unsuppress/delete, set a feature-scoped dimension, or reorder a feature before/after a reviewed target, then rebuild and report before/after evidence.',
+    inputSchema: { type: 'object', properties: { feature: { type: 'string' }, action: { type: 'string', enum: ['suppress','unsuppress','delete','set-dimension','reorder'] }, dimension: { type: 'string' }, value_m: { type: 'number' }, target_feature: { type: 'string' }, reorder_position: { type: 'string', enum: ['before','after'] }, model: { type: 'string' }, save: { type: 'boolean' }, out: { type: 'string' } }, required: ['feature','action'], additionalProperties: false }
   },
   {
     name: 'solidworks_part_feature_execute',
@@ -508,6 +508,8 @@ async function callTool(name, input) {
       args.push('feature-state', '-Target', input.feature, '-Action', input.action);
       if (input?.dimension) args.push('-Dimension', input.dimension);
       if (input?.value_m !== undefined) args.push('-ValueM', String(input.value_m));
+      if (input?.target_feature) args.push('-TargetFeature', input.target_feature);
+      if (input?.reorder_position) args.push('-ReorderPosition', input.reorder_position);
       if (input?.model) args.push('-Model', input.model);
       if (input?.save) args.push('-Save');
       if (input?.out) args.push('-Out', input.out);

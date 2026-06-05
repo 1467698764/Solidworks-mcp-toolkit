@@ -1,6 +1,6 @@
 """Change SolidWorks feature state or feature-scoped dimensions and emit JSON evidence.
 
-Supported actions: suppress, unsuppress, delete, set-dimension.
+Supported actions: suppress, unsuppress, delete, set-dimension, reorder.
 Works on the active part/assembly document, or opens a provided model path.
 """
 from __future__ import annotations
@@ -127,6 +127,10 @@ def list_features(model: Any) -> list[Any]:
     return iter_feature_chain(read(model, "FirstFeature"))
 
 
+def feature_order(model: Any) -> list[str]:
+    return [name for name in (feature_name(feature) for feature in list_features(model)) if isinstance(name, str)]
+
+
 def snapshot(feature: Any | None) -> dict[str, Any] | None:
     if feature is None:
         return None
@@ -221,6 +225,7 @@ def operation_role(action: str) -> str:
         "unsuppress": "feature_reactivation",
         "delete": "feature_removal",
         "set-dimension": "feature_parameter_adjustment",
+        "reorder": "feature_reorder",
     }.get(action, "feature_state_change")
 
 
@@ -232,6 +237,8 @@ def action_evidence(
     before_feature_count: int,
     after_feature_count: int,
     action_result: dict[str, Any],
+    before_order: list[str] | None = None,
+    after_order: list[str] | None = None,
 ) -> dict[str, Any]:
     dimension = action_result.get("dimension") if isinstance(action_result, dict) else None
     before_value = dimension.get("before_m") if isinstance(dimension, dict) else None
@@ -250,6 +257,7 @@ def action_evidence(
         "unsuppress": "feature_state",
         "delete": "feature_tree",
         "set-dimension": "feature_dimension",
+        "reorder": "feature_tree_order",
     }.get(action, "feature")
     evidence = {
         "operation_role": operation_role(action),
@@ -268,10 +276,53 @@ def action_evidence(
                 "parameter_delta_m": parameter_delta,
             }
         )
+    reorder = action_result.get("reorder") if isinstance(action_result, dict) else None
+    if isinstance(reorder, dict):
+        evidence.update(
+            {
+                "reorder_target_feature": reorder.get("target_feature"),
+                "reorder_position": reorder.get("position"),
+                "feature_order_before": before_order,
+                "feature_order_after": after_order,
+            }
+        )
     return evidence
 
 
-def apply_action(model: Any, feature: Any, action: str, dimension: str = "", value_m: float | None = None) -> Any:
+def reorder_feature(model: Any, feature: Any, target_query: str, position: str) -> dict[str, Any]:
+    if not target_query:
+        raise ValueError("reorder requires target_feature")
+    position = position.lower().strip()
+    if position not in {"before", "after"}:
+        raise ValueError("reorder_position must be before or after")
+    target = find_feature(model, target_query)
+    source_name = feature_name(feature)
+    target_name = feature_name(target)
+    if source_name == target_name:
+        raise ValueError("reorder source and target feature must differ")
+    feature_manager = read(model, "FeatureManager")
+    if feature_manager is None or isinstance(feature_manager, dict):
+        raise RuntimeError("Model.FeatureManager is unavailable; cannot reorder feature")
+    for method, args in (
+        ("ReorderFeature", (source_name, target_name, position)),
+        ("ReorderFeature2", (source_name, target_name, position)),
+        ("EditReorder", (source_name, target_name, position)),
+    ):
+        result = read(feature_manager, method, *args)
+        if not isinstance(result, dict):
+            return {"ok": bool(result), "method": method, "source_feature": source_name, "target_feature": target_name, "position": position, "raw": result}
+    raise RuntimeError(f"Could not reorder feature {source_name} {position} {target_name}")
+
+
+def apply_action(
+    model: Any,
+    feature: Any,
+    action: str,
+    dimension: str = "",
+    value_m: float | None = None,
+    target_feature: str = "",
+    reorder_position: str = "after",
+) -> Any:
     selection_result = select_feature(feature)
     if action == "suppress":
         return {"select": selection_result, "state": set_suppression(feature, True)}
@@ -283,6 +334,8 @@ def apply_action(model: Any, feature: Any, action: str, dimension: str = "", val
         if value_m is None:
             raise ValueError("set-dimension requires value_m")
         return {"select": selection_result, "dimension": set_feature_dimension(model, feature, dimension, value_m)}
+    if action == "reorder":
+        return {"select": selection_result, "reorder": reorder_feature(model, feature, target_feature, reorder_position)}
     raise ValueError(f"Unsupported action: {action}")
 
 
@@ -297,9 +350,11 @@ def save_model(model: Any) -> dict[str, Any]:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--feature", required=True, help="Feature name exact or unique substring")
-    parser.add_argument("--action", required=True, choices=["suppress", "unsuppress", "delete", "set-dimension"])
+    parser.add_argument("--action", required=True, choices=["suppress", "unsuppress", "delete", "set-dimension", "reorder"])
     parser.add_argument("--dimension", default="", help="Exact dimension full name or feature-local token such as D1")
     parser.add_argument("--value-m", type=float, default=None)
+    parser.add_argument("--target-feature", default="", help="Feature name exact or unique substring used by reorder")
+    parser.add_argument("--reorder-position", default="after", choices=["before", "after"])
     parser.add_argument("--model", default=None)
     parser.add_argument("--start", action="store_true")
     parser.add_argument("--save", action="store_true")
@@ -310,12 +365,22 @@ def main() -> None:
     sw, started = attach(args.start)
     model = open_or_active(sw, args.model)
     before_features = len(list_features(model))
+    before_order = feature_order(model)
     feature = find_feature(model, args.feature)
     before = snapshot(feature)
-    action_result = apply_action(model, feature, args.action, dimension=args.dimension, value_m=args.value_m)
+    action_result = apply_action(
+        model,
+        feature,
+        args.action,
+        dimension=args.dimension,
+        value_m=args.value_m,
+        target_feature=args.target_feature,
+        reorder_position=args.reorder_position,
+    )
     rebuild_result = read(model, "ForceRebuild3", False)
     after = None if args.action == "delete" else snapshot(find_feature(model, args.feature))
     after_features = len(list_features(model))
+    after_order = feature_order(model)
     evidence = action_evidence(
         action=args.action,
         before=before,
@@ -323,6 +388,8 @@ def main() -> None:
         before_feature_count=before_features,
         after_feature_count=after_features,
         action_result=action_result,
+        before_order=before_order,
+        after_order=after_order,
     )
     save_result = save_model(model) if args.save else None
     result = {
@@ -335,8 +402,12 @@ def main() -> None:
         "action": args.action,
         "dimension_query": args.dimension,
         "value_m": args.value_m,
+        "target_feature_query": args.target_feature,
+        "reorder_position": args.reorder_position,
         "before_feature_count": before_features,
         "after_feature_count": after_features,
+        "feature_order_before": before_order,
+        "feature_order_after": after_order,
         "before": before,
         "after": after,
         "action_result": action_result,
