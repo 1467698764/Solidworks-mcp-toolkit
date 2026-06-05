@@ -175,7 +175,7 @@ Status values:
 | Interference | present | Callback available and count/pairs reported. | Nonzero unexpected interference blocks static/mechanism profiles. |
 | Clearance/near evidence | present | `assembly-diagnose` emits bbox pairwise near/contact pairs, largest separated pairs, missing-bbox components, and `clearance_summary` with minimum gap relation, near/separated counts, scattered components, tolerance, and evidence source. | Scattered components and floating details are detected. |
 | Motion sweep lite | missing | Sample key positions, limits, collisions. | Mechanism_lite can reject path collisions and dead layouts. |
-| Visual screenshot review | partial/missing | Computer Use window capture, stored evidence, visual findings. | Screenshot contradicting report blocks acceptance. |
+| Visual screenshot review | present/guarded | `visual-validate` records screenshot evidence, accepts reviewed warning/not-applicable/accepted findings, and turns missing screenshots or reviewed visual contradictions into blocking findings. Live screenshot capture remains operator/browser-assisted evidence. | Screenshot contradicting report blocks acceptance. |
 | BOM/metadata | partial/guarded | `metadata-execute` / `solidworks_metadata_execute` writes reviewed material and custom-property specs to active or specified models with rebuild/save evidence; inspect/report tools still provide readback and BOM-oriented summaries. Quantity rollups and drawing BOM generation remain separate tracks. | Engineering_lite report can produce a useful BOM. |
 | DFM/DFA-lite | missing/defer | Wall thickness, hole edge, tool access, assembly order, fastener access. | Optional warnings, not mandatory for draft profiles. |
 
@@ -223,7 +223,7 @@ This order matters because later work depends on earlier evidence.
 | 2 | Interface index extraction | Implemented offline heuristic. | Component bbox, nearest-neighbor, contact candidates, fixed-root hints, and standard-part hints are indexed; live face/axis identity is pending. |
 | 3 | Repair planning | Implemented offline. | Diagnosis turns into ordered repair actions and read-only assembly review pipeline artifacts. |
 | 4 | Mate group executor | Present/guarded. | Mate group plans, validation gates, reviewable macro drafts, live execution protocols, native identity envelopes, native face/axis/edge/point selection, AddMate5 group execution, bad-mate suppress/delete actions, and after-inspect execution checks exist; richer live capture of SolidWorks persist-reference bytes remains a hardening track. |
-| 5 | Visual validation gate | Catches failures humans see immediately. | SolidWorks window screenshot is part of blocking evidence for assemblies. |
+| 5 | Visual validation gate | Present/guarded. | SolidWorks window screenshots and reviewed visual findings feed `visual-validate`; missing screenshots or visual contradiction findings block assembly acceptance. |
 | 6 | Mechanism_lite | Makes simple machines credible. | Slider-crank/quick-return samples limits and collisions. |
 | 7 | Engineering_lite | Moves from usable CAD to practical review. | BOM/material/mass/fit/DFM/DFA warnings are available when requested. |
 

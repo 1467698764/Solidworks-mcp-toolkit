@@ -1,11 +1,11 @@
 # SolidWorks Codex Capability Matrix
 
-- Timestamp: `2026-06-05T03:04:35`
-- Capability count: `68`
+- Timestamp: `2026-06-05T12:29:42`
+- Capability count: `69`
 
 ## Coverage
 
-- CLI commands: `68`
+- CLI commands: `69`
 - MCP tools: `50`
 - MCP tools mapped to CLI: `50`
 - CLI for every local MCP tool: `True`
@@ -88,5 +88,6 @@
 | `summary` | `solidworks_report_summary` | `discover` | `read_only` | `False` | `report` |
 | `template-macro` | `solidworks_template_macro` | `macro_generation` | `generated_reviewable_artifact` | `False` | `template` |
 | `tool-catalog` | `solidworks_tool_catalog` | `handoff` | `offline_or_read_only` | `False` | `-` |
+| `visual-validate` | `-` | `verify_export` | `verification_or_export` | `False` | `-` |
 | `workflow-plan` | `-` | `analysis` | `read_only` | `False` | `Target` |
 | `worklog` | `solidworks_worklog` | `handoff` | `offline_or_read_only` | `False` | `message` |
