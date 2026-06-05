@@ -620,6 +620,7 @@ class MateGroupExecuteTests(unittest.TestCase):
         self.assertEqual(asm.mates[0][0], mod.MATE_TYPES["distance"])
         self.assertEqual(asm.mates[0][3], 0.0125)
         self.assertEqual(distance_result["executed_mates"][0]["distance_m"], 0.0125)
+        self.assertEqual(distance_result["executed_mates"][0]["constraint_role"], "offset_clearance")
 
         angle_manifest = self.manifest()
         angle_manifest["macros"][0]["mate_type"] = "angle"
@@ -636,6 +637,7 @@ class MateGroupExecuteTests(unittest.TestCase):
         self.assertEqual(angle_asm.mates[0][7], 0)
         self.assertAlmostEqual(angle_asm.mates[0][8], math.radians(30.0))
         self.assertAlmostEqual(angle_result["executed_mates"][0]["angle_rad"], math.radians(30.0))
+        self.assertEqual(angle_result["executed_mates"][0]["constraint_role"], "design_angle")
 
     def test_executes_parallel_and_perpendicular_as_supporting_orientation_mates(self):
         parallel_manifest = self.manifest()
@@ -681,6 +683,7 @@ class MateGroupExecuteTests(unittest.TestCase):
         self.assertEqual(distance_asm.mates[0][5], 0.01)
         self.assertEqual(distance_result["executed_mates"][0]["distance_max_m"], 0.03)
         self.assertEqual(distance_result["executed_mates"][0]["distance_min_m"], 0.01)
+        self.assertEqual(distance_result["executed_mates"][0]["constraint_role"], "bounded_linear_motion")
 
         angle_manifest = self.manifest()
         angle_manifest["macros"][0]["mate_type"] = "limit_angle"
@@ -700,6 +703,7 @@ class MateGroupExecuteTests(unittest.TestCase):
         self.assertAlmostEqual(angle_asm.mates[0][10], math.radians(15.0))
         self.assertAlmostEqual(angle_result["executed_mates"][0]["angle_max_rad"], math.radians(75.0))
         self.assertAlmostEqual(angle_result["executed_mates"][0]["angle_min_rad"], math.radians(15.0))
+        self.assertEqual(angle_result["executed_mates"][0]["constraint_role"], "bounded_angular_motion")
 
     def test_executes_width_mate_with_four_native_planar_faces(self):
         manifest = self.manifest()

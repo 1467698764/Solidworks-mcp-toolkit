@@ -28,6 +28,14 @@ MATE_TYPES = {
 }
 
 ORIENTATION_MATE_TYPES = {"parallel", "perpendicular"}
+CONSTRAINT_ROLE_BY_MATE_TYPE = {
+    "parallel": "supporting_orientation",
+    "perpendicular": "supporting_orientation",
+    "distance": "offset_clearance",
+    "angle": "design_angle",
+    "limit_distance": "bounded_linear_motion",
+    "limit_angle": "bounded_angular_motion",
+}
 
 FALLBACK_SELECT_TYPES = {
     "bbox_planar_face": "FACE",
@@ -819,7 +827,7 @@ def add_selected_mate(assembly: Any, item: dict[str, Any]) -> dict[str, Any]:
         "api": "AddMate5",
         "mate_type": mate_type,
         "orientation_constraint": mate_type in ORIENTATION_MATE_TYPES,
-        "constraint_role": "supporting_orientation" if mate_type in ORIENTATION_MATE_TYPES else "primary_attachment_or_motion",
+        "constraint_role": CONSTRAINT_ROLE_BY_MATE_TYPE.get(mate_type, "primary_attachment_or_motion"),
         "expected_mate_name": item.get("expected_mate_name"),
         "distance_m": distance,
         "distance_max_m": distance_upper,
