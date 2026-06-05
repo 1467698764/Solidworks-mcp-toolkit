@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 from datetime import datetime
 from pathlib import Path
@@ -124,6 +125,20 @@ def persist_reference_value(model: Any, obj: Any) -> list[int] | None:
     return None
 
 
+def persist_reference_envelope(values: list[int] | None) -> dict[str, Any] | None:
+    if values is None:
+        return None
+    raw = bytes(max(0, min(255, int(item))) for item in values)
+    return {
+        "source": "Model.Extension.GetPersistReference3",
+        "length": len(raw),
+        "bytes": values,
+        "hex": raw.hex(),
+        "base64": base64.b64encode(raw).decode("ascii"),
+        "encoding": "solidworks_persist_reference_bytes",
+    }
+
+
 def identity_member(obj: Any, names: tuple[str, ...]) -> Any:
     for name in names:
         got = read(obj, name)
@@ -138,8 +153,10 @@ def native_identity(model: Any, obj: Any, comp: Any) -> dict[str, Any]:
     component_name = component_summary.get("Name2") or component_summary.get("Name") or component_summary.get("GetName")
     component_path = component_summary.get("GetPathName")
     select_name = identity_member(obj, ("GetNameForSelection", "GetName", "Name"))
+    persistent_reference = persist_reference_value(model, obj)
     return {
-        "persistent_reference": persist_reference_value(model, obj),
+        "persistent_reference": persistent_reference,
+        "persistent_reference_bytes": persist_reference_envelope(persistent_reference),
         "tracking_id": identity_member(obj, ("GetTrackingID", "GetTrackingId", "TrackingID")),
         "select_name": select_name,
         "component": component_name,

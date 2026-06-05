@@ -20,6 +20,8 @@ Current write paths include guarded dimension edits, component state, component 
 
 `component-insert` accepts an optional `attachment` object for standard/detail parts. The execution plan carries component role, attachment role, host component, host interface id, optional host/inserted selectors with native identity envelopes, mate group id, required mate types, selector handoff status, and an attachment status that hands off cleanly to mate group execution.
 
+`selection-report` captures native identity for reviewed mate selections, including SolidWorks persist-reference bytes as list, hex, and base64, plus tracking id, select name, component, component path, object type, and resolution order. `mate-selection-check` forwards those envelopes as selector patches before mate group execution.
+
 `interface-index` emits planar, cylindrical, slot/path, and coordinate-system selectors with stable ids, native identity envelopes, geometry fallbacks, and live identity capture protocols. Those protocols name the SolidWorks selection/readback calls, capture fields, patch target, and blocking policy used before mate execution trusts a selector.
 
 `engineering-lite` converts inspect evidence into BOM rows, normalized drawing BOM rows, and optional `drawing_bom.csv` artifacts through `-OutDir` / MCP `out_dir`. The output carries item numbers, part numbers, configurations, quantities, materials, descriptions, and instances so material gaps and drawing handoff state are visible before release.

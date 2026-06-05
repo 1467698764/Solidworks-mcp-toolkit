@@ -106,6 +106,10 @@ class ComPropertyReadingTests(unittest.TestCase):
 
         identity = selection_mod.native_identity(FakeModel(), FakeObject(), FakeComponent())
         self.assertEqual(identity["persistent_reference"], [1, 2, 3, 255])
+        self.assertEqual(identity["persistent_reference_bytes"]["length"], 4)
+        self.assertEqual(identity["persistent_reference_bytes"]["hex"], "010203ff")
+        self.assertEqual(identity["persistent_reference_bytes"]["base64"], "AQID/w==")
+        self.assertEqual(identity["persistent_reference_bytes"]["source"], "Model.Extension.GetPersistReference3")
         self.assertEqual(identity["tracking_id"], 42)
         self.assertEqual(identity["select_name"], "Face<1>@plate-1")
         self.assertEqual(identity["component"], "plate-1")
