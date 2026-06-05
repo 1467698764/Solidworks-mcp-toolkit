@@ -308,6 +308,16 @@ const toolSchemas = [
     inputSchema: { type: 'object', properties: { report: { type: 'string' }, contract: { type: 'string' }, out: { type: 'string' } }, required: ['report', 'contract'], additionalProperties: false }
   },
   {
+    name: 'solidworks_visual_capture',
+    description: 'Capture SolidWorks window visual evidence into a screenshot manifest; dry_run writes a deterministic placeholder PNG for CI/protocol checks.',
+    inputSchema: { type: 'object', properties: { out_dir: { type: 'string' }, out: { type: 'string' }, dry_run: { type: 'boolean' } }, additionalProperties: false }
+  },
+  {
+    name: 'solidworks_visual_validate',
+    description: 'Validate screenshot evidence and reviewed visual findings against an inspect report; missing screenshots or visual contradictions block acceptance.',
+    inputSchema: { type: 'object', properties: { report: { type: 'string' }, screenshots: { type: 'array', items: { type: 'string' } }, visual_review: { type: 'string' }, out: { type: 'string' } }, required: ['report'], additionalProperties: false }
+  },
+  {
     name: 'solidworks_mate_group_live_protocol',
     description: 'Generate a controlled per-group live SolidWorks work order for reviewed mate group macros: backup, selection evidence, macro run, rebuild, inspect, execution check, interference, and cleanup.',
     inputSchema: { type: 'object', properties: { macro_manifest: { type: 'string' }, validation_report: { type: 'string' }, model: { type: 'string' }, out: { type: 'string' }, markdown_out: { type: 'string' } }, required: ['macro_manifest', 'validation_report'], additionalProperties: false }
@@ -675,6 +685,18 @@ async function callTool(name, input) {
       break;
     case 'solidworks_part_geometry_validate':
       args.push('part-geometry-validate', '-Report', input.report, '-Manifest', input.contract);
+      if (input?.out) args.push('-Out', input.out);
+      break;
+    case 'solidworks_visual_capture':
+      args.push('visual-capture');
+      if (input?.out_dir) args.push('-OutDir', input.out_dir);
+      if (input?.out) args.push('-Out', input.out);
+      if (input?.dry_run) args.push('-ValidateOnly');
+      break;
+    case 'solidworks_visual_validate':
+      args.push('visual-validate', '-Report', input.report);
+      for (const screenshot of (input?.screenshots || [])) args.push('-Files', screenshot);
+      if (input?.visual_review) args.push('-Manifest', input.visual_review);
       if (input?.out) args.push('-Out', input.out);
       break;
     case 'solidworks_mate_group_live_protocol':

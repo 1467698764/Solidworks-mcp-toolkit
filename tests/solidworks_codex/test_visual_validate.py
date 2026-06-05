@@ -7,11 +7,23 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "tools" / "solidworks_codex" / "scripts" / "sw_visual_validate.py"
+CAPTURE_SCRIPT = ROOT / "tools" / "solidworks_codex" / "scripts" / "sw_visual_capture.py"
 
 
 def run_py(*args: str):
     return subprocess.run(
         [sys.executable, str(SCRIPT), *args],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+
+
+def run_capture(*args: str):
+    return subprocess.run(
+        [sys.executable, str(CAPTURE_SCRIPT), *args],
         cwd=ROOT,
         capture_output=True,
         text=True,
@@ -96,6 +108,50 @@ class VisualValidateTests(unittest.TestCase):
 
             self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
             self.assertTrue(json.loads(out.read_text(encoding="utf-8-sig"))["ok"])
+
+    def test_visual_capture_writes_reviewable_manifest_and_placeholder(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            out_dir = root / "screens"
+            manifest = root / "capture.json"
+
+            proc = run_capture("--out-dir", str(out_dir), "--manifest", str(manifest), "--placeholder")
+
+            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+            data = json.loads(manifest.read_text(encoding="utf-8-sig"))
+            self.assertTrue(data["ok"], data)
+            self.assertEqual(data["capture_method"], "placeholder_png")
+            self.assertEqual(len(data["screenshots"]), 1)
+            screenshot = Path(data["screenshots"][0]["path"])
+            self.assertTrue(screenshot.exists())
+            self.assertGreater(screenshot.stat().st_size, 0)
+            self.assertEqual(data["screenshots"][0]["evidence_role"], "solidworks_window_capture")
+
+    def test_swctl_routes_visual_capture(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            out_dir = root / "screens"
+            manifest = root / "capture.json"
+
+            proc = subprocess.run(
+                [
+                    "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass",
+                    "-File", str(ROOT / "tools/solidworks_codex/swctl.ps1"),
+                    "visual-capture",
+                    "-OutDir", str(out_dir),
+                    "-Out", str(manifest),
+                    "-ValidateOnly",
+                ],
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+            )
+
+            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+            data = json.loads(manifest.read_text(encoding="utf-8-sig"))
+            self.assertEqual(data["capture_method"], "placeholder_png")
 
 
 if __name__ == "__main__":

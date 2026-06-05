@@ -163,6 +163,9 @@ child.stderr.on('data', (d) => { stderr += d.toString(); });
   const motionSweepLite = await send('tools/call', { name: 'solidworks_motion_sweep_lite', arguments: { spec: 'tools/solidworks_codex/sandbox/mcp_motion_sweep_lite.json', macro_manifest: 'tools/solidworks_codex/sandbox/mcp_mate_group_manifest.json', dry_run: true, out: 'tools/solidworks_codex/reports/mcp_motion_sweep_lite.json' } });
   const engineeringLite = await send('tools/call', { name: 'solidworks_engineering_lite', arguments: { report: 'tools/solidworks_codex/sandbox/report_after.json', out: 'tools/solidworks_codex/reports/mcp_engineering_lite.md', json_out: 'tools/solidworks_codex/reports/mcp_engineering_lite.json' } });
   const partGeometryValidate = await send('tools/call', { name: 'solidworks_part_geometry_validate', arguments: { report: 'tools/solidworks_codex/sandbox/mcp_part_geometry_report.json', contract: 'tools/solidworks_codex/sandbox/mcp_part_geometry_contract.json', out: 'tools/solidworks_codex/reports/mcp_part_geometry_validate.json' } });
+  const visualCapture = await send('tools/call', { name: 'solidworks_visual_capture', arguments: { dry_run: true, out_dir: 'tools/solidworks_codex/reports/mcp_visual', out: 'tools/solidworks_codex/reports/mcp_visual_capture.json' } });
+  const visualCaptureData = JSON.parse(fs.readFileSync(path.join(workspace, 'tools/solidworks_codex/reports/mcp_visual_capture.json'), 'utf8'));
+  const visualValidate = await send('tools/call', { name: 'solidworks_visual_validate', arguments: { report: 'tools/solidworks_codex/sandbox/mcp_part_geometry_report.json', screenshots: [visualCaptureData.screenshots[0].path], out: 'tools/solidworks_codex/reports/mcp_visual_validate.json' } });
   const mateGroupLiveProtocol = await send('tools/call', { name: 'solidworks_mate_group_live_protocol', arguments: { macro_manifest: 'tools/solidworks_codex/sandbox/mcp_mate_group_manifest.json', validation_report: 'tools/solidworks_codex/sandbox/mcp_mate_group_validation.json', model: 'C:/models/mcp_fixture.SLDASM', out: 'tools/solidworks_codex/reports/mcp_mate_group_live_protocol.json', markdown_out: 'tools/solidworks_codex/reports/mcp_mate_group_live_protocol.md' } });
   const designReview = await send('tools/call', { name: 'solidworks_design_review', arguments: { report: 'tools/solidworks_codex/sandbox/report_after.json', intent: 'locating interfaces, floating components, editable dimensions, and manufacturability evidence', out: 'tools/solidworks_codex/reports/mcp_design_review.md', json_out: 'tools/solidworks_codex/reports/mcp_design_review.json' } });
   const changePlan = await send('tools/call', { name: 'solidworks_change_plan', arguments: { report: 'tools/solidworks_codex/sandbox/report_after.json', goal: 'adjust a critical mounting dimension and verify assembly, clearance, and manufacturing evidence', session_name: 'mcp-change', out: 'tools/solidworks_codex/reports/mcp_change_plan.md', json_out: 'tools/solidworks_codex/reports/mcp_change_plan.json' } });
@@ -197,6 +200,8 @@ child.stderr.on('data', (d) => { stderr += d.toString(); });
     motionSweepLite_is_error: motionSweepLite.isError === true,
     engineeringLite_is_error: engineeringLite.isError === true,
     partGeometryValidate_is_error: partGeometryValidate.isError === true,
+    visualCapture_is_error: visualCapture.isError === true,
+    visualValidate_is_error: visualValidate.isError === true,
     mateGroupLiveProtocol_is_error: mateGroupLiveProtocol.isError === true,
     designReview_is_error: designReview.isError === true,
     changePlan_is_error: changePlan.isError === true,
@@ -223,6 +228,8 @@ child.stderr.on('data', (d) => { stderr += d.toString(); });
     mateGroupExecute_text_head: mateGroupExecute.content?.[0]?.text?.slice(0, 500),
     motionSweepLite_text_head: motionSweepLite.content?.[0]?.text?.slice(0, 500),
     engineeringLite_text_head: engineeringLite.content?.[0]?.text?.slice(0, 500),
+    visualCapture_text_head: visualCapture.content?.[0]?.text?.slice(0, 500),
+    visualValidate_text_head: visualValidate.content?.[0]?.text?.slice(0, 500),
     mateGroupLiveProtocol_text_head: mateGroupLiveProtocol.content?.[0]?.text?.slice(0, 500),
     designReview_text_head: designReview.content?.[0]?.text?.slice(0, 500),
     changePlan_text_head: changePlan.content?.[0]?.text?.slice(0, 500),

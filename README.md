@@ -2,15 +2,15 @@
 
 [English](README.en.md)
 
-一个面向真实机械 CAD 工作的 practical SolidWorks MCP/control layer。它不是单个夹具生成器，也不是把 AI 固定进某个建模模板；它的主线是先把当前 SolidWorks 状态整理成可靠证据，再让强模型基于证据完成理解、计划、执行和验证。
+面向真实机械 CAD 工作的 practical SolidWorks MCP/control layer。项目重点不是单个演示夹具，而是把当前 SolidWorks 模型整理成可追溯证据，再让模型基于证据完成理解、计划、受控执行和验收。
 
 ## 当前定位
 
-- **53 MCP tools** 通过 `tools/solidworks_codex/mcp/server.cjs` 暴露，并落到 `swctl.ps1` 与 Python 控制层。
-- 面向通用 SolidWorks MCP：零件、装配、尺寸、特征、mate、Transform2/origin、干涉、质量属性、原生 `.SLDASM/.SLDPRT` 文件读回。
-- 执行层已覆盖受控组件插入、零件特征执行、元数据写入、组件状态、尺寸修改、mate 组选面/校验/宏生成/执行检查等链路。
-- 证据优先：`inspect` / `model-understand` / `assembly-diagnose` / `interface-index` / `report-context` / `worklog` / `handoff-bundle` 让后续 AI 回合从事实继续，而不是从猜测重启。
-- 验证优先但不倒置顺序：先实现执行能力，再配套 `compare`、`change-verify`、`assembly-contract`、`interference`、`live-gate` 与发布门禁。
+- **55 MCP tools** 由 `tools/solidworks_codex/mcp/server.cjs` 暴露，并落到 `swctl.ps1` 与 Python 控制层。
+- 覆盖通用 SolidWorks 对象：零件、装配、尺寸、特征、mate、Transform2/origin、干涉、质量属性、原生 `.SLDASM/.SLDPRT` 文件读回。
+- 执行层覆盖受控组件插入、零件特征执行、元数据写入、组件状态、尺寸修改、mate 组选面、宏生成、执行检查和视觉证据采集。
+- 证据链由 `inspect`、`model-understand`、`assembly-diagnose`、`interface-index`、`report-context`、`worklog`、`handoff-bundle` 串起来，让后续回合从事实继续。
+- 受控写入后使用 `rebuild`、`compare`、`change-verify`、`assembly-contract`、`interference`、`visual-capture`、`visual-validate` 和 `live-gate` 做验收闭环。
 
 ## 快速开始
 
@@ -36,10 +36,10 @@ cd <repo>
 ## 推荐工作流
 
 1. 用 `inspect` 或 `session-snapshot` 固化当前模型事实。
-2. 用 `model-understand` / `assembly-diagnose` / `interface-index` 找对象、接口、风险和证据缺口。
+2. 用 `model-understand`、`assembly-diagnose`、`interface-index` 找对象、接口、风险和证据缺口。
 3. 用 `workflow-plan` 选择 validation profiles：`draft_part`、`single_part`、`assembly`、`mechanism_assembly`、`engineering_release`，并按任务设置 `runtime_budget` 与 `extra_checks`。
-4. 需要写入时先准备 backup，再执行明确的动作：`safe-set-dimension`、`component-insert`、`part-feature-execute`、`metadata-execute`、`mate-group-execute` 等。
-5. 执行后立即 `rebuild`、`inspect`、`compare`、`change-verify`；装配类任务加 `assembly-contract`、`interference`，真实能力验收走 `live-gate`。
+4. 需要写入时先准备 `backup`，再执行明确动作：`safe-set-dimension`、`component-insert`、`part-feature-execute`、`metadata-execute`、`mate-group-execute` 等。
+5. 执行后立即 `rebuild`、`inspect`、`compare`、`change-verify`；装配类任务加 `assembly-contract`、`interference`，视觉检查加 `visual-capture` 与 `visual-validate`，真实能力验收走 `live-gate`。
 6. 暂停、提交或切换会话前，用 `worklog` 和 `handoff-bundle` 记录证据、决策、失败、未解问题和下一步。
 
 ## 工具分组
@@ -48,10 +48,10 @@ cd <repo>
 - **理解与诊断**：`model-understand`、`design-review`、`change-plan`、`report-search`、`report-context`、`assembly-diagnose`、`assembly-repair-plan`、`interface-index`。
 - **受控执行**：`backup`、`restore-backup`、`set-dimension`、`safe-set-dimension`、`component-state`、`component-insert`、`feature-state`、`part-feature-execute`、`metadata-execute`、`rebuild`。
 - **Mate 与装配**：`mate-macro`、`mate-group-plan`、`mate-group-validate`、`mate-selection-check`、`mate-group-macro`、`mate-group-execute`、`mate-group-execution-check`、`mate-group-live-protocol`、`assembly-review-pipeline`。
-- **验证与导出**：`compare`、`change-verify`、`interference`、`assembly-contract`、`export`、`live-gate`。
+- **验证与导出**：`compare`、`change-verify`、`interference`、`assembly-contract`、`export`、`visual-capture`、`visual-validate`、`live-gate`。
 - **交接与发布**：`worklog`、`handoff-bundle`、`tool-catalog`、`offline-demo`、`preflight`、`audit`、`finalize`、`repo-health`、`github-readiness`。
 
-完整当前目录以生成结果为准：
+完整目录以生成结果为准：
 
 ```powershell
 .\tools\solidworks_codex\swctl.ps1 tool-catalog -Out tools\solidworks_codex\reports\tool_catalog.md -JsonOut tools\solidworks_codex\reports\tool_catalog.json
@@ -59,10 +59,10 @@ cd <repo>
 
 ## 重要边界
 
-- `shaper_machine_v5` 是 simple-mechanism regression，用来压测 native file readback、semantic mate participation、`0 interference`、cleanup 和装配诊断；它 is not a showcase，也 is not proof，不能把项目边界定义成一个 named fixture。
+- `shaper_machine_v5` 是 simple-mechanism regression，用来压测 native file readback、semantic mate participation、`0 interference`、cleanup 和装配诊断；它不能把项目边界定义成一个 named fixture。
 - 验收主产物是原生 `.SLDASM/.SLDPRT`；STEP optional smoke 只做补充。
 - `mate_error: 1` 在 SolidWorks AddMate 路径中按 no-error 处理，但必须再由 mate 读回、参与组件、suppressed 状态、placement 和干涉证据确认。
-- 两个固定组件之间的 required mate 默认会被 `assembly-contract` 拦截；只有 manifest 明确 `allow_fixed_fixed: true` 才作为参考/文档约束接受。
+- 两个固定组件之间的 required mate 默认会被 `assembly-contract` 拦截；只有 manifest 明确 `allow_fixed_fixed: true` 才作为参考或文档约束接受。
 
 ## 文档
 
