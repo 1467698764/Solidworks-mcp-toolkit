@@ -637,6 +637,33 @@ class MateGroupExecuteTests(unittest.TestCase):
         self.assertAlmostEqual(angle_asm.mates[0][8], math.radians(30.0))
         self.assertAlmostEqual(angle_result["executed_mates"][0]["angle_rad"], math.radians(30.0))
 
+    def test_executes_parallel_and_perpendicular_as_supporting_orientation_mates(self):
+        parallel_manifest = self.manifest()
+        parallel_manifest["macros"][0]["mate_type"] = "parallel"
+        parallel_manifest["macros"][0]["expected_mate_name"] = "MG_cover_orientation_parallel"
+        parallel_asm = FakeAssembly()
+
+        parallel_result = mod.execute_manifest(parallel_manifest, parallel_asm)
+
+        self.assertTrue(parallel_result["ok"], parallel_result)
+        self.assertEqual(parallel_asm.mates[0][0], mod.MATE_TYPES["parallel"])
+        parallel_mate = parallel_result["executed_mates"][0]
+        self.assertTrue(parallel_mate["orientation_constraint"])
+        self.assertEqual(parallel_mate["constraint_role"], "supporting_orientation")
+
+        perpendicular_manifest = self.manifest()
+        perpendicular_manifest["macros"][0]["mate_type"] = "perpendicular"
+        perpendicular_manifest["macros"][0]["expected_mate_name"] = "MG_cover_orientation_perpendicular"
+        perpendicular_asm = FakeAssembly()
+
+        perpendicular_result = mod.execute_manifest(perpendicular_manifest, perpendicular_asm)
+
+        self.assertTrue(perpendicular_result["ok"], perpendicular_result)
+        self.assertEqual(perpendicular_asm.mates[0][0], mod.MATE_TYPES["perpendicular"])
+        perpendicular_mate = perpendicular_result["executed_mates"][0]
+        self.assertTrue(perpendicular_mate["orientation_constraint"])
+        self.assertEqual(perpendicular_mate["constraint_role"], "supporting_orientation")
+
     def test_executes_limit_distance_and_angle_bounds_in_addmate5_parameter_slots(self):
         distance_manifest = self.manifest()
         distance_manifest["macros"][0]["mate_type"] = "limit_distance"

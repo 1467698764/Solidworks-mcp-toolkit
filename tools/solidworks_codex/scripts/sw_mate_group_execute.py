@@ -27,6 +27,8 @@ MATE_TYPES = {
     "slot": 21,
 }
 
+ORIENTATION_MATE_TYPES = {"parallel", "perpendicular"}
+
 FALLBACK_SELECT_TYPES = {
     "bbox_planar_face": "FACE",
     "cylindrical_axis": "AXIS",
@@ -816,6 +818,8 @@ def add_selected_mate(assembly: Any, item: dict[str, Any]) -> dict[str, Any]:
         "ok": feature is not None,
         "api": "AddMate5",
         "mate_type": mate_type,
+        "orientation_constraint": mate_type in ORIENTATION_MATE_TYPES,
+        "constraint_role": "supporting_orientation" if mate_type in ORIENTATION_MATE_TYPES else "primary_attachment_or_motion",
         "expected_mate_name": item.get("expected_mate_name"),
         "distance_m": distance,
         "distance_max_m": distance_upper,
