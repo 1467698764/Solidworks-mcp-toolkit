@@ -81,6 +81,37 @@ def native_identity_envelope(component: str, component_path: str | None, stable_
     }
 
 
+def live_identity_capture_protocol(
+    component: str,
+    component_path: str | None,
+    stable_id: str,
+    selection_entity: str,
+    geometry_signature: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "target_stable_id": stable_id,
+        "component": component,
+        "component_path": component_path,
+        "selection_entity": selection_entity,
+        "patch_target": "selector.native_identity",
+        "capture_fields": ["persistent_reference", "tracking_id", "select_name", "geometry_signature"],
+        "solidworks_calls": [
+            "IModelDocExtension::SelectByID2",
+            "ISelectionMgr::GetSelectedObject6",
+            "IEntity::GetSafeEntity",
+            "IModelDocExtension::GetPersistReference3",
+            "IModelDocExtension::GetObjectByPersistReference3",
+        ],
+        "readback_checks": {
+            "component_path": component_path,
+            "geometry_signature": geometry_signature,
+            "selection_entity": selection_entity,
+            "stable_id": stable_id,
+        },
+        "failure_policy": "block_mate_execution_until_reviewed_native_identity_or_geometry_fallback_matches",
+    }
+
+
 def planar_selector(component: str, component_path: str | None, interface_id: str, face_name: str, face: dict[str, Any]) -> dict[str, Any]:
     geometry_signature = {
         "type": "bbox_planar_face",
@@ -95,8 +126,9 @@ def planar_selector(component: str, component_path: str | None, interface_id: st
         "component_path": component_path,
         "strategy": "native_identity_then_stable_id_then_bbox_fallback",
         "native_identity": native_identity_envelope(component, component_path, interface_id, "face", geometry_signature),
+        "live_identity_capture_protocol": live_identity_capture_protocol(component, component_path, interface_id, "face", geometry_signature),
         "fallback": geometry_signature,
-        "tags": ["reopen_repair_selector", "review_before_live_selection", "native_identity_envelope"],
+        "tags": ["reopen_repair_selector", "review_before_live_selection", "native_identity_envelope", "capture_protocol"],
     }
 
 
@@ -308,8 +340,9 @@ def cylinder_selector(component: str, component_path: str | None, interface: dic
         "component_path": component_path,
         "strategy": "native_identity_then_stable_id_then_feature_dimension_bbox_fallback",
         "native_identity": native_identity_envelope(component, component_path, interface["interface_id"], "face_or_axis", geometry_signature),
+        "live_identity_capture_protocol": live_identity_capture_protocol(component, component_path, interface["interface_id"], "face_or_axis", geometry_signature),
         "fallback": geometry_signature,
-        "tags": ["reopen_repair_selector", "review_before_live_selection", "native_identity_envelope"],
+        "tags": ["reopen_repair_selector", "review_before_live_selection", "native_identity_envelope", "capture_protocol"],
     }
 
 
@@ -405,8 +438,9 @@ def slot_selector(component: str, component_path: str | None, interface: dict[st
         "component_path": component_path,
         "strategy": "native_identity_then_stable_id_then_feature_dimension_bbox_fallback",
         "native_identity": native_identity_envelope(component, component_path, interface["interface_id"], "edge_or_curve", geometry_signature),
+        "live_identity_capture_protocol": live_identity_capture_protocol(component, component_path, interface["interface_id"], "edge_or_curve", geometry_signature),
         "fallback": geometry_signature,
-        "tags": ["reopen_repair_selector", "review_before_live_selection", "native_identity_envelope"],
+        "tags": ["reopen_repair_selector", "review_before_live_selection", "native_identity_envelope", "capture_protocol"],
     }
 
 
@@ -473,8 +507,9 @@ def coordinate_system_selector(component: str, component_path: str | None, coord
         "component_path": component_path,
         "strategy": "native_identity_then_stable_id_then_bbox_fallback",
         "native_identity": native_identity_envelope(component, component_path, coordinate_system["coordinate_system_id"], "coordinate_system", geometry_signature),
+        "live_identity_capture_protocol": live_identity_capture_protocol(component, component_path, coordinate_system["coordinate_system_id"], "coordinate_system", geometry_signature),
         "fallback": geometry_signature,
-        "tags": ["reopen_repair_selector", "review_before_live_selection", "native_identity_envelope"],
+        "tags": ["reopen_repair_selector", "review_before_live_selection", "native_identity_envelope", "capture_protocol"],
     }
 
 
@@ -624,6 +659,7 @@ def build_index(report: dict[str, Any], *, near_tolerance_m: float, standard_par
             "use_live_face_axis_selection_before_applying_mates",
             "standard_part_role_is_name_based_and_may_require_confirmation",
             "selectors_carry_native_identity_envelopes_with_geometry_fallbacks",
+            "selectors_publish_live_identity_capture_protocols",
             "interface_confidence_scoring_blocks_weak_bbox_only_targets",
             "named_cylindrical_interfaces_from_feature_and_dimension_evidence",
             "slot_path_interfaces_from_feature_dimension_bbox_evidence",

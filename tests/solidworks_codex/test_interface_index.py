@@ -165,6 +165,60 @@ class InterfaceIndexTests(unittest.TestCase):
             self.assertEqual(data["interfaces"][0]["selector_refs"]["a"], "base_plate-1:plane:z_max")
             self.assertEqual(data["interfaces"][0]["selector_refs"]["b"], "cover_plate-1:plane:z_min")
 
+    def test_selectors_publish_live_identity_capture_protocols(self):
+        report = {
+            "active_document": {
+                "type": "assembly",
+                "title": "identity_protocol_fixture.SLDASM",
+                "components": [
+                    {"name2": "base_plate-1", "path": "C:/m/base_plate.SLDPRT", "fixed": True, "bbox_m": [0.0, 0.0, 0.0, 0.20, 0.10, 0.012]},
+                    {"name2": "bearing_block-1", "path": "C:/m/bearing_block.SLDPRT", "bbox_m": [-0.04, -0.03, -0.02, 0.04, 0.03, 0.02]},
+                    {"name2": "guide_plate-1", "path": "C:/m/guide_plate.SLDPRT", "bbox_m": [0.0, 0.0, 0.0, 0.20, 0.06, 0.012]},
+                ],
+                "features": [
+                    {"name": "BearingBore_D24_Z", "type": "HoleWizard", "components": ["bearing_block-1"]},
+                    {"name": "SliderSlot_L120_W12_X", "type": "SlotCut", "components": ["guide_plate-1"]},
+                ],
+                "dimensions": [
+                    {"full_name": "DIA24@BearingBore_D24_Z@bearing_block.SLDPRT", "system_value_m": 0.024, "feature": "BearingBore_D24_Z"},
+                    {"full_name": "SlotWidth@SliderSlot_L120_W12_X@guide_plate.SLDPRT", "system_value_m": 0.012, "feature": "SliderSlot_L120_W12_X"},
+                    {"full_name": "SlotLength@SliderSlot_L120_W12_X@guide_plate.SLDPRT", "system_value_m": 0.120, "feature": "SliderSlot_L120_W12_X"},
+                ],
+            }
+        }
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            src = root / "inspect.json"
+            out = root / "interface_index.json"
+            src.write_text(json.dumps(report), encoding="utf-8")
+
+            proc = run_py("--report", str(src), "--out", str(out))
+
+            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+            data = json.loads(out.read_text(encoding="utf-8-sig"))
+            selector_by_id = {
+                data["planar_interfaces"][0]["selector"]["stable_id"]: data["planar_interfaces"][0]["selector"],
+                data["cylindrical_interfaces"][0]["selector"]["stable_id"]: data["cylindrical_interfaces"][0]["selector"],
+                data["slot_path_interfaces"][0]["selector"]["stable_id"]: data["slot_path_interfaces"][0]["selector"],
+                data["coordinate_systems"][0]["selector"]["stable_id"]: data["coordinate_systems"][0]["selector"],
+            }
+            for selector in selector_by_id.values():
+                protocol = selector["live_identity_capture_protocol"]
+                self.assertEqual(protocol["target_stable_id"], selector["stable_id"])
+                self.assertEqual(protocol["component"], selector["component"])
+                self.assertEqual(protocol["patch_target"], "selector.native_identity")
+                self.assertIn("persistent_reference", protocol["capture_fields"])
+                self.assertIn("tracking_id", protocol["capture_fields"])
+                self.assertIn("select_name", protocol["capture_fields"])
+                self.assertIn("geometry_signature", protocol["readback_checks"])
+                self.assertIn("capture_protocol", selector["tags"])
+
+            self.assertEqual(selector_by_id["base_plate-1:plane:x_max"]["live_identity_capture_protocol"]["selection_entity"], "face")
+            self.assertIn("IEntity::GetSafeEntity", selector_by_id["bearing_block-1:cylinder:BearingBore_D24_Z"]["live_identity_capture_protocol"]["solidworks_calls"])
+            self.assertEqual(selector_by_id["guide_plate-1:slot:SliderSlot_L120_W12_X"]["live_identity_capture_protocol"]["selection_entity"], "edge_or_curve")
+            self.assertEqual(selector_by_id["base_plate-1:csys:bbox_center"]["live_identity_capture_protocol"]["selection_entity"], "coordinate_system")
+            self.assertIn("selectors_publish_live_identity_capture_protocols", data["operator_notes"])
+
     def test_scores_interface_confidence_and_blocks_weak_bbox_only_targets(self):
         report = {
             "active_document": {

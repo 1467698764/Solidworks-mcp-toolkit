@@ -20,6 +20,8 @@ Current write paths include guarded dimension edits, component state, component 
 
 `component-insert` accepts an optional `attachment` object for standard/detail parts. The execution plan carries component role, attachment role, host component, host interface id, mate group id, required mate types, and an attachment status that hands off cleanly to mate group execution.
 
+`interface-index` emits planar, cylindrical, slot/path, and coordinate-system selectors with stable ids, native identity envelopes, geometry fallbacks, and live identity capture protocols. Those protocols name the SolidWorks selection/readback calls, capture fields, patch target, and blocking policy used before mate execution trusts a selector.
+
 `assembly-repair-plan` emits an `affected_subgraph` for each action. The subgraph lists local components, affected mates, native file paths, and the diagnosis evidence used to choose the boundary, keeping mate repair focused on the damaged area.
 
 `preflight` emits runtime hygiene evidence: memory budget, generated lock files, generated/report roots, screenshot roots, file counts, and cleanup scope. It treats memory-budget excess and generated lock files as blockers before live work continues.
