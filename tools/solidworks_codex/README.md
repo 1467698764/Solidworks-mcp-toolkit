@@ -16,6 +16,8 @@ Current write paths include guarded dimension edits, component state, component 
 
 `component-insert` accepts an optional `attachment` object for standard/detail parts. The execution plan carries component role, attachment role, host component, host interface id, mate group id, required mate types, and an attachment status that hands off cleanly to mate group execution.
 
+`assembly-repair-plan` emits an `affected_subgraph` for each action. The subgraph lists local components, affected mates, native file paths, and the diagnosis evidence used to choose the boundary, keeping mate repair focused on the damaged area.
+
 ## Validation Layer
 
 The project uses validation profiles through `workflow-plan`: `draft_part`, `single_part`, `assembly`, `mechanism_assembly`, and `engineering_release`. `runtime_budget` and `extra_checks` keep validation proportional.

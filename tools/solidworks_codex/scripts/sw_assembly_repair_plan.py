@@ -44,6 +44,53 @@ def mate_participants(mate_name: str, diagnosis: dict[str, Any]) -> list[str]:
     return []
 
 
+def component_paths_for(components: list[str], diagnosis: dict[str, Any]) -> dict[str, str]:
+    paths = diagnosis.get("inventory", {}).get("component_paths", {})
+    if not isinstance(paths, dict):
+        return {}
+    return {name: str(paths[name]) for name in components if paths.get(name)}
+
+
+def mate_names_for_components(components: list[str], diagnosis: dict[str, Any]) -> list[str]:
+    wanted = set(components)
+    mates: list[str] = []
+    for edge in diagnosis.get("mates", {}).get("edges", []):
+        participants = {str(item) for item in edge.get("components", []) if item}
+        if participants & wanted and edge.get("mate"):
+            mates.append(str(edge["mate"]))
+    return sorted(dict.fromkeys(mates))
+
+
+def affected_subgraph_for_action(action: dict[str, Any], diagnosis: dict[str, Any]) -> dict[str, Any]:
+    kind = action.get("kind")
+    target = str(action.get("target") or "")
+    components: list[str] = []
+    mates: list[str] = []
+    evidence: list[str] = []
+    if kind == "resolve_bad_mate":
+        components = mate_participants(target, diagnosis)
+        mates = [target] if target else []
+        evidence.append("bad_mate_participants")
+    elif kind == "attach_hostless_standard_part":
+        components = [target] if target else []
+        if action.get("suggested_host"):
+            components.append(str(action["suggested_host"]))
+            evidence.append("nearest_spatial_host")
+        evidence.append("hostless_standard_part")
+        mates = mate_names_for_components(components, diagnosis)
+    elif kind == "classify_isolated_component":
+        components = [target] if target else []
+        evidence.append("isolated_mate_graph_component")
+        mates = mate_names_for_components(components, diagnosis)
+    components = sorted(dict.fromkeys(name for name in components if name))
+    return {
+        "components": components,
+        "mates": sorted(dict.fromkeys(name for name in mates if name)),
+        "component_paths": component_paths_for(components, diagnosis),
+        "evidence": sorted(dict.fromkeys(evidence)),
+    }
+
+
 def affected_components(actions: list[dict[str, Any]], diagnosis: dict[str, Any]) -> list[str]:
     found: list[str] = []
     for action in actions:
@@ -97,35 +144,41 @@ def build_plan(diagnosis: dict[str, Any]) -> dict[str, Any]:
     isolated = list(diagnosis.get("mate_graph", {}).get("isolated_components", []))
 
     for mate in bad_mates:
-        actions.append({
+        action = {
             "kind": "resolve_bad_mate",
             "target": mate,
             "priority": "P0",
             "strategy": "suppress_or_delete_stale_mate_then_recreate_from_current_interface_evidence",
             "requires_live_solidworks": True,
-        })
+        }
+        action["affected_subgraph"] = affected_subgraph_for_action(action, diagnosis)
+        actions.append(action)
 
     for name in hostless:
-        actions.append({
+        action = {
             "kind": "attach_hostless_standard_part",
             "target": name,
             "suggested_host": nearest_host(name, diagnosis),
             "priority": "P1",
             "strategy": "identify hole/axis/contact faces before adding concentric/coincident/lock rotation mates",
             "requires_live_solidworks": True,
-        })
+        }
+        action["affected_subgraph"] = affected_subgraph_for_action(action, diagnosis)
+        actions.append(action)
 
     hostless_set = set(hostless)
     for name in isolated:
         if name in hostless_set:
             continue
-        actions.append({
+        action = {
             "kind": "classify_isolated_component",
             "target": name,
             "priority": "P2",
             "strategy": "classify as functional/reference/envelope/optional before adding or removing mates",
             "requires_live_solidworks": False,
-        })
+        }
+        action["affected_subgraph"] = affected_subgraph_for_action(action, diagnosis)
+        actions.append(action)
 
     findings = diagnosis.get("findings", {})
     rollback = rollback_plan(actions, diagnosis)

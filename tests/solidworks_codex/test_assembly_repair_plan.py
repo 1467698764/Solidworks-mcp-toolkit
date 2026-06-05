@@ -63,9 +63,22 @@ class AssemblyRepairPlanTests(unittest.TestCase):
                 next(i for i, item in enumerate(actions) if item["kind"] == "attach_hostless_standard_part"),
             )
             self.assertTrue(any(item["kind"] == "resolve_bad_mate" and item["target"] == "Broken_Bolt_Mate" for item in actions))
+            bad_mate_action = next(item for item in actions if item["kind"] == "resolve_bad_mate")
+            self.assertEqual(bad_mate_action["affected_subgraph"]["components"], ["bolt_m6-1", "cover_plate-1"])
+            self.assertEqual(bad_mate_action["affected_subgraph"]["mates"], ["Broken_Bolt_Mate"])
+            self.assertEqual(
+                bad_mate_action["affected_subgraph"]["component_paths"],
+                {
+                    "bolt_m6-1": "C:/machines/bolt_m6.SLDPRT",
+                    "cover_plate-1": "C:/machines/cover_plate.SLDPRT",
+                },
+            )
+            self.assertIn("bad_mate_participants", bad_mate_action["affected_subgraph"]["evidence"])
             host_actions = [item for item in actions if item["kind"] == "attach_hostless_standard_part"]
             self.assertEqual(host_actions[0]["target"], "bolt_m6-1")
             self.assertEqual(host_actions[0]["suggested_host"], "cover_plate-1")
+            self.assertEqual(host_actions[0]["affected_subgraph"]["components"], ["bolt_m6-1", "cover_plate-1"])
+            self.assertIn("nearest_spatial_host", host_actions[0]["affected_subgraph"]["evidence"])
             self.assertTrue(any(item["kind"] == "classify_isolated_component" and item["target"] == "loose_handle-1" for item in actions))
             rollback = data["rollback_plan"]
             self.assertEqual("rollback_plan", rollback["artifact"])
