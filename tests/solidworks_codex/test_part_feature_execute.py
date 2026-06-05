@@ -105,8 +105,19 @@ class PartFeatureExecuteTests(unittest.TestCase):
         })
 
         self.assertEqual(plan["operation"], "fillet")
+        self.assertEqual(plan["operation_role"], "edge_rounding")
         self.assertEqual(plan["selectors"][0]["type"], "EDGE")
         self.assertEqual(plan["parameters"]["radius_mm"], 2.5)
+
+    def test_validates_chamfer_as_edge_break_operation(self):
+        plan = mod.validate_spec({
+            "operation": "chamfer",
+            "selectors": [{"kind": "entity", "name": "Edge<2>@Plate", "type": "EDGE", "point": {"x": 0.1}}],
+            "parameters": {"distance_mm": 1.2, "angle_deg": 45},
+        })
+
+        self.assertEqual(plan["operation"], "chamfer")
+        self.assertEqual(plan["operation_role"], "edge_break")
 
     def test_rejects_pattern_without_seed_feature(self):
         with self.assertRaisesRegex(ValueError, "seed feature"):
@@ -135,6 +146,7 @@ class PartFeatureExecuteTests(unittest.TestCase):
         self.assertEqual(model.FeatureManager.calls[0][0], "FeatureLinearPattern5")
         self.assertEqual(model.FeatureManager.calls[0][1][0], 3)
         self.assertAlmostEqual(model.FeatureManager.calls[0][1][2], 0.01)
+        self.assertEqual(result["operation_role"], "repeat_seed_feature")
 
     def test_dry_run_writes_reviewable_execution_plan(self):
         with tempfile.TemporaryDirectory() as td:
@@ -161,6 +173,7 @@ class PartFeatureExecuteTests(unittest.TestCase):
             self.assertTrue(data["ok"])
             self.assertTrue(data["dry_run"])
             self.assertEqual(data["operation"], "mirror")
+            self.assertEqual(data["operation_role"], "mirror_seed_feature")
             self.assertEqual(data["execution_plan"]["selectors"][1]["type"], "PLANE")
 
     def test_executes_basic_hole_cut_from_reviewed_plane(self):
@@ -174,6 +187,7 @@ class PartFeatureExecuteTests(unittest.TestCase):
         result = mod.execute(model, plan)
 
         self.assertTrue(result["ok"])
+        self.assertEqual(result["operation_role"], "cylindrical_hole_cut")
         self.assertIn(("CreateCircleByRadius", (0.01, 0.02, 0.0, 0.003)), model.SketchManager.calls)
         self.assertEqual(model.FeatureManager.calls[-1][0], "FeatureCut3")
 
@@ -188,6 +202,7 @@ class PartFeatureExecuteTests(unittest.TestCase):
         result = mod.execute(model, plan)
 
         self.assertTrue(result["ok"])
+        self.assertEqual(result["operation_role"], "slot_profile_cut")
         self.assertTrue(any(call[0] == "CreateStraightSlot" for call in model.SketchManager.calls))
         self.assertEqual(model.FeatureManager.calls[-1][0], "FeatureCut3")
 
@@ -202,6 +217,7 @@ class PartFeatureExecuteTests(unittest.TestCase):
         result = mod.execute(model, plan)
 
         self.assertTrue(result["ok"])
+        self.assertEqual(result["operation_role"], "rectangular_pocket_cut")
         self.assertTrue(any(call[0] == "CreateCenterRectangle" for call in model.SketchManager.calls))
         self.assertEqual(model.FeatureManager.calls[-1][0], "FeatureCut3")
 

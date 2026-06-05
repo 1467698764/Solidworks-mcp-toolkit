@@ -31,6 +31,16 @@ SUPPORTED_OPERATIONS = {
     "mirror",
 }
 SELECT_BY_ID_TYPES = {"EDGE", "FACE", "PLANE", "AXIS", "SKETCH", "EXTSKETCHSEGMENT", "EXTSKETCHPOINT"}
+OPERATION_ROLE_BY_OPERATION = {
+    "fillet": "edge_rounding",
+    "chamfer": "edge_break",
+    "basic_hole": "cylindrical_hole_cut",
+    "slot_cut": "slot_profile_cut",
+    "pocket_cut": "rectangular_pocket_cut",
+    "linear_pattern": "repeat_seed_feature",
+    "circular_pattern": "repeat_seed_feature",
+    "mirror": "mirror_seed_feature",
+}
 
 
 def require_pywin32() -> tuple[Any, Any]:
@@ -258,7 +268,7 @@ def validate_spec(spec: dict[str, Any]) -> dict[str, Any]:
             raise ValueError("circular_pattern angle_deg must be positive")
     if operation == "mirror" and not any(s["kind"] == "entity" and s["type"] == "PLANE" for s in selectors):
         raise ValueError("mirror requires a reviewed PLANE entity selector")
-    return {"operation": operation, "selectors": selectors, "parameters": params}
+    return {"operation": operation, "operation_role": OPERATION_ROLE_BY_OPERATION[operation], "selectors": selectors, "parameters": params}
 
 
 def find_feature(model: Any, query: str) -> Any:
@@ -470,6 +480,8 @@ def execute(model: Any, plan: dict[str, Any]) -> dict[str, Any]:
     operation_result = execute_operation(model, plan)
     return {
         "ok": bool(operation_result.get("ok")),
+        "operation": plan["operation"],
+        "operation_role": plan["operation_role"],
         "clear_selection": clear_result,
         "selection_results": selection_results,
         "operation_result": operation_result,
@@ -491,6 +503,7 @@ def main() -> None:
         "timestamp": datetime.now().isoformat(timespec="seconds"),
         "spec": str(Path(args.spec).resolve()),
         "operation": plan["operation"],
+        "operation_role": plan["operation_role"],
         "dry_run": args.dry_run,
         "execution_plan": plan,
         "connected": False,
