@@ -153,7 +153,105 @@ def feature_float(feature: dict[str, Any], key: str) -> float | None:
         return None
 
 
-def analyze_dfm(features: list[dict[str, Any]], findings: dict[str, list[dict[str, Any]]]) -> None:
+def bbox_axis_thickness(feature: dict[str, Any]) -> float | None:
+    bbox = feature.get("bbox")
+    if not isinstance(bbox, dict):
+        return None
+    values = []
+    for key in ("x", "y", "z", "width_m", "height_m", "depth_m"):
+        value = bbox.get(key)
+        try:
+            if value not in (None, "") and float(value) > 0:
+                values.append(float(value))
+        except (TypeError, ValueError):
+            pass
+    return min(values) if values else None
+
+
+def material_wall_threshold_m(material: str) -> float:
+    text = material.casefold()
+    if "steel" in text:
+        return 0.0015
+    if "aluminum" in text or "aluminium" in text or "6061" in text:
+        return 0.002
+    if "plastic" in text or "abs" in text or "nylon" in text:
+        return 0.0025
+    return 0.002
+
+
+def wall_thickness_samples(features: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    samples = []
+    for feature in features:
+        semantic = str(feature.get("semantic") or feature.get("type") or "").casefold()
+        if not any(token in semantic for token in ("wall", "rib", "web", "shell", "boss")):
+            continue
+        thickness = feature_float(feature, "thickness_m") or bbox_axis_thickness(feature)
+        if thickness is None:
+            continue
+        material = str(feature.get("material") or "")
+        threshold = material_wall_threshold_m(material)
+        status = "warning" if thickness < threshold else "accepted"
+        samples.append({
+            "feature": str(feature.get("name") or "<unnamed>"),
+            "semantic": semantic,
+            "material": material,
+            "thickness_m": thickness,
+            "threshold_m": threshold,
+            "status": status,
+            "source": "feature.thickness_m" if feature.get("thickness_m") not in (None, "") else "feature.bbox_min_axis",
+        })
+    return samples
+
+
+def tool_access_samples(features: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    samples = []
+    for feature in features:
+        semantic = str(feature.get("semantic") or feature.get("type") or "").casefold()
+        if not any(token in semantic for token in ("pocket", "cavity", "slot", "cut")):
+            continue
+        depth = feature_float(feature, "depth_m")
+        width = feature_float(feature, "width_m")
+        access = feature.get("tool_access") if isinstance(feature.get("tool_access"), dict) else {}
+        open_faces = access.get("open_faces", feature.get("open_faces"))
+        try:
+            open_faces_int = int(open_faces) if open_faces not in (None, "") else None
+        except (TypeError, ValueError):
+            open_faces_int = None
+        aspect_ratio = depth / width if depth and width else None
+        limited = (open_faces_int is not None and open_faces_int <= 0) or (aspect_ratio is not None and aspect_ratio > 3.0)
+        if open_faces_int is None and aspect_ratio is None:
+            continue
+        samples.append({
+            "feature": str(feature.get("name") or "<unnamed>"),
+            "semantic": semantic,
+            "depth_m": depth,
+            "width_m": width,
+            "aspect_ratio": aspect_ratio,
+            "open_faces": open_faces_int,
+            "axis": access.get("axis") or feature.get("axis") or "",
+            "status": "warning" if limited else "accepted",
+            "source": "feature.tool_access_and_depth_width",
+        })
+    return samples
+
+
+def build_dfm_sampling(features: list[dict[str, Any]]) -> dict[str, Any]:
+    wall_samples = wall_thickness_samples(features)
+    access_samples = tool_access_samples(features)
+    return {
+        "source": "inspect_feature_sampling",
+        "wall_thickness": wall_samples,
+        "tool_access": access_samples,
+        "counts": {
+            "wall_samples": len(wall_samples),
+            "thin_wall_warnings": sum(1 for item in wall_samples if item["status"] == "warning"),
+            "tool_access_samples": len(access_samples),
+            "tool_access_warnings": sum(1 for item in access_samples if item["status"] == "warning"),
+        },
+    }
+
+
+def analyze_dfm(features: list[dict[str, Any]], findings: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
     for feature in features:
         semantic = str(feature.get("semantic") or feature.get("type") or "").casefold()
         diameter = feature_float(feature, "diameter_m")
@@ -164,6 +262,18 @@ def analyze_dfm(features: list[dict[str, Any]], findings: dict[str, list[dict[st
         width = feature_float(feature, "width_m")
         if "pocket" in semantic and depth and width and depth / width > 2.0:
             add(findings, "warning", "deep_narrow_pocket", "pocket depth is more than twice its width", feature)
+    sampling = build_dfm_sampling(features)
+    for sample in sampling["wall_thickness"]:
+        if sample["status"] == "warning":
+            add(findings, "warning", "thin_wall_sample", "sampled wall thickness is below material-aware threshold", sample)
+        else:
+            add(findings, "accepted", "wall_thickness_sample", "sampled wall thickness meets material-aware threshold", sample)
+    for sample in sampling["tool_access"]:
+        if sample["status"] == "warning":
+            add(findings, "warning", "tool_access_limited", "sampled cut/pocket has limited tool access or high depth-width ratio", sample)
+        else:
+            add(findings, "accepted", "tool_access_sample", "sampled cut/pocket has usable tool access evidence", sample)
+    return sampling
 
 
 def analyze(report: dict[str, Any]) -> dict[str, Any]:
@@ -191,7 +301,7 @@ def analyze(report: dict[str, Any]) -> dict[str, Any]:
         if component.get("fixed") is False and name.casefold() not in mated and not is_standard_part(component):
             add(findings, "warning", "floating_component_without_mate", "floating component has no accepted mate evidence", component)
 
-    analyze_dfm(features, findings)
+    dfm_sampling = analyze_dfm(features, findings)
     if bom["rows"]:
         add(findings, "accepted", "bom_generated", "BOM rows were grouped by part path and configuration", {"rows": bom["count"], "quantity_total": bom["quantity_total"]})
         add(findings, "accepted", "drawing_bom_ready", "Drawing BOM rows were normalized for export", {"rows": drawing_bom["count"], "quantity_total": drawing_bom["quantity_total"]})
@@ -211,6 +321,7 @@ def analyze(report: dict[str, Any]) -> dict[str, Any]:
         },
         "bom": bom,
         "drawing_bom": drawing_bom,
+        "dfm_sampling": dfm_sampling,
         "findings": findings,
     }
 
@@ -239,6 +350,20 @@ def markdown(data: dict[str, Any]) -> str:
     ]
     for row in data["drawing_bom"]["rows"]:
         lines.append(f"| {row['item']} | `{row['part_number']}` | `{row['configuration']}` | {row['quantity']} | `{row.get('material') or '<missing>'}` | {row.get('description') or ''} | {', '.join(f'`{name}`' for name in row['instances'])} |")
+    lines += [
+        "",
+        "## DFM Sampling",
+        "",
+        f"- Source: `{data['dfm_sampling']['source']}`",
+        f"- Counts: `{data['dfm_sampling']['counts']}`",
+        "",
+        "| Sample | Feature | Status | Evidence |",
+        "| --- | --- | --- | --- |",
+    ]
+    for row in data["dfm_sampling"]["wall_thickness"]:
+        lines.append(f"| Wall thickness | `{row['feature']}` | `{row['status']}` | thickness `{row['thickness_m']}`, threshold `{row['threshold_m']}` |")
+    for row in data["dfm_sampling"]["tool_access"]:
+        lines.append(f"| Tool access | `{row['feature']}` | `{row['status']}` | open faces `{row.get('open_faces')}`, aspect `{row.get('aspect_ratio')}` |")
     lines += ["", "## Findings", ""]
     for severity in ("blocking", "warning", "accepted"):
         lines.append(f"### {severity}")

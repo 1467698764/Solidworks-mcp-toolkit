@@ -26,6 +26,8 @@ Current write paths include guarded dimension edits, component state, component 
 
 `engineering-lite` converts inspect evidence into BOM rows, normalized drawing BOM rows, and optional `drawing_bom.csv` artifacts through `-OutDir` / MCP `out_dir`. The output carries item numbers, part numbers, configurations, quantities, materials, descriptions, and instances so material gaps and drawing handoff state are visible before release.
 
+`engineering-lite` also samples manufacturability evidence from inspected features: hole-edge clearance, deep pockets, wall/rib/web thickness from feature thickness or bbox minimum axis, and tool access from open-face plus depth/width evidence. The JSON report exposes `dfm_sampling` so warning findings can be traced back to the sampled feature.
+
 `assembly-repair-plan` emits an `affected_subgraph` for each action. The subgraph lists local components, affected mates, native file paths, and the diagnosis evidence used to choose the boundary, keeping mate repair focused on the damaged area.
 
 `preflight` emits runtime hygiene evidence: memory budget, generated lock files, generated/report roots, screenshot roots, file counts, and cleanup scope. It treats memory-budget excess and generated lock files as blockers before live work continues.

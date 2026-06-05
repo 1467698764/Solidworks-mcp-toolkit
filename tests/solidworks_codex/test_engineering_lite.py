@@ -38,6 +38,8 @@ class EngineeringLiteTests(unittest.TestCase):
                 "features": [
                     {"name": "Mounting_Hole_Close_To_Edge", "type": "Cut", "semantic": "through_hole", "diameter_m": 0.006, "edge_distance_m": 0.004},
                     {"name": "Pocket_Deep", "type": "Cut", "semantic": "pocket", "depth_m": 0.025, "width_m": 0.010},
+                    {"name": "Thin_Web", "type": "Boss", "semantic": "wall", "thickness_m": 0.0012, "material": "6061 Aluminum", "bbox": {"x": 0.080, "y": 0.012, "z": 0.020}},
+                    {"name": "Closed_Deep_Cavity", "type": "Cut", "semantic": "blind_pocket", "depth_m": 0.040, "width_m": 0.006, "tool_access": {"open_faces": 0, "axis": "z"}},
                 ],
             }
         }
@@ -71,6 +73,20 @@ class EngineeringLiteTests(unittest.TestCase):
         self.assertIn("hostless_standard_part", blocking)
         self.assertIn("hole_edge_clearance_low", warnings)
         self.assertIn("deep_narrow_pocket", warnings)
+        self.assertIn("thin_wall_sample", warnings)
+        self.assertIn("tool_access_limited", warnings)
+        sampling = data["dfm_sampling"]
+        self.assertEqual(sampling["source"], "inspect_feature_sampling")
+        self.assertEqual(sampling["counts"]["wall_samples"], 1)
+        self.assertEqual(sampling["counts"]["tool_access_samples"], 2)
+        wall_sample = sampling["wall_thickness"][0]
+        self.assertEqual(wall_sample["feature"], "Thin_Web")
+        self.assertEqual(wall_sample["status"], "warning")
+        self.assertAlmostEqual(wall_sample["thickness_m"], 0.0012)
+        tool_sample = next(row for row in sampling["tool_access"] if row["feature"] == "Closed_Deep_Cavity")
+        self.assertEqual(tool_sample["feature"], "Closed_Deep_Cavity")
+        self.assertEqual(tool_sample["status"], "warning")
+        self.assertEqual(tool_sample["open_faces"], 0)
 
     def test_cli_writes_markdown_and_json(self):
         with tempfile.TemporaryDirectory() as d:
