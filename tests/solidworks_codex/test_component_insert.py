@@ -83,6 +83,45 @@ class ComponentInsertTests(unittest.TestCase):
         self.assertEqual(plan["attachment_intent"]["required_mates"], ["concentric", "coincident"])
         self.assertEqual(plan["attachment_status"], "awaiting_mate_group_execution")
 
+    def test_component_insert_preserves_attachment_native_selectors(self):
+        host_selector = {
+            "stable_id": "base_plate-1:cylinder:M6Clearance",
+            "component": "base_plate-1",
+            "native_identity": {
+                "stable_id": "base_plate-1:cylinder:M6Clearance",
+                "kind": "face_or_axis",
+                "persistent_reference": "host-persist-bytes",
+            },
+        }
+        inserted_selector = {
+            "stable_id": "standard_bolt_m6-1:cylinder:shank",
+            "component": "standard_bolt_m6-1",
+            "native_identity": {
+                "stable_id": "standard_bolt_m6-1:cylinder:shank",
+                "kind": "face_or_axis",
+                "tracking_id": "bolt-shank-track",
+            },
+        }
+        plan = mod.validate_spec({
+            "part_path": "C:/hardware/bolt_m6.SLDPRT",
+            "component_name": "standard_bolt_m6-1",
+            "origin_m": [0.0, 0.0, 0.0],
+            "attachment": {
+                "role": "fastener",
+                "host_component": "base_plate-1",
+                "host_interface_id": "base_plate-1:cylinder:M6Clearance",
+                "mate_group_id": "MG_standard_bolt_m6_01",
+                "required_mates": "concentric,coincident",
+                "host_selector": host_selector,
+                "inserted_selector": inserted_selector,
+            },
+        })
+
+        self.assertEqual(plan["attachment_intent"]["host_selector"], host_selector)
+        self.assertEqual(plan["attachment_intent"]["inserted_selector"], inserted_selector)
+        self.assertEqual(plan["attachment_intent"]["selector_handoff_status"], "native_identity_ready_for_mate_group")
+        self.assertEqual(plan["attachment_status"], "awaiting_mate_group_execution")
+
     def test_executes_component_insert_and_optional_fix(self):
         assembly = FakeAssembly()
         plan = mod.validate_spec({

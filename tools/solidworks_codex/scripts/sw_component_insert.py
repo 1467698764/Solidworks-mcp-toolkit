@@ -109,6 +109,9 @@ def validate_attachment(value: Any) -> dict[str, Any]:
             "host_interface_id": "",
             "mate_group_id": "",
             "required_mates": [],
+            "host_selector": None,
+            "inserted_selector": None,
+            "selector_handoff_status": "no_attachment_selectors",
         }
     if not isinstance(value, dict):
         raise ValueError("attachment must be a JSON object when provided")
@@ -117,12 +120,22 @@ def validate_attachment(value: Any) -> dict[str, Any]:
         required_mates = [item.strip() for item in required_mates.split(",") if item.strip()]
     if not isinstance(required_mates, list):
         raise ValueError("attachment.required_mates must be an array or comma-separated string")
+    host_selector = value.get("host_selector") or value.get("host_interface_selector")
+    inserted_selector = value.get("inserted_selector") or value.get("standard_part_selector") or value.get("component_selector")
+    if host_selector is not None and not isinstance(host_selector, dict):
+        raise ValueError("attachment.host_selector must be a JSON object when provided")
+    if inserted_selector is not None and not isinstance(inserted_selector, dict):
+        raise ValueError("attachment.inserted_selector must be a JSON object when provided")
+    selector_handoff_status = "native_identity_ready_for_mate_group" if host_selector or inserted_selector else "awaiting_selector_capture"
     return {
         "role": str(value.get("role") or "").strip(),
         "host_component": str(value.get("host_component") or "").strip(),
         "host_interface_id": str(value.get("host_interface_id") or "").strip(),
         "mate_group_id": str(value.get("mate_group_id") or "").strip(),
         "required_mates": [str(item).strip() for item in required_mates if str(item).strip()],
+        "host_selector": host_selector,
+        "inserted_selector": inserted_selector,
+        "selector_handoff_status": selector_handoff_status,
     }
 
 

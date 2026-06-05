@@ -18,7 +18,7 @@ Current write paths include guarded dimension edits, component state, component 
 
 `inspect` records document handoff evidence for active-document, specified native file, and provided-model-object paths. Reports carry the source, resolved path, doc type, and OpenDoc6 error/warning values so downstream diagnosis and repair plans know which model was actually read.
 
-`component-insert` accepts an optional `attachment` object for standard/detail parts. The execution plan carries component role, attachment role, host component, host interface id, mate group id, required mate types, and an attachment status that hands off cleanly to mate group execution.
+`component-insert` accepts an optional `attachment` object for standard/detail parts. The execution plan carries component role, attachment role, host component, host interface id, optional host/inserted selectors with native identity envelopes, mate group id, required mate types, selector handoff status, and an attachment status that hands off cleanly to mate group execution.
 
 `interface-index` emits planar, cylindrical, slot/path, and coordinate-system selectors with stable ids, native identity envelopes, geometry fallbacks, and live identity capture protocols. Those protocols name the SolidWorks selection/readback calls, capture fields, patch target, and blocking policy used before mate execution trusts a selector.
 
