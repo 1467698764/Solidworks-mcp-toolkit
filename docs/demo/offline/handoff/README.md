@@ -1,6 +1,6 @@
 # SolidWorks Codex Handoff Bundle
 
-- Created: `2026-06-01T21:45:52`
+- Created: `2026-06-05T09:08:19`
 - Focus: `current model evidence, constraints, clearance, and manufacturing gaps`
 - Document: `sample_machine.SLDASM`
 - Source report: `tools/solidworks_codex/sandbox/report_after.json`
@@ -26,7 +26,7 @@ Do not blindly replay templates: read `context.md`, `worklog.md`, and the source
 # SolidWorks Codex Worklog
 
 - Log: `docs/demo/offline/handoff/worklog.jsonl`
-- Events: `6`
+- Events: `7`
 
 ## Session `offline-demo`
 
@@ -76,6 +76,15 @@ Artifacts:
 Next: Generate handoff bundle
 
 ### 2026-06-01T21:45:52 `decision`
+
+Use report-context and tool-catalog before any template or write operation
+
+Artifacts:
+- `context.md`
+
+Next: Generate handoff bundle
+
+### 2026-06-05T09:08:19 `decision`
 
 Use report-context and tool-catalog before any template or write operation
 

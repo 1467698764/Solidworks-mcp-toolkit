@@ -1,7 +1,7 @@
 # SolidWorks Codex Worklog
 
 - Log: `docs/demo/offline/worklog.jsonl`
-- Events: `6`
+- Events: `7`
 
 ## Session `offline-demo`
 
@@ -51,6 +51,15 @@ Artifacts:
 Next: Generate handoff bundle
 
 ### 2026-06-01T21:45:52 `decision`
+
+Use report-context and tool-catalog before any template or write operation
+
+Artifacts:
+- `context.md`
+
+Next: Generate handoff bundle
+
+### 2026-06-05T09:08:19 `decision`
 
 Use report-context and tool-catalog before any template or write operation
 

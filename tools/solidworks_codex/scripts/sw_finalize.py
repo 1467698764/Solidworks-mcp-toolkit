@@ -125,7 +125,7 @@ def markdown(report: dict[str, Any]) -> str:
     lines += [
         "## What is considered ready",
         "",
-        "- 45 MCP tools are documented and routed through the local PowerShell/Python control layer.",
+        "- 50 MCP tools are documented and routed through the local PowerShell/Python control layer.",
         "- Offline unit tests cover report parsing, context/search/model-understand flows, guarded change verification, release gates, public-copy guard, live-gate validation logic, validation profiles, and fixture-level assembly contracts.",
         "- Native `.SLDASM/.SLDPRT` artifacts are treated as the deliverable for CAD work; STEP optional smoke is only supplemental.",
         "- Intent-scoped validation profiles exist: `draft_part`, `single_part`, `assembly`, `mechanism_assembly`, and `engineering_release`.",
@@ -202,7 +202,10 @@ def main() -> None:
     audit = read_json(audit_path)
     should_run_audit = args.run_audit or not isinstance(audit, dict) or audit.get("ok") is not True
     if should_run_audit:
-        audit_result = run(["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "tools/solidworks_codex/swctl.ps1", "audit", "-Out", "tools/solidworks_codex/reports/audit_latest.json"])
+        audit_result = run(
+            ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "tools/solidworks_codex/swctl.ps1", "audit", "-Out", "tools/solidworks_codex/reports/audit_latest.json"],
+            timeout=300,
+        )
         audit = read_json(audit_path)
     preflight = read_json(ROOT / "tools/solidworks_codex/reports/preflight_latest.json") or read_json(ROOT / "tools/solidworks_codex/reports/audit_preflight.json")
     report = {

@@ -1,30 +1,41 @@
 # Contributing
 
-Contributions should preserve the core design: safe, inspectable, multi-turn SolidWorks automation.
+This repository is a SolidWorks MCP/control layer. Contributions should improve the full evidence -> execution -> verification chain instead of adding isolated wrappers.
 
-## Development loop
+## Development Rules
+
+- Keep public behavior aligned with the current `50 MCP tools` catalog.
+- Prefer generic CAD mechanisms over fixture-specific assumptions.
+- Treat `.SLDASM/.SLDPRT` native file readback as primary CAD evidence; STEP optional smoke is supplemental.
+- Preserve safety around writes: backup, execute, rebuild, inspect, compare, and verify.
+- Update docs and tests when a tool changes the user-visible workflow.
+
+## Local Checks
 
 ```powershell
 python -m unittest discover -s tests -p "test_*.py" -v
-python -m py_compile (Get-ChildItem tools\solidworks_codex\scripts\*.py | ForEach-Object FullName)
-node --check tools\solidworks_codex\mcp\server.cjs
-node --check tools\solidworks_codex\mcp\smoke-test.cjs
-.\tools\solidworks_codex\swctl.ps1 audit
+node tools\solidworks_codex\mcp\smoke-test.cjs
+.\scripts\verify-all.ps1
 ```
 
-## Rules for new tools
+Use narrower offline test commands while developing, then run the full gate before commit. `audit` and `verify-all.ps1` are the release baseline.
 
-1. Prefer read-only analysis unless a write is necessary.
-2. Add a deterministic offline test.
-3. Add CLI and MCP wiring if the feature should be public.
-4. Update usage docs and tool catalog behavior.
-5. Add audit coverage.
-6. Keep generated outputs out of git.
+## Generated Artifacts
 
-## Naming
+Do not commit normal runtime output from:
 
-Use stable, explicit names:
+- `tools/solidworks_codex/reports/`
+- `tools/solidworks_codex/backups/`
+- `tools/solidworks_codex/exports/`
+- generated `.swp.vba` macros
+- live fixture output unless explicitly promoted
 
-- CLI commands: `kebab-case`
-- MCP tools: `solidworks_snake_case`
-- Python scripts: `sw_<feature>.py`
+## Pull Requests
+
+Include:
+
+- workflow problem solved
+- changed commands or MCP tools
+- safety and validation evidence
+- tests run
+- any remaining limits or live SolidWorks checks still needed

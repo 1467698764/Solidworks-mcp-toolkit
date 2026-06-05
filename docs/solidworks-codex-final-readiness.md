@@ -1,6 +1,6 @@
 # SolidWorks Codex Current Readiness Report
 
-- Timestamp: `2026-06-04T19:48:51`
+- Timestamp: `2026-06-05T09:55:43`
 - Branch: `main`
 - Current stance: evidence-first SolidWorks MCP/control layer with offline gates, MCP smoke, validation profiles, and opt-in live SolidWorks validation.
 - Audit OK: `True`
@@ -8,7 +8,7 @@
 
 ## What is considered ready
 
-- 45 MCP tools are documented and routed through the local PowerShell/Python control layer.
+- 50 MCP tools are documented and routed through the local PowerShell/Python control layer.
 - Offline unit tests cover report parsing, context/search/model-understand flows, guarded change verification, release gates, public-copy guard, live-gate validation logic, validation profiles, and fixture-level assembly contracts.
 - Native `.SLDASM/.SLDPRT` artifacts are treated as the deliverable for CAD work; STEP optional smoke is only supplemental.
 - Intent-scoped validation profiles exist: `draft_part`, `single_part`, `assembly`, `mechanism_assembly`, and `engineering_release`.

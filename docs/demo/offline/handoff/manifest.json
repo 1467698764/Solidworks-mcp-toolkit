@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-06-01T21:45:52",
+  "timestamp": "2026-06-05T09:08:19",
   "ok": true,
   "focus": "current model evidence, constraints, clearance, and manufacturing gaps",
   "source_report": "tools/solidworks_codex/sandbox/report_after.json",
@@ -87,7 +87,7 @@
   "commands": [
     {
       "cmd": [
-        "<python>",
+        "C:\\Users\\Alphahui\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\python\\python.exe",
         "<repo>\\tools\\solidworks_codex\\scripts\\sw_report_context.py",
         "--report",
         "<repo>\\docs\\demo\\offline\\handoff\\inspect.json",

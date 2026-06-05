@@ -1,7 +1,49 @@
 {
-  "timestamp": "2026-06-01T21:45:52",
-  "count": 35,
+  "timestamp": "2026-06-05T09:08:19",
+  "count": 50,
   "tools": [
+    {
+      "name": "solidworks_assembly_diagnose",
+      "group": "analysis",
+      "description": "Diagnose an assembly inspect report: fixed/floating state, mate graph gaps, bad mates, isolated/no-mate components, bbox spacing, standard-part attachment, and lock-file hints.",
+      "required": [
+        "report"
+      ],
+      "properties": [
+        "lock_root",
+        "near_tolerance_m",
+        "out",
+        "report",
+        "standard_part_regex"
+      ]
+    },
+    {
+      "name": "solidworks_assembly_repair_plan",
+      "group": "other",
+      "description": "Build a read-only local repair plan from an assembly diagnosis JSON: bad mate resolution order, hostless standard-part host suggestions, and isolated-component intent questions.",
+      "required": [
+        "diagnosis"
+      ],
+      "properties": [
+        "diagnosis",
+        "markdown_out",
+        "out"
+      ]
+    },
+    {
+      "name": "solidworks_assembly_review_pipeline",
+      "group": "other",
+      "description": "Run the read-only assembly review pipeline from one inspect report and write diagnosis, interface index, repair plan, mate group plan, and manifest artifacts.",
+      "required": [
+        "report"
+      ],
+      "properties": [
+        "near_tolerance_m",
+        "out_dir",
+        "report",
+        "standard_part_regex"
+      ]
+    },
     {
       "name": "solidworks_audit",
       "group": "export_verify",
@@ -65,7 +107,8 @@
         "allow_dimension",
         "allow_feature_type",
         "delta",
-        "out"
+        "out",
+        "require_allowed_change"
       ]
     },
     {
@@ -81,6 +124,22 @@
         "before",
         "json_out",
         "out"
+      ]
+    },
+    {
+      "name": "solidworks_component_insert",
+      "group": "write_guarded",
+      "description": "Insert a reviewed .SLDPRT/.SLDASM component into the active or specified assembly with origin/config/fixed-state evidence.",
+      "required": [
+        "spec"
+      ],
+      "properties": [
+        "dry_run",
+        "model",
+        "out",
+        "save",
+        "spec",
+        "start"
       ]
     },
     {
@@ -133,6 +192,24 @@
       ]
     },
     {
+      "name": "solidworks_feature_state",
+      "group": "write_guarded",
+      "description": "Change part or assembly feature state by feature name: suppress/unsuppress/delete or set a feature-scoped dimension, then rebuild and report before/after evidence.",
+      "required": [
+        "feature",
+        "action"
+      ],
+      "properties": [
+        "action",
+        "dimension",
+        "feature",
+        "model",
+        "out",
+        "save",
+        "value_m"
+      ]
+    },
+    {
       "name": "solidworks_finalize",
       "group": "export_verify",
       "description": "Generate the final readiness Markdown/JSON report after running audit.",
@@ -162,7 +239,22 @@
       "description": "Deep read-only inspect of active part/assembly: features, dimensions, components.",
       "required": [],
       "properties": [
+        "model",
         "out"
+      ]
+    },
+    {
+      "name": "solidworks_interface_index",
+      "group": "other",
+      "description": "Build a read-only heuristic component/interface index from an inspect report: bbox contact candidates, nearest neighbors, standard-part hints, and root/suppression role hints.",
+      "required": [
+        "report"
+      ],
+      "properties": [
+        "near_tolerance_m",
+        "out",
+        "report",
+        "standard_part_regex"
       ]
     },
     {
@@ -198,6 +290,89 @@
       ]
     },
     {
+      "name": "solidworks_mate_group_execute",
+      "group": "write_guarded",
+      "description": "Execute reviewed mate group selector evidence in the active SolidWorks assembly using SelectByID2, AddMate5, and immediate rebuild. dry_run only plans selector actions.",
+      "required": [
+        "macro_manifest"
+      ],
+      "properties": [
+        "dry_run",
+        "macro_manifest",
+        "out"
+      ]
+    },
+    {
+      "name": "solidworks_mate_group_execution_check",
+      "group": "other",
+      "description": "Check after-inspect evidence for mate group macro execution: expected named mates exist, are unsuppressed, and report no solver/API errors.",
+      "required": [
+        "macro_manifest",
+        "after_report"
+      ],
+      "properties": [
+        "after_report",
+        "macro_manifest",
+        "out"
+      ]
+    },
+    {
+      "name": "solidworks_mate_group_live_protocol",
+      "group": "live_protocol",
+      "description": "Generate a controlled per-group live SolidWorks work order for reviewed mate group macros: backup, selection evidence, macro run, rebuild, inspect, execution check, interference, and cleanup.",
+      "required": [
+        "macro_manifest",
+        "validation_report"
+      ],
+      "properties": [
+        "macro_manifest",
+        "markdown_out",
+        "model",
+        "out",
+        "validation_report"
+      ]
+    },
+    {
+      "name": "solidworks_mate_group_macro",
+      "group": "macro_generation",
+      "description": "Generate reviewable preselect VBA macro drafts from a mate group plan. Each macro still requires live entity preselection and review before running.",
+      "required": [
+        "mate_group_plan"
+      ],
+      "properties": [
+        "manifest",
+        "mate_group_plan",
+        "out_dir"
+      ]
+    },
+    {
+      "name": "solidworks_mate_group_plan",
+      "group": "other",
+      "description": "Build a read-only mate group plan from an assembly repair plan and interface index: grouped candidate mates, components, evidence, and per-group verification.",
+      "required": [
+        "repair_plan",
+        "interface_index"
+      ],
+      "properties": [
+        "interface_index",
+        "markdown_out",
+        "out",
+        "repair_plan"
+      ]
+    },
+    {
+      "name": "solidworks_mate_group_validate",
+      "group": "other",
+      "description": "Validate a read-only mate group plan before macro or live execution: component count, supported mate types, and required rebuild/mate-error verification.",
+      "required": [
+        "mate_group_plan"
+      ],
+      "properties": [
+        "mate_group_plan",
+        "out"
+      ]
+    },
+    {
       "name": "solidworks_mate_macro",
       "group": "macro_generation",
       "description": "Generate reviewable VBA macro for adding a mate between two preselected entities.",
@@ -206,16 +381,56 @@
       ],
       "properties": [
         "angle_deg",
+        "angle_max_deg",
+        "angle_min_deg",
+        "distance_max_mm",
+        "distance_min_mm",
         "distance_mm",
         "flip",
+        "gear_ratio_denominator",
+        "gear_ratio_numerator",
         "manifest",
         "mate",
-        "out"
+        "out",
+        "slot_constraint_type",
+        "slot_distance_mm",
+        "slot_percent"
+      ]
+    },
+    {
+      "name": "solidworks_mate_selection_check",
+      "group": "read_only",
+      "description": "Validate current selection-report evidence against a mate macro manifest before running a reviewed mate macro: exactly two supported entity selections on expected components.",
+      "required": [
+        "macro_manifest",
+        "selection_report"
+      ],
+      "properties": [
+        "expected_mate_name",
+        "macro_manifest",
+        "out",
+        "selection_report"
+      ]
+    },
+    {
+      "name": "solidworks_metadata_execute",
+      "group": "write_guarded",
+      "description": "Execute reviewed material and custom-property metadata writes for active or specified SolidWorks models.",
+      "required": [
+        "spec"
+      ],
+      "properties": [
+        "dry_run",
+        "model",
+        "out",
+        "save",
+        "spec",
+        "start"
       ]
     },
     {
       "name": "solidworks_model_understand",
-      "group": "other",
+      "group": "analysis",
       "description": "Build a compact task-scoped model understanding pack from an inspect report: baseline facts, relevant CAD objects, relationship hypotheses, risks, and next minimal queries.",
       "required": [
         "report"
@@ -235,6 +450,22 @@
       "required": [],
       "properties": [
         "out_dir"
+      ]
+    },
+    {
+      "name": "solidworks_part_feature_execute",
+      "group": "other",
+      "description": "Execute a reviewed part feature spec in SolidWorks: basic holes, slot cuts, pocket cuts, fillet, chamfer, linear pattern, circular pattern, or mirror with named feature/entity selectors.",
+      "required": [
+        "spec"
+      ],
+      "properties": [
+        "dry_run",
+        "model",
+        "out",
+        "save",
+        "spec",
+        "start"
       ]
     },
     {
@@ -383,6 +614,7 @@
       "description": "Allow COM launch of SolidWorks, then run deep read-only inspect.",
       "required": [],
       "properties": [
+        "model",
         "out"
       ]
     },
@@ -451,6 +683,28 @@
     }
   ],
   "groups": {
+    "analysis": [
+      "solidworks_assembly_diagnose",
+      "solidworks_change_plan",
+      "solidworks_design_review",
+      "solidworks_issue_report",
+      "solidworks_model_understand",
+      "solidworks_report_context",
+      "solidworks_report_search"
+    ],
+    "other": [
+      "solidworks_assembly_repair_plan",
+      "solidworks_assembly_review_pipeline",
+      "solidworks_change_verify",
+      "solidworks_interface_index",
+      "solidworks_mate_group_execution_check",
+      "solidworks_mate_group_plan",
+      "solidworks_mate_group_validate",
+      "solidworks_offline_demo",
+      "solidworks_part_feature_execute",
+      "solidworks_session_snapshot",
+      "solidworks_tool_catalog"
+    ],
     "export_verify": [
       "solidworks_audit",
       "solidworks_compare_reports",
@@ -462,25 +716,15 @@
     "write_guarded": [
       "solidworks_backup",
       "solidworks_backup_status",
+      "solidworks_component_insert",
       "solidworks_component_state",
+      "solidworks_feature_state",
+      "solidworks_mate_group_execute",
+      "solidworks_metadata_execute",
       "solidworks_rebuild",
       "solidworks_restore_backup",
       "solidworks_safe_set_dimension",
       "solidworks_set_dimension"
-    ],
-    "analysis": [
-      "solidworks_change_plan",
-      "solidworks_design_review",
-      "solidworks_issue_report",
-      "solidworks_report_context",
-      "solidworks_report_search"
-    ],
-    "other": [
-      "solidworks_change_verify",
-      "solidworks_model_understand",
-      "solidworks_offline_demo",
-      "solidworks_session_snapshot",
-      "solidworks_tool_catalog"
     ],
     "external_reference": [
       "solidworks_existing_mcp_tools"
@@ -492,13 +736,18 @@
     "read_only": [
       "solidworks_inspect",
       "solidworks_mass_properties",
+      "solidworks_mate_selection_check",
       "solidworks_probe",
       "solidworks_report_summary",
       "solidworks_selection_report",
       "solidworks_start_inspect",
       "solidworks_start_probe"
     ],
+    "live_protocol": [
+      "solidworks_mate_group_live_protocol"
+    ],
     "macro_generation": [
+      "solidworks_mate_group_macro",
       "solidworks_mate_macro",
       "solidworks_template_macro"
     ]

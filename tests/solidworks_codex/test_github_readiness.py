@@ -47,9 +47,11 @@ class GithubReadinessTests(unittest.TestCase):
             ]:
                 self.assertTrue(required[key]["ok"], key)
             readme = (ROOT / "README.md").read_text(encoding="utf-8-sig")
-            self.assertIn("45", readme)
+            self.assertIn("50 MCP tools", readme)
             self.assertNotIn("30 conservative MCP tools", readme)
             self.assertNotIn("29", readme)
+            self.assertNotIn("35 conservative MCP tools", readme)
+            self.assertNotIn("45 conservative MCP tools", readme)
             self.assertIn("practical SolidWorks MCP", readme)
             self.assertIn("model-understand", readme)
             self.assertIn("report-context", readme)

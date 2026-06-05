@@ -1,176 +1,83 @@
 # Troubleshooting
 
-This guide covers setup, runtime, live SolidWorks, and release-check failures for the SolidWorks Codex MCP control layer. Start with the narrowest check that can prove or disprove the symptom.
+## PowerShell ExecutionPolicy
 
-## Quick diagnosis
+If scripts will not run:
 
 ```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 .\tools\solidworks_codex\install.ps1 -CheckOnly
-.\tools\solidworks_codex\swctl.ps1 preflight -Out tools\solidworks_codex\reports\preflight_latest.json
-.\scripts\verify-all.ps1 -SkipMcpSmoke
 ```
 
-If `verify-all` fails, fix the first failing gate before running later gates.
+Use process scope unless you intentionally want a persistent policy change.
 
-## PowerShell ExecutionPolicy blocks scripts
+## No Active SolidWorks Document
 
-Symptom:
+Contract term: No active SolidWorks document.
 
-```text
-File ... cannot be loaded because running scripts is disabled on this system.
-```
-
-Use the same bounded invocation used by CI and MCP:
+Many commands require an open `.SLDASM` or `.SLDPRT`. Open the target file in SolidWorks, then run:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools\solidworks_codex\swctl.ps1 preflight
+.\tools\solidworks_codex\swctl.ps1 probe
+.\tools\solidworks_codex\swctl.ps1 inspect -Out tools\solidworks_codex\reports\inspect_latest.json
 ```
 
-Do not change machine-wide policy unless you intentionally manage that system.
+## Cannot Attach To SldWorks.Application
 
-## Python is not found or pywin32 is missing
+Check:
 
-Symptoms:
+- SolidWorks is installed and running in the same user session
+- Python has `pywin32`
+- no modal SolidWorks dialog is blocking COM calls
+- only one heavy live gate is running
+- stale lock files `~$*` are not holding generated documents
 
-```text
-No usable Python found. Install Python 3 or set SWCODEX_PYTHON to a python.exe path.
-No usable Python with pywin32 found.
-```
+## MCP Config Problems
 
-Fix options:
+Contract term: MCP config.
 
-1. Install Python 3.12 and ensure `python` is on PATH.
-2. Install pywin32 into the Python used for live SolidWorks commands.
-3. Set `SWCODEX_PYTHON` to a specific `python.exe` that can import `pythoncom` and `win32com.client`.
-
-Verify:
-
-```powershell
-python --version
-python -c "import pythoncom, win32com.client; print('pywin32 ok')"
-.\tools\solidworks_codex\swctl.ps1 preflight -Out tools\solidworks_codex\reports\preflight_latest.json
-```
-
-## Node or MCP smoke fails
-
-Verify the offline pieces first:
-
-```powershell
-node --version
-node --check tools\solidworks_codex\mcp\server.cjs
-node --check tools\solidworks_codex\mcp\smoke-test.cjs
-node tools\solidworks_codex\mcp\smoke-test.cjs
-```
-
-If syntax checks pass but smoke fails, inspect the first `is_error: true` field and rerun the matching `swctl.ps1` command directly.
-
-## MCP config points at the wrong command
-
-Check that your local config uses:
+The server entry point is:
 
 ```text
 tools/solidworks_codex/mcp/server.cjs
 ```
 
-Use `examples/codex-mcp-config.example.toml` as a reference. This repository should not edit global Codex config automatically.
+Use `examples/codex-mcp-config.example.toml` as the config reference. This repository does not edit global Codex config automatically.
 
-## SolidWorks COM is missing
+## Selection Or Mate Failures
 
-Symptom in preflight:
-
-```text
-SldWorks.Application: MISSING
-```
-
-Likely causes:
-
-- SolidWorks is not installed on this Windows machine.
-- SolidWorks is installed but COM registration is broken.
-- You are running on a CI runner or non-Windows host.
-
-Offline gates still work without SolidWorks. Live commands such as inspect, rebuild, export, mass, set-dimension, mate creation, and live-gate require local SolidWorks COM.
-
-## No active SolidWorks document
-
-Symptom:
-
-```text
-No active SolidWorks document. Open a document or pass --model.
-```
-
-Fix:
-
-1. Open the target `.SLDASM` or `.SLDPRT` in SolidWorks.
-2. Save it once so backup paths are stable.
-3. Rerun the command.
-
-Use `start-inspect` only when you intentionally allow the command to launch SolidWorks.
-
-## A guarded write fails
-
-For `safe-set-dimension`, component state changes, generated macro workflows, rebuild/export failures, or feature creation failures:
-
-1. Stop after the first failure.
-2. Read the generated JSON report in `tools/solidworks_codex/reports/`.
-3. Confirm a backup exists before trying another write.
-4. Inspect again and compare before/after reports.
-5. If the feature does not match the selected sketch, check active document title, selection count before feature creation, selected sketch name, and rebuild errors.
-
-Useful commands:
+For mate and feature execution, validate selection before writing:
 
 ```powershell
-.\tools\solidworks_codex\swctl.ps1 backup -Files 'C:\path\to\model.SLDASM' -Out tools\solidworks_codex\reports\backup_before_change.json
-.\tools\solidworks_codex\swctl.ps1 rebuild -Out tools\solidworks_codex\reports\rebuild_latest.json
-.\tools\solidworks_codex\swctl.ps1 compare -Before tools\solidworks_codex\reports\before.json -After tools\solidworks_codex\reports\after.json -Out tools\solidworks_codex\reports\delta.md -JsonOut tools\solidworks_codex\reports\delta.json
+.\tools\solidworks_codex\swctl.ps1 interface-index -Report tools\solidworks_codex\reports\inspect_latest.json -Out tools\solidworks_codex\reports\interfaces.json
+.\tools\solidworks_codex\swctl.ps1 mate-group-plan -Report tools\solidworks_codex\reports\inspect_latest.json -Out tools\solidworks_codex\reports\mate_plan.json
+.\tools\solidworks_codex\swctl.ps1 mate-selection-check -Manifest tools\solidworks_codex\reports\mate_plan.json -Out tools\solidworks_codex\reports\mate_selection.json
 ```
 
-## Mates look created but assembly is still loose
+If AddMate reports `mate_error: 1`, treat it as SolidWorks no-error only after readback confirms mate type, component participation, suppression state, placements, and interference status.
 
-Do not trust file existence or a mate count alone. Check:
+## Live Gate Timeouts
 
-- `inspect` mate type and suppressed state;
-- mate participating component names;
-- selection evidence from the live operation;
-- component Transform/origin against the accepted placement contract;
-- whether the component was fixed before or after mate creation;
-- whether a verified mate network is available as functional connection evidence.
-
-For a reusable check, write an `assembly-contract` manifest and run it against the inspect report.
-
-## Live gate reports low memory, hidden windows, or crash
-
-Symptoms include `timeout_after_<seconds>s`, `SLDWORKS.exe Responding=False`, high private memory, or generated `~$*.SLDPRT` / `~$*.SLDASM` lock files under `tools\solidworks_codex\live_fixture`.
-
-Use a narrow process/lock check before rerunning heavy gates:
-
-```powershell
-$locks = Get-ChildItem -LiteralPath 'tools\solidworks_codex\live_fixture' -Recurse -Force -Filter '~$*' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName
-$procs = Get-Process SLDWORKS -ErrorAction SilentlyContinue | Select-Object Id,PrivateMemorySize64,WorkingSet64,Responding,StartTime
-[pscustomobject]@{LockFiles=$locks; Processes=$procs} | ConvertTo-Json -Depth 4
-```
-
-Then run live checks serially:
+Run:
 
 ```powershell
 .\tools\solidworks_codex\swctl.ps1 live-gate -CleanupStale -Out tools\solidworks_codex\reports\live_validation_gate.json
 ```
 
-`CleanupStale` only removes known generated stale fixture directories. It should not touch `shaper_machine_v5`, `live_capability_suite`, user models, or unrelated workspace files. If SolidWorks repeatedly crashes, run the smaller checks first through the gate report rather than immediately rerunning a full fixture.
+`CleanupStale` is bounded to known old generated fixture directories. It does not delete `shaper_machine_v5` or unrelated project directories. If the gate fails, inspect the JSON first; findings are usually grouped as blocking, warning, or not_applicable.
 
-## Live fixture status looks stale
+## Release Gate Fails
 
-The retained simple-mechanism fixture is `shaper_machine_v5`. Treat its report as current evidence only for the validator version that produced it. A healthy static fixture report should include native file readback, part feature evidence, component placement/readback, semantic mate participation, fixed/floating policy, model-understanding evidence, available interference callback with `0 interference`, and post-cleanup with no generated `~$` locks.
-
-If the report shows functional components fixed as a substitute for mates, hostless standard/detail components, mate errors, placement drift, nonzero interference, or a screenshot that looks scattered, treat the fixture as a failing regression. Do not explain it away as a display issue.
-
-## Public copy guard or repo-health fails
-
-Run the gates directly and inspect the JSON:
+Run the full gate:
 
 ```powershell
-.\tools\solidworks_codex\swctl.ps1 public-copy-guard -Out tools\solidworks_codex\reports\public_copy_guard.json
-.\tools\solidworks_codex\swctl.ps1 repo-health -Out tools\solidworks_codex\reports\repo_health.json
-.\tools\solidworks_codex\swctl.ps1 release-tree -Out tools\solidworks_codex\reports\release_tree.json
+.\scripts\verify-all.ps1
 ```
 
-Common causes are stale generated reports becoming Git-visible, personal paths leaking into docs, mojibake, or outdated docs that no longer mention current live/native validation behavior.
+Common causes:
+
+- stale docs still mention old tool counts
+- generated artifacts leaked into tracked release paths
+- `release-tree` found reports/backups/exports that should remain runtime-only
+- `repo-health` or `github-readiness` found missing public docs
+- MCP smoke failed after changing `server.cjs` or `swctl.ps1`

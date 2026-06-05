@@ -1,18 +1,21 @@
 # Demo
 
-Generate the offline demo bundle:
+The demo area contains reproducible offline material for people who do not have SolidWorks open.
+
+## Regenerate
 
 ```powershell
 .\tools\solidworks_codex\swctl.ps1 offline-demo -OutDir docs\demo\offline
 ```
 
-The demo uses the fixture inspect report in `tools/solidworks_codex/sandbox/report_after.json` and does not require SolidWorks to be open.
+The generated bundle includes:
 
-It demonstrates:
+- `docs/demo/offline/README.md`
+- `docs/demo/offline/tool_catalog.md`
+- `docs/demo/offline/context.md`
+- `docs/demo/offline/worklog.md`
+- `docs/demo/offline/handoff/README.md`
 
-- `tool-catalog`
-- `report-context`
-- `worklog`
-- `handoff-bundle`
+## Purpose
 
-This is the recommended first GitHub demo because it shows the project's non-template differentiator in five minutes.
+The offline demo proves the handoff and reasoning layer: `report-context`, `worklog`, `handoff-bundle`, and `tool-catalog`. It does not prove live CAD execution. Use `live-gate` for native SolidWorks behavior.

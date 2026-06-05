@@ -1,76 +1,51 @@
 # Architecture
 
-SolidWorks Codex MCP is a conservative, evidence-first control layer for multi-turn CAD work. It favors inspectable state, narrow edits, live readback, and reproducible handoff over a large unguarded API surface.
+## Layer Map
 
-## Layer map
+Contract terms for release gates: Layer map, Data flow, Safety model.
 
-```text
-Codex / MCP client
-  -> tools/solidworks_codex/mcp/server.cjs
-  -> tools/solidworks_codex/swctl.ps1
-  -> tools/solidworks_codex/scripts/*.py
-  -> SolidWorks COM automation or offline JSON fixtures
-  -> reports, handoff bundles, exports, generated macros, or native .SLDASM/.SLDPRT artifacts
-```
+- **MCP server**: `tools/solidworks_codex/mcp/server.cjs` exposes 50 MCP tools and translates JSON arguments into local CLI commands.
+- **CLI router**: `tools/solidworks_codex/swctl.ps1` provides stable PowerShell commands for scripts, CI, and human use.
+- **Python control scripts**: `tools/solidworks_codex/scripts/` implement inspection, evidence modeling, execution, validation, handoff, and release gates.
+- **SolidWorks boundary**: COM automation and generated macros touch the live SolidWorks process; offline tests validate parsing and orchestration without requiring SolidWorks.
+- **Reports and artifacts**: `tools/solidworks_codex/reports/`, `backups/`, `exports/`, live fixture folders, and generated macros are runtime output unless promoted intentionally.
 
-## Runtime boundaries
+## Data Flow
 
-- `server.cjs` exposes 50 MCP tools and translates tool arguments into `swctl.ps1` commands.
-- `swctl.ps1` is the stable command router used by humans, tests, CI, and MCP.
-- Python scripts implement focused operations: inspect, summary, compare, model-understand, worklog, handoff, release gates, validation profiles, and guarded write helpers.
-- SolidWorks COM is only touched by commands that need live model state or model mutation. Offline gates use fixtures and generated reports.
-- Live validation is opt-in and serial. It avoids parallel SolidWorks sessions because COM automation, hidden windows, file locks, and memory pressure are part of the system boundary.
+1. `inspect` or `session-snapshot` reads the active model and writes structured JSON plus summaries.
+2. Understanding tools build evidence graphs, risks, interface hypotheses, assembly diagnosis, local repair options, and mate groups.
+3. Planning tools choose validation profiles and execution paths.
+4. Execution tools perform controlled writes: dimensions, component state, component insert, feature state, part feature execute, metadata execute, or mate group execute.
+5. Verification tools rebuild, inspect again, compare reports, check contracts, read native files, and produce blocking / warning / not_applicable findings.
+6. Handoff tools preserve decisions, failed attempts, evidence, and next actions for the next model turn.
 
-## Data flow
+## Safety Model
 
-1. Read-only commands produce JSON or Markdown evidence reports.
-2. Analysis commands consume inspect/session reports and generate context, search results, design reviews, change plans, model understanding, or handoff bundles.
-3. Write commands stay narrow: backup first, one dimension/component/feature workflow at a time, rebuild, inspect, compare, verify.
-4. Assembly contract commands convert user intent into reusable evidence gates: component existence, Transform/origin placement, part shape/feature semantics, semantic mate network, suppressed/fixed state, mate error/status when reported, and participation evidence. They support blocking/warning/not_applicable severities so contract evidence can stay profile-aware.
-5. Release commands validate the repository itself: GitHub readiness, repo health, public copy guard, release-tree, audit, capability matrix, and finalize.
+Writes must be bounded, inspectable, and reversible when practical:
 
-## Validation architecture
+- use backups before file-modifying operations
+- clear and verify SolidWorks selections before feature or mate creation
+- rebuild before trusting geometry
+- compare before/after reports
+- require semantic evidence, not only success return codes
+- use native `.SLDASM/.SLDPRT` readback for CAD acceptance
 
-The project separates validation into four practical layers:
+Validation profiles keep the gate proportional: `draft_part`, `single_part`, `assembly`, `mechanism_assembly`, and `engineering_release` can scale with `runtime_budget` and `extra_checks`.
 
-- Geometry: native artifacts, part shape semantics, required feature-name/semantic readback, part_geometry_readback bbox/body/volume evidence, rebuild health, static interference, clearance tolerance.
-- Assembly: mate semantics, component placements, fixed/suppressed state, functional adjacency, constraint/DOF intent, motion sweep collision.
-- Engineering: mass properties, DFM/DFA screens, BOM metadata, strength/stiffness screen, drawing/BOM readiness.
-- MCP quality: evidence completeness, traceability, model-understand usefulness, public-copy hygiene, release-tree cleanliness.
+## Assembly Evidence
 
-`validation profiles` keep this proportional to intent: `draft_part`, `single_part`, `assembly`, `mechanism_assembly`, and `engineering_release`. `runtime_budget` can downgrade expensive checks for fast feedback, and `extra_checks` lets a reasoning model add task-specific gates without making every heavy check globally mandatory.
+Assembly work is accepted by generic evidence, not by a single named fixture:
 
-## Live gate architecture
+- `assembly_component_placements` from Transform2/origin readback
+- semantic mate participation and suppression status
+- `0 interference` where static clearance is required
+- interface indexing for faces, axes, holes, slots, and expected contact/clearance regions
+- local repair plans for missing, bad, or hostless components
+- mate groups with selection validation before execution
+- visual validation where text evidence is insufficient
 
-Live gate is where runtime truth outranks source assumptions. It validates SolidWorks-native behavior through three gates:
+`shaper_machine_v5` remains a simple-mechanism regression target. It is useful because it stresses native file readback, semantic mate participation, `mate_error: 1`, CleanupStale, and mechanism-like constraints, but it is not a showcase and not proof of general mechanism assembly competence.
 
-- `live_session_smoke` proves the minimal COM/session/mate/interference/cleanup path.
-- `live_capability_suite` proves feature creation and edit primitives: extrude, cut, revolve, revolved cut, sketch dimension read/modify/rebuild/save, assembly insert, concentric mate, distance mate, interference, mass, component placement readback, part_geometry_readback from reopened native parts, close/cleanup.
-- `complete_shaper_v5` is retained as a simple-mechanism regression fixture. It is useful only when it exposes generic assembly-control gaps: component inventory, native placement/readback, part feature evidence, semantic mate participation, fixed/floating policy, interference, visual coherence, and cleanup. It is not architectural proof that general mechanism assembly is solved.
+## Release Gates
 
-No single named fixture is the product boundary. The architecture should make ordinary mechanical parts and assemblies routine through design intent, interface indexing, local repair, profile-scoped validation, and native readback.
-
-## Safety model
-
-- Generated artifacts go under ignored runtime directories unless intentionally promoted as fixtures or demo assets.
-- Real CAD edits should be backed up, rebuilt, inspected, and compared before saving or committing.
-- Macro generation creates reviewable `.swp.vba` text; it does not run macros automatically.
-- `release-tree` checks that reports, backups, exports, generated macros, caches, logs, and personal config paths are not Git-visible.
-- `CleanupStale` is bounded to known generated stale fixture directories and must not delete unrelated workspace files.
-- Public copy guard prevents rank-boasting language, personal scenario leakage, and mojibake in release-facing files.
-
-## Handoff model
-
-Long-running CAD work needs durable context. `report-context`, `model-understand`, `worklog`, `handoff-bundle`, and `tool-catalog` preserve facts, decisions, failed attempts, verification evidence, and next-step options without forcing one fixed template workflow.
-
-## Offline and live evaluation
-
-Offline tests and fixtures keep CI fast and deterministic. Live SolidWorks remains necessary for COM inspection, rebuild, export, mass properties, model mutation, actual mate creation, interference callbacks, and file-lock cleanup. STEP optional smoke can supplement native validation, but `.SLDASM/.SLDPRT` remains the deliverable for assembly work.
-
-## Extension points
-
-- Add new operations as focused Python scripts first.
-- Route them through `swctl.ps1` with explicit parameters.
-- Expose MCP tools only after there is a CLI path and test coverage.
-- Add validation-profile coverage when a feature changes acceptance semantics.
-- Add release/audit coverage for new public behavior.
+`verify-all.ps1` combines unit tests, Python compilation, Node syntax checks, MCP smoke, audit, release-tree, repo-health, github-readiness, and finalize. Public release checks also guard against stale docs, forbidden rank claims, unsafe generated artifacts, and missing workflow documentation.

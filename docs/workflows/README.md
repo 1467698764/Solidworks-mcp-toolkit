@@ -1,106 +1,55 @@
-﻿# Workflows
+# Workflows
 
-These recipes are meant to be copied into a local shell or Codex turn. They focus on evidence, reversible changes, and handoff quality rather than raw API coverage.
-
-## 1. Five-minute offline demo evaluation
-
-Use this when reviewing the repository without SolidWorks installed or open. It proves the context, worklog, and handoff path from a fixed inspect report.
+## Offline Documentation Demo
 
 ```powershell
-cd <repo>
 .\tools\solidworks_codex\swctl.ps1 offline-demo -OutDir docs\demo\offline
-.\tools\solidworks_codex\swctl.ps1 report-context `
-  -Report tools\solidworks_codex\sandbox\report_after.json `
-  -Target "current constraints clearance editable dimensions manufacturing evidence" `
-  -Out tools\solidworks_codex\reports\offline_context.md `
-  -JsonOut tools\solidworks_codex\reports\offline_context.json
-.\tools\solidworks_codex\swctl.ps1 handoff-bundle `
-  -Report tools\solidworks_codex\sandbox\report_after.json `
-  -Target "offline evaluator handoff" `
-  -OutDir tools\solidworks_codex\reports\handoff-offline
 ```
 
-Check:
+The offline demo shows report-context, worklog, handoff-bundle, and tool-catalog without requiring SolidWorks.
 
-- `docs\demo\offline\README.md` explains the static demo output.
-- `tools\solidworks_codex\reports\offline_context.md` gives ranked context anchors.
-- `tools\solidworks_codex\reports\handoff-offline\README.md` gives the next-turn handoff.
-
-## 2. Live SolidWorks inspect and handoff
-
-Use this when SolidWorks is open with the assembly or part you want Codex to reason about. This is read-only until you deliberately choose a guarded edit.
+## First Real Assembly Pass
 
 ```powershell
-cd <repo>
-.\tools\solidworks_codex\swctl.ps1 probe -Out tools\solidworks_codex\reports\probe.json
-.\tools\solidworks_codex\swctl.ps1 session-snapshot -SessionName assembly-baseline
-.\tools\solidworks_codex\swctl.ps1 report-context `
-  -Report tools\solidworks_codex\reports\sessions\<timestamp>-assembly-baseline\inspect.json `
-  -Target "locating interfaces clearance editable dimensions manufacturing evidence" `
-  -Out tools\solidworks_codex\reports\assembly_context.md `
-  -JsonOut tools\solidworks_codex\reports\assembly_context.json
-.\tools\solidworks_codex\swctl.ps1 worklog `
-  -Action observation `
-  -Message "Captured baseline session-snapshot and report-context before any model change" `
-  -Artifact tools\solidworks_codex\reports\assembly_context.md `
-  -Next "Review candidate dimensions, then decide whether a backup and single edit are justified"
-.\tools\solidworks_codex\swctl.ps1 handoff-bundle `
-  -Report tools\solidworks_codex\reports\sessions\<timestamp>-assembly-baseline\inspect.json `
-  -FromReport tools\solidworks_codex\reports\worklog.jsonl `
-  -Target "assembly-baseline handoff" `
-  -OutDir tools\solidworks_codex\reports\handoff-assembly-baseline
+.\tools\solidworks_codex\swctl.ps1 session-snapshot -SessionName first-pass
+.\tools\solidworks_codex\swctl.ps1 model-understand -Report <inspect.json> -View spatial-assembly -Target "placement, mates, interfaces, clearance, manufacturing evidence"
+.\tools\solidworks_codex\swctl.ps1 assembly-diagnose -Report <inspect.json> -Out tools\solidworks_codex\reports\assembly_diagnosis.json
+.\tools\solidworks_codex\swctl.ps1 interface-index -Report <inspect.json> -Out tools\solidworks_codex\reports\interfaces.json
 ```
 
-Check:
-
-- `session-snapshot` captures `inspect.json`, `summary.md`, and issue-oriented notes.
-- `report-context` narrows messy model names into useful anchors without changing CAD state.
-- `handoff-bundle` preserves enough context for a later Codex turn to continue safely.
-
-## 3. Guarded one-variable edit
-
-Use this only after the target dimension or component state is known from an inspect/session report. Keep the edit reversible and verify before continuing.
+## Guarded Edit
 
 ```powershell
-cd <repo>
-.\tools\solidworks_codex\swctl.ps1 inspect -Out tools\solidworks_codex\reports\before_edit.json
-.\tools\solidworks_codex\swctl.ps1 backup `
-  -Files 'C:\path\to\assembly.SLDASM','C:\path\to\part.SLDPRT' `
-  -Out tools\solidworks_codex\reports\backup_before_edit.json
-.\tools\solidworks_codex\swctl.ps1 set-dimension `
-  -Dimension 'D1@Sketch1@part.SLDPRT' `
-  -ValueM 0.012 `
-  -Out tools\solidworks_codex\reports\set_dimension.json
-.\tools\solidworks_codex\swctl.ps1 rebuild -Out tools\solidworks_codex\reports\rebuild_after_edit.json
-.\tools\solidworks_codex\swctl.ps1 inspect -Out tools\solidworks_codex\reports\after_edit.json
-.\tools\solidworks_codex\swctl.ps1 compare `
-  -Before tools\solidworks_codex\reports\before_edit.json `
-  -After tools\solidworks_codex\reports\after_edit.json `
-  -Out tools\solidworks_codex\reports\edit_delta.md `
-  -JsonOut tools\solidworks_codex\reports\edit_delta.json
-.\tools\solidworks_codex\swctl.ps1 worklog `
-  -Action verification `
-  -Message "Changed one dimension, rebuilt, inspected, and compared before/after reports" `
-  -Artifact tools\solidworks_codex\reports\edit_delta.md `
-  -Next "Review delta; export or save only after human confirmation"
+.\tools\solidworks_codex\swctl.ps1 backup -Out tools\solidworks_codex\reports\backup.json
+.\tools\solidworks_codex\swctl.ps1 safe-set-dimension -DimensionName <name> -Value <meters> -Out tools\solidworks_codex\reports\safe_set_dimension.json
+.\tools\solidworks_codex\swctl.ps1 rebuild
+.\tools\solidworks_codex\swctl.ps1 inspect -Out tools\solidworks_codex\reports\after.json
+.\tools\solidworks_codex\swctl.ps1 compare -Before tools\solidworks_codex\reports\before.json -After tools\solidworks_codex\reports\after.json -JsonOut tools\solidworks_codex\reports\delta.json
 ```
 
-Check:
+## Mate Group Work
 
-- `backup` finished before any write command.
-- `rebuild` completed and the after report exists.
-- `compare` shows only the intended geometry/state change.
-- Do not use `-Save` until the delta has been reviewed.
+```powershell
+.\tools\solidworks_codex\swctl.ps1 mate-group-plan -Report <inspect.json> -Out tools\solidworks_codex\reports\mate_plan.json
+.\tools\solidworks_codex\swctl.ps1 mate-group-validate -Manifest tools\solidworks_codex\reports\mate_plan.json -Out tools\solidworks_codex\reports\mate_validate.json
+.\tools\solidworks_codex\swctl.ps1 mate-selection-check -Manifest tools\solidworks_codex\reports\mate_plan.json -Out tools\solidworks_codex\reports\mate_selection.json
+.\tools\solidworks_codex\swctl.ps1 mate-group-execute -Manifest tools\solidworks_codex\reports\mate_plan.json -Out tools\solidworks_codex\reports\mate_execute.json
+.\tools\solidworks_codex\swctl.ps1 mate-group-execution-check -Manifest tools\solidworks_codex\reports\mate_plan.json -Report <after-inspect.json> -Out tools\solidworks_codex\reports\mate_execution_check.json
+```
 
-## Release hygiene
+## Handoff
 
-Before opening a pull request or publishing, run:
+```powershell
+.\tools\solidworks_codex\swctl.ps1 worklog -Action next_step -Message "Accepted current edit" -Next "Run local repair on remaining warnings"
+.\tools\solidworks_codex\swctl.ps1 handoff-bundle -Report <after-inspect.json> -Out tools\solidworks_codex\reports\handoff
+```
+
+## Public Release
 
 ```powershell
 .\scripts\verify-all.ps1
-.\tools\solidworks_codex\swctl.ps1 release-tree -Out tools\solidworks_codex\reports\release_tree_latest.json
-.\tools\solidworks_codex\swctl.ps1 public-copy-guard -Out tools\solidworks_codex\reports\public_copy_guard_latest.json
+.\tools\solidworks_codex\swctl.ps1 public-copy-guard
+.\tools\solidworks_codex\swctl.ps1 release-tree -Out tools\solidworks_codex\reports\release_tree.json
 ```
 
-`release-tree` keeps generated reports, backups, exports, logs, VBA dumps, caches, and personal Codex paths out of the Git-visible tree. `public-copy-guard` keeps public copy evidence-based and avoids unsupported ranking claims.
-
+Do not commit runtime reports, backups, exports, generated macros, caches, or unsanitized CAD artifacts.

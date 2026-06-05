@@ -10,6 +10,10 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class FinalizeTests(unittest.TestCase):
+    def test_finalize_audit_timeout_covers_full_release_gate(self):
+        script = (ROOT / "tools/solidworks_codex/scripts/sw_finalize.py").read_text(encoding="utf-8-sig")
+        self.assertIn("timeout=300", script)
+
     def test_finalize_json_is_powershell_parseable_and_compact(self):
         with tempfile.TemporaryDirectory() as d:
             out = Path(d) / "final.md"

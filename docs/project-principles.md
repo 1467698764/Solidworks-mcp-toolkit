@@ -1,61 +1,29 @@
-# Project Principles for Future AI Sessions
+# Project Principles
 
-This document captures project-level preferences so a new AI session can continue without the user repeating them.
+## Evidence Before Action
 
-## Product direction
+The model should understand current SolidWorks state before changing it. Good context includes components, transforms, dimensions, features, semantic mate participation, interface candidates, clearance, mass/geometry evidence, risks, and unknowns.
 
-Build a general-purpose SolidWorks MCP/control layer for mechanical CAD work. Avoid making the project feel like a school project, thesis, or a single narrowly scoped demo. Public examples should use generic mechanical assemblies: plates, housings, locating interfaces, fasteners, shafts, bushings, covers, hole patterns, clearances, and manufacturing evidence.
+## Execute The Real Layer
 
-## Reasoning stance
+Do not stop at validators when the execution layer is missing. Implement the ability to select entities, create features, insert components, write metadata, add mates, rebuild, and read results back. Validation then proves the real path rather than replacing it.
 
-Do not over-constrain strong models with rigid output templates. Prefer evidence-rich context packs, graphs, search tools, and suggested next queries that leave room for flexible reasoning. The model should understand the existing CAD project before changing it.
+## Generality Over Fixture Theater
 
-Important evidence includes:
+The project is a general SolidWorks MCP. A named fixture can be a regression target, but acceptance must come from generic mechanisms: assembly diagnosis, interface indexing, local repair, mate groups, visual validation, native file readback, and semantic evidence.
 
-- active document, configuration, component state, paths, suppression/hidden/fixed/lightweight state;
-- dimensions with full names and owning features;
-- mate-like evidence and explicit component references;
-- transforms, origins, local axes, axis parallel/orthogonal relationships;
-- bounding boxes, centers, pairwise gaps/overlaps, containment, coaxial candidates;
-- manufacturing hole groups, feature/dimension links, nearby fasteners/locators;
-- evidence gaps: thread/fit, tolerance, manufacturing process, tool access, edge distance, live interference results.
+`shaper_machine_v5` is a simple-mechanism regression. It is not a showcase and not proof that mechanism assembly is solved.
 
-## Safety stance
+## Native CAD Evidence
 
-Prefer reversible, narrow, verifiable actions:
+Native `.SLDASM/.SLDPRT` files matter. STEP optional smoke is useful as a compatibility check, not as the primary deliverable. Reopened native readback is the stronger signal.
 
-1. inspect/session snapshot;
-2. model-understand/report-context/report-search;
-3. backup;
-4. one focused modification;
-5. rebuild;
-6. inspect after;
-7. compare/change-verify;
-8. worklog/handoff.
+## Honest Validation
 
-Do not promise unattended bulk CAD redesign. Do not imply automated checks replace engineering review, simulation, tolerance analysis, or manufacturing review.
+Validation profiles should match intent: `draft_part`, `single_part`, `assembly`, `mechanism_assembly`, and `engineering_release`. `runtime_budget` and `extra_checks` prevent both under-validation and wasteful full gates on drafts.
 
-## Public positioning rules
+Findings should say `blocking`, `warning`, or `not_applicable` rather than pretending every task needs the same checks.
 
-- Do not claim public placement against other projects in README/docs.
-- Do not present the project as tied to a single domain-specific demo, graduation design, or personal thesis.
-- Lead with practical capability, evidence-first workflow, guarded edits, and handoff.
-- Keep examples mechanically generic and reusable.
+## Durable Handoff
 
-## Implementation preferences
-
-- Use TDD for behavior changes.
-- Keep CLI/MCP behavior backed by tests and audit gates.
-- Add new functionality as focused Python scripts or focused functions first, route through `swctl.ps1`, then expose via MCP only when covered.
-- Keep generated reports/backups/exports/macros/caches/logs out of Git unless intentionally promoted as fixtures or docs demo assets.
-- Do not edit `<codex-home>\config.toml` unless the user explicitly asks.
-
-## Current strategic priority
-
-Prioritize real CAD understanding over presentation polish:
-
-- deeper mate/entity extraction;
-- stronger transform/spatial reasoning;
-- richer hole/manufacturing evidence;
-- better readiness checks for dimensions, constraints, interference, and manufacturability;
-- clean handoff artifacts for multi-turn AI work.
+Long CAD work spans sessions. Use `worklog`, `report-context`, `model-understand`, `tool-catalog`, and `handoff-bundle` so the next model can continue from decisions and evidence instead of rediscovering the world.

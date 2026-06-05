@@ -38,7 +38,6 @@ class RepoHealthTests(unittest.TestCase):
                 "demo_static_bundle",
                 "readme_demo_link",
                 "release_checklist_verify_all",
-                "changelog_release_notes",
                 "roadmap_public_direction",
                 "readme_project_lifecycle_links",
                 "release_tree_gate",

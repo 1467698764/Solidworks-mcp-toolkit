@@ -1,32 +1,35 @@
-# Security Policy
+# Security
 
-This project controls local SolidWorks through a conservative wrapper. Treat all CAD files as valuable source data.
+This project controls local SolidWorks through PowerShell, Python, COM automation, generated macros, and MCP calls. Treat every write path as capable of changing CAD files.
 
-## License boundary
+## Supported Usage
 
-This repository is not MIT-licensed. It uses a custom non-commercial license.
-Commercial resale, paid hosting, commercial bundling, and paid CAD automation /
-MCP / AI-agent services require separate written permission from the copyright
-holder. See `LICENSE`.
+- Run in a local workspace you control.
+- Review generated macros before manual execution.
+- Use backup tools before modifying dimensions, features, mates, component state, metadata, or file outputs.
+- Keep generated reports, backups, exports, and logs out of public releases unless intentionally sanitized.
 
-## Safety model
+## Write Safety
 
-- Read-only inspection is preferred before writes.
-- Write operations should be preceded by `backup`.
-- Real model changes should be narrow: one dimension/state/action at a time.
-- Generated macros are review-first artifacts; do not run them blindly.
-- `install.ps1` does not modify Codex config automatically.
+Read-only tools inspect and summarize the active model. Write tools should be paired with:
 
-## Reporting issues
+1. backup
+2. execution
+3. rebuild
+4. inspect
+5. compare / change-verify
+6. task-specific validation such as `assembly-contract`, `interference`, or live validation
 
-For public GitHub use, report security or data-loss issues privately first if possible. Include:
+Generated macros are local artifacts and should not be treated as trusted input from strangers.
 
-- command used;
-- file type involved;
-- whether `-Save` was used;
-- generated report/log paths;
-- SolidWorks version if relevant.
+## Reporting Issues
 
-## Out of scope
+For private security concerns, include:
 
-This project does not claim to replace engineering validation for strength, thermal, fatigue, tolerance stack-up, manufacturing, or safety-critical review.
+- command or MCP tool used
+- affected file paths
+- whether generated macros were involved
+- whether backups existed
+- reproduction steps with sensitive CAD data removed
+
+Do not publish proprietary CAD files, license keys, customer names, or private path contents in public issues.
