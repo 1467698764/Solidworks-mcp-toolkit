@@ -4,7 +4,7 @@ This directory contains the MCP server, CLI router, Python implementation script
 
 ## Main Entry Points
 
-- `mcp/server.cjs` exposes the 51 MCP tools, including `solidworks_component_insert`, `solidworks_part_feature_execute`, `solidworks_metadata_execute`, `solidworks_mate_group_execute`, `solidworks_tool_catalog`, `solidworks_handoff_bundle`, and `solidworks_worklog`.
+- `mcp/server.cjs` exposes the 52 MCP tools, including `solidworks_component_insert`, `solidworks_part_feature_execute`, `solidworks_metadata_execute`, `solidworks_mate_group_execute`, `solidworks_tool_catalog`, `solidworks_handoff_bundle`, and `solidworks_worklog`.
 - `swctl.ps1` is the stable local command router used by tests, CI, and human workflows.
 - `scripts/` contains the implementation for inspection, understanding, execution, validation, handoff, and release gates.
 

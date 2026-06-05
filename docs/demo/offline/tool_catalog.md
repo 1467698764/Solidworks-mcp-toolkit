@@ -1,7 +1,7 @@
 # SolidWorks MCP Tool Catalog
 
-- Timestamp: `2026-06-05T12:46:34`
-- Tool count: `51`
+- Timestamp: `2026-06-05T13:06:58`
+- Tool count: `52`
 
 ## Operator notes
 - Do not blindly replay templates: inspect the current report, context, worklog, and handoff artifacts before choosing a tool.
@@ -9,7 +9,7 @@
 - Use handoff-bundle for pauses, session changes, and review handoff; use audit/finalize as release gates.
 
 ## Groups
-- `analysis`: `solidworks_assembly_diagnose`, `solidworks_change_plan`, `solidworks_design_review`, `solidworks_issue_report`, `solidworks_model_understand`, `solidworks_report_context`, `solidworks_report_search`
+- `analysis`: `solidworks_assembly_diagnose`, `solidworks_change_plan`, `solidworks_design_review`, `solidworks_engineering_lite`, `solidworks_issue_report`, `solidworks_model_understand`, `solidworks_report_context`, `solidworks_report_search`
 - `export_verify`: `solidworks_audit`, `solidworks_compare_reports`, `solidworks_export`, `solidworks_finalize`, `solidworks_interference_check`, `solidworks_preflight`
 - `external_reference`: `solidworks_existing_mcp_tools`
 - `handoff`: `solidworks_handoff_bundle`, `solidworks_worklog`
@@ -103,6 +103,13 @@
 - Description: Generate a generic evidence-first mechanical CAD review from an inspect JSON report: findings, open questions, and candidate actions.
 - Required: `report`
 - Properties: `intent, json_out, out, report`
+
+### `solidworks_engineering_lite`
+
+- Group: `analysis`
+- Description: Generate a read-only engineering-lite BOM, material, DFM, and DFA review from inspect evidence.
+- Required: `report`
+- Properties: `json_out, out, report`
 
 ### `solidworks_existing_mcp_tools`
 

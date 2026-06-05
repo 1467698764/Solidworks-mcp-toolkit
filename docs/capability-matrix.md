@@ -1,13 +1,13 @@
 # SolidWorks Codex Capability Matrix
 
-- Timestamp: `2026-06-05T12:44:34`
-- Capability count: `70`
+- Timestamp: `2026-06-05T13:06:58`
+- Capability count: `71`
 
 ## Coverage
 
-- CLI commands: `70`
-- MCP tools: `51`
-- MCP tools mapped to CLI: `51`
+- CLI commands: `71`
+- MCP tools: `52`
+- MCP tools mapped to CLI: `52`
 - CLI for every local MCP tool: `True`
 - Safety label for every capability: `True`
 - Workflow label for every capability: `True`
@@ -36,6 +36,7 @@
 | `component-insert` | `solidworks_component_insert` | `guarded_edit` | `guarded_write` | `True` | `spec` |
 | `component-state` | `solidworks_component_state` | `guarded_edit` | `guarded_write` | `True` | `component, action` |
 | `design-review` | `solidworks_design_review` | `analysis` | `read_only` | `False` | `report` |
+| `engineering-lite` | `solidworks_engineering_lite` | `analysis` | `read_only` | `False` | `report` |
 | `export` | `solidworks_export` | `verify_export` | `verification_or_export` | `True` | `target` |
 | `feature-state` | `solidworks_feature_state` | `guarded_edit` | `guarded_write` | `True` | `feature, action` |
 | `finalize` | `solidworks_finalize` | `release_gate` | `offline_gate` | `False` | `-` |

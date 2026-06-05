@@ -1,6 +1,6 @@
 # SolidWorks Codex Usage
 
-The MCP wrapper currently exposes **51 MCP tools** across inspection, understanding, guarded execution, validation, handoff, and release gates.
+The MCP wrapper currently exposes **52 MCP tools** across inspection, understanding, guarded execution, validation, handoff, and release gates.
 
 This is a general SolidWorks MCP. It should be judged by how well it understands and safely changes arbitrary CAD state, not by a single named fixture. `shaper_machine_v5` is a useful simple-mechanism regression case, but it is not impressive enough to define the project and not enough to prove general mechanism assembly.
 

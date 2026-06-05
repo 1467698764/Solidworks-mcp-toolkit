@@ -1,6 +1,6 @@
 {
-  "timestamp": "2026-06-05T12:44:34",
-  "count": 70,
+  "timestamp": "2026-06-05T13:06:58",
+  "count": 71,
   "capabilities": [
     {
       "cli": "assembly-contract",
@@ -226,6 +226,22 @@
         "report"
       ],
       "description": "Generate a generic evidence-first mechanical CAD review from an inspect JSON report: findings, open questions, and candidate actions."
+    },
+    {
+      "cli": "engineering-lite",
+      "mcp": "solidworks_engineering_lite",
+      "workflow": "analysis",
+      "safety": "read_only",
+      "solidworks_required": false,
+      "required": [
+        "report"
+      ],
+      "properties": [
+        "json_out",
+        "out",
+        "report"
+      ],
+      "description": "Generate a read-only engineering-lite BOM, material, DFM, and DFA review from inspect evidence."
     },
     {
       "cli": "export",
@@ -1043,9 +1059,9 @@
     }
   ],
   "coverage": {
-    "cli_commands": 70,
-    "mcp_tools": 51,
-    "mapped_mcp_tools": 51,
+    "cli_commands": 71,
+    "mcp_tools": 52,
+    "mapped_mcp_tools": 52,
     "has_cli_for_every_local_mcp": true,
     "has_safety_for_every_capability": true,
     "has_workflow_for_every_capability": true,

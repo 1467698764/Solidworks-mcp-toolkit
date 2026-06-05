@@ -298,6 +298,11 @@ const toolSchemas = [
     inputSchema: { type: 'object', properties: { spec: { type: 'string' }, macro_manifest: { type: 'string' }, model: { type: 'string' }, dry_run: { type: 'boolean' }, out: { type: 'string' } }, required: ['spec'], additionalProperties: false }
   },
   {
+    name: 'solidworks_engineering_lite',
+    description: 'Generate a read-only engineering-lite BOM, material, DFM, and DFA review from inspect evidence.',
+    inputSchema: { type: 'object', properties: { report: { type: 'string' }, out: { type: 'string' }, json_out: { type: 'string' } }, required: ['report'], additionalProperties: false }
+  },
+  {
     name: 'solidworks_mate_group_live_protocol',
     description: 'Generate a controlled per-group live SolidWorks work order for reviewed mate group macros: backup, selection evidence, macro run, rebuild, inspect, execution check, interference, and cleanup.',
     inputSchema: { type: 'object', properties: { macro_manifest: { type: 'string' }, validation_report: { type: 'string' }, model: { type: 'string' }, out: { type: 'string' }, markdown_out: { type: 'string' } }, required: ['macro_manifest', 'validation_report'], additionalProperties: false }
@@ -653,6 +658,11 @@ async function callTool(name, input) {
       if (input?.model) args.push('-Model', input.model);
       if (input?.dry_run) args.push('-ValidateOnly');
       if (input?.out) args.push('-Out', input.out);
+      break;
+    case 'solidworks_engineering_lite':
+      args.push('engineering-lite', '-Report', input.report);
+      if (input?.out) args.push('-Out', input.out);
+      if (input?.json_out) args.push('-JsonOut', input.json_out);
       break;
     case 'solidworks_mate_group_live_protocol':
       args.push('mate-group-live-protocol', '-Report', input.macro_manifest, '-FromReport', input.validation_report);

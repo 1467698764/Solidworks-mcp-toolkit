@@ -31,12 +31,12 @@ def main() -> None:
     args = parser.parse_args()
 
     checks = {
-        "root_readme": check_contains("README.md", ["practical SolidWorks MCP", "51 MCP tools", "model-understand", "report-context", "handoff-bundle", "tool-catalog", "audit"]),
+        "root_readme": check_contains("README.md", ["practical SolidWorks MCP", "52 MCP tools", "model-understand", "report-context", "handoff-bundle", "tool-catalog", "audit"]),
         "license": check_contains("LICENSE", ["Non-Commercial License", "non-commercial use only", "sell, rent, sublicense", "commercial licensing"]),
         "install_script": check_contains("tools/solidworks_codex/install.ps1", ["CheckOnly", "mcp", "preflight"]),
         "mcp_config_example": check_contains("examples/codex-mcp-config.example.toml", ["mcp_servers", "server.cjs"]),
         "ci_workflow": check_contains(".github/workflows/solidworks-codex-offline.yml", ["unittest", "py_compile", "node --check", "sw_github_readiness.py"]),
-        "release_checklist": check_contains("docs/github-release-checklist.md", ["51 MCP tools", "model-understand", "handoff-bundle", "Do not commit", "audit"]),
+        "release_checklist": check_contains("docs/github-release-checklist.md", ["52 MCP tools", "model-understand", "handoff-bundle", "Do not commit", "audit"]),
         "security": check_contains("SECURITY.md", ["backup", "Generated macros", "Read-only"]),
         "contributing": check_contains("CONTRIBUTING.md", ["offline test", "audit", "MCP"]),
         "offline_demo": check_contains("docs/demo/README.md", ["offline demo", "report-context", "handoff-bundle"]),

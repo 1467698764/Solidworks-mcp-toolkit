@@ -53,6 +53,7 @@ class ToolCatalogTests(unittest.TestCase):
             self.assertIn("solidworks_mate_group_execution_check", names)
             self.assertIn("solidworks_mate_group_live_protocol", names)
             self.assertIn("solidworks_motion_sweep_lite", names)
+            self.assertIn("solidworks_engineering_lite", names)
             self.assertIn("mate", by_name["solidworks_mate_macro"]["properties"])
             schemas = {tool["name"]: tool for tool in sw_tool_catalog.list_tools_via_node()}
             mate_schema = schemas["solidworks_mate_macro"]["inputSchema"]["properties"]
@@ -64,7 +65,7 @@ class ToolCatalogTests(unittest.TestCase):
             self.assertIn("angle_max_deg", mate_schema)
             self.assertIn("read_only", data["groups"])
             self.assertIn("handoff", data["groups"])
-            self.assertGreaterEqual(data["count"], 51)
+            self.assertGreaterEqual(data["count"], 52)
             self.assertTrue(any("Do not blindly replay templates" in item for item in data["operator_notes"]))
 
 
@@ -155,6 +156,10 @@ class ToolCatalogTests(unittest.TestCase):
             self.assertEqual(by_cli["motion-sweep-lite"]["safety"], "guarded_write")
             self.assertEqual(by_cli["motion-sweep-lite"]["mcp"], "solidworks_motion_sweep_lite")
             self.assertTrue(by_cli["motion-sweep-lite"]["solidworks_required"])
+            self.assertEqual(by_cli["engineering-lite"]["workflow"], "analysis")
+            self.assertEqual(by_cli["engineering-lite"]["safety"], "read_only")
+            self.assertEqual(by_cli["engineering-lite"]["mcp"], "solidworks_engineering_lite")
+            self.assertFalse(by_cli["engineering-lite"]["solidworks_required"])
             self.assertEqual(by_cli["mate-group-live-protocol"]["workflow"], "analysis")
             self.assertEqual(by_cli["mate-group-live-protocol"]["safety"], "read_only")
             self.assertEqual(by_cli["mate-group-live-protocol"]["mcp"], "solidworks_mate_group_live_protocol")
