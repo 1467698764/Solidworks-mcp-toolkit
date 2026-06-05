@@ -35,6 +35,14 @@ CONSTRAINT_ROLE_BY_MATE_TYPE = {
     "angle": "design_angle",
     "limit_distance": "bounded_linear_motion",
     "limit_angle": "bounded_angular_motion",
+    "tangent": "surface_contact",
+    "width": "centered_linear_guidance",
+    "symmetry": "symmetric_alignment",
+    "slot": "slot_guided_motion",
+    "path": "path_following_motion",
+    "gear": "rotary_ratio_coupling",
+    "cam": "cam_follower_contact",
+    "cam_follower": "cam_follower_contact",
 }
 
 FALLBACK_SELECT_TYPES = {
@@ -868,6 +876,7 @@ def add_width_mate(assembly: Any, item: dict[str, Any], select_reports: list[dic
         "ok": feature is not None,
         "api": "CreateMateData/CreateMate",
         "mate_type": "width",
+        "constraint_role": CONSTRAINT_ROLE_BY_MATE_TYPE["width"],
         "expected_mate_name": item.get("expected_mate_name"),
         "width_constraint_type": data.ConstraintType,
         "width_selection_count": len(data.WidthSelection),
@@ -911,6 +920,7 @@ def add_slot_mate(assembly: Any, item: dict[str, Any], select_reports: list[dict
         "ok": feature is not None,
         "api": "CreateMateData/CreateMate",
         "mate_type": "slot",
+        "constraint_role": CONSTRAINT_ROLE_BY_MATE_TYPE["slot"],
         "expected_mate_name": item.get("expected_mate_name"),
         "slot_constraint_type": constraint_type,
         "slot_distance_m": getattr(data, "Distance", None),

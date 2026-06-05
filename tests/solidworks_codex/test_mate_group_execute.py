@@ -459,6 +459,7 @@ class MateGroupExecuteTests(unittest.TestCase):
         self.assertTrue(result["ok"], result)
         self.assertEqual(result["executed_mates"][0]["api"], "CreateMateData/CreateMate")
         self.assertEqual(result["executed_mates"][0]["mate_type"], "slot")
+        self.assertEqual(result["executed_mates"][0]["constraint_role"], "slot_guided_motion")
         self.assertEqual(result["executed_mates"][0]["slot_constraint_type"], 1)
         self.assertEqual(asm.mate_data[0].Type, mod.MATE_TYPES["slot"])
         self.assertEqual(asm.mate_data[0].EntitiesToMate, [slot_edge, pin_face])
@@ -488,6 +489,7 @@ class MateGroupExecuteTests(unittest.TestCase):
         self.assertEqual(distance_asm.mate_data[0].Constraint, 2)
         self.assertEqual(distance_asm.mate_data[0].Distance, 0.018)
         self.assertEqual(distance_result["executed_mates"][0]["slot_distance_m"], 0.018)
+        self.assertEqual(distance_result["executed_mates"][0]["constraint_role"], "slot_guided_motion")
 
         percent_manifest = self.manifest()
         percent_manifest["macros"][0]["mate_type"] = "slot"
@@ -502,6 +504,7 @@ class MateGroupExecuteTests(unittest.TestCase):
         self.assertEqual(percent_asm.mate_data[0].Constraint, 3)
         self.assertEqual(percent_asm.mate_data[0].Percent, 42.5)
         self.assertEqual(percent_result["executed_mates"][0]["slot_percent"], 42.5)
+        self.assertEqual(percent_result["executed_mates"][0]["constraint_role"], "slot_guided_motion")
 
     def test_executes_path_mate_with_native_vertex_and_path_edge(self):
         manifest = self.manifest()
@@ -538,6 +541,7 @@ class MateGroupExecuteTests(unittest.TestCase):
         self.assertTrue(result["ok"], result)
         self.assertEqual(asm.mates[0][0], mod.MATE_TYPES["path"])
         self.assertEqual(result["executed_mates"][0]["mate_type"], "path")
+        self.assertEqual(result["executed_mates"][0]["constraint_role"], "path_following_motion")
         self.assertEqual(path_vertex.select_calls, [(False, {"mark": 0})])
         self.assertEqual(path_edge.select_calls, [(True, {"mark": 0})])
         guard = result["executed_mates"][0]["selection_guard"]
@@ -583,6 +587,7 @@ class MateGroupExecuteTests(unittest.TestCase):
         self.assertTrue(result["ok"], result)
         self.assertEqual(asm.mates[0][0], mod.MATE_TYPES["tangent"])
         self.assertEqual(result["executed_mates"][0]["mate_type"], "tangent")
+        self.assertEqual(result["executed_mates"][0]["constraint_role"], "surface_contact")
         self.assertEqual(roller_face.select_calls, [(False, {"mark": 0})])
         self.assertEqual(cam_face.select_calls, [(True, {"mark": 0})])
 
@@ -751,6 +756,7 @@ class MateGroupExecuteTests(unittest.TestCase):
         self.assertTrue(result["ok"], result)
         self.assertEqual(result["executed_mates"][0]["api"], "CreateMateData/CreateMate")
         self.assertEqual(result["executed_mates"][0]["mate_type"], "width")
+        self.assertEqual(result["executed_mates"][0]["constraint_role"], "centered_linear_guidance")
         self.assertEqual(result["executed_mates"][0]["width_selection_count"], 2)
         self.assertEqual(result["executed_mates"][0]["tab_selection_count"], 2)
         self.assertEqual(asm.mate_data[0].Type, mod.MATE_TYPES["width"])
@@ -793,6 +799,7 @@ class MateGroupExecuteTests(unittest.TestCase):
         self.assertTrue(result["ok"], result)
         self.assertEqual(asm.mates[0][0], mod.MATE_TYPES["symmetry"])
         self.assertEqual(result["executed_mates"][0]["mate_type"], "symmetry")
+        self.assertEqual(result["executed_mates"][0]["constraint_role"], "symmetric_alignment")
         self.assertEqual(result["executed_mates"][0]["selected_entities"], 3)
         self.assertEqual(left_face.select_calls, [(False, {"mark": 0})])
         self.assertEqual(right_face.select_calls, [(True, {"mark": 0})])
@@ -843,6 +850,7 @@ class MateGroupExecuteTests(unittest.TestCase):
         self.assertEqual(asm.mates[0][6], 18.0)
         self.assertEqual(asm.mates[0][7], 54.0)
         self.assertEqual(result["executed_mates"][0]["mate_type"], "gear")
+        self.assertEqual(result["executed_mates"][0]["constraint_role"], "rotary_ratio_coupling")
         self.assertEqual(result["executed_mates"][0]["gear_ratio_numerator"], 18.0)
         self.assertEqual(result["executed_mates"][0]["gear_ratio_denominator"], 54.0)
         self.assertEqual(pinion_face.select_calls, [(False, {"mark": 0})])
@@ -889,6 +897,7 @@ class MateGroupExecuteTests(unittest.TestCase):
         self.assertTrue(result["ok"], result)
         self.assertEqual(asm.mates[0][0], mod.MATE_TYPES["cam"])
         self.assertEqual(result["executed_mates"][0]["mate_type"], "cam")
+        self.assertEqual(result["executed_mates"][0]["constraint_role"], "cam_follower_contact")
         self.assertEqual(cam_face.select_calls, [(False, {"mark": 0})])
         self.assertEqual(follower_face.select_calls, [(True, {"mark": 0})])
 
