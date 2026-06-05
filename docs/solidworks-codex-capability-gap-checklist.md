@@ -169,7 +169,7 @@ Status values:
 
 | Capability | Status | Detail required | Acceptance |
 | --- | --- | --- | --- |
-| Rebuild health | partial | No rebuild errors, dangling refs, suppressed leftovers, zero-thickness warnings where detectable. | Blocking findings include feature/component path. |
+| Rebuild health | present/guarded | `rebuild` / `solidworks_rebuild` now records `rebuild_health` with ForceRebuild3 success, document extension error/warning counts, feature-level nonzero error codes, blocking/warning/accepted findings, and nonzero process exit for blocking rebuild health. | Blocking findings include rebuild failure, error counts, and feature name/type/error-code evidence. |
 | Part geometry validation | partial | bbox, body count, volume, key feature existence, interface count. | Plain block stack cannot pass a feature-rich intent. |
 | Assembly mate validation | present/guarded | Mate group validation checks mate type, participants, state-bearing groups, verification gates, DOF expectation, concentric axial-locator evidence, and selector availability before macro/live execution. | Decorative mate count cannot pass; concentric-only attachment is blocked unless axial freedom is explicit mechanism intent. |
 | Interference | present | Callback available and count/pairs reported. | Nonzero unexpected interference blocks static/mechanism profiles. |

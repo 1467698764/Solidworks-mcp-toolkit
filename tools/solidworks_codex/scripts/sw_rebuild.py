@@ -98,6 +98,112 @@ def save_model(model: Any) -> dict[str, Any]:
     return {"ok": bool(ok), "errors": getattr(errors, "value", errors), "warnings": getattr(warnings, "value", warnings)}
 
 
+def call_int(obj: Any, name: str) -> int:
+    func = getattr(obj, name, None)
+    if not callable(func):
+        return 0
+    try:
+        return int(func() or 0)
+    except Exception:
+        return 0
+
+
+def feature_name(feature: Any) -> str:
+    for method in ("GetNameForSelection", "Name", "GetName"):
+        value = read_member(feature, method)
+        if isinstance(value, str) and value:
+            return value
+    return "<unnamed>"
+
+
+def feature_type(feature: Any) -> str:
+    for method in ("GetTypeName2", "GetTypeName"):
+        value = read_member(feature, method)
+        if isinstance(value, str) and value:
+            return value
+    return "<unknown>"
+
+
+def feature_error_code(feature: Any) -> int:
+    for method in ("GetErrorCode2", "GetErrorCode"):
+        value = read_member(feature, method)
+        if isinstance(value, int):
+            return value
+    return 0
+
+
+def next_feature(feature: Any) -> Any | None:
+    for method in ("GetNextFeature", "IGetNextFeature"):
+        func = getattr(feature, method, None)
+        if not callable(func):
+            continue
+        try:
+            return func()
+        except Exception:
+            continue
+    return None
+
+
+def iter_features(model: Any, limit: int = 500) -> list[Any]:
+    func = getattr(model, "FirstFeature", None)
+    if not callable(func):
+        return []
+    try:
+        first = func()
+    except Exception:
+        return []
+    result = []
+    current = first
+    seen: set[int] = set()
+    while current is not None and id(current) not in seen and len(result) < limit:
+        seen.add(id(current))
+        result.append(current)
+        current = next_feature(current)
+    return result
+
+
+def add(findings: dict[str, list[dict[str, Any]]], severity: str, kind: str, reason: str, detail: Any = None) -> None:
+    item = {"kind": kind, "reason": reason}
+    if detail is not None:
+        item["detail"] = detail
+    findings.setdefault(severity, []).append(item)
+
+
+def rebuild_health(model: Any) -> dict[str, Any]:
+    rebuild_result = read_member(model, "ForceRebuild3", False)
+    rebuild_ok = bool(rebuild_result) and not isinstance(rebuild_result, dict)
+    extension = getattr(model, "Extension", None)
+    error_count = call_int(extension, "GetErrorCount") if extension is not None else 0
+    warning_count = call_int(extension, "GetWarningCount") if extension is not None else 0
+    feature_errors = []
+    for feature in iter_features(model):
+        code = feature_error_code(feature)
+        if code:
+            feature_errors.append({"name": feature_name(feature), "type": feature_type(feature), "error_code": code})
+
+    findings: dict[str, list[dict[str, Any]]] = {"blocking": [], "warning": [], "accepted": []}
+    if not rebuild_ok:
+        add(findings, "blocking", "rebuild_failed", "ForceRebuild3 did not report success", {"rebuild_result": rebuild_result})
+    if error_count:
+        add(findings, "blocking", "rebuild_error_count", "document extension reports rebuild errors", {"error_count": error_count})
+    if warning_count:
+        add(findings, "warning", "rebuild_warning_count", "document extension reports rebuild warnings", {"warning_count": warning_count})
+    for item in feature_errors:
+        add(findings, "blocking", "feature_error", "feature reports a nonzero error code", item)
+    if not findings["blocking"]:
+        add(findings, "accepted", "rebuild_health_clean", "rebuild completed without blocking health findings")
+
+    return {
+        "ok": not findings["blocking"],
+        "rebuild_result": rebuild_result,
+        "rebuild_ok": rebuild_ok,
+        "error_count": error_count,
+        "warning_count": warning_count,
+        "feature_errors": feature_errors,
+        "findings": findings,
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--start", action="store_true")
@@ -109,7 +215,7 @@ def main() -> None:
     pythoncom_mod.CoInitialize()
     sw, started = attach(args.start)
     model = open_or_active(sw, args.model)
-    rebuild_result = read_member(model, "ForceRebuild3", False)
+    health = rebuild_health(model)
     save_result = None
     if args.save:
         save_result = save_model(model)
@@ -119,7 +225,9 @@ def main() -> None:
         "started_by_probe": started,
         "document_title": read_member(model, "GetTitle"),
         "document_path": read_member(model, "GetPathName"),
-        "rebuild_result": rebuild_result,
+        "ok": health["ok"],
+        "rebuild_result": health["rebuild_result"],
+        "rebuild_health": health,
         "saved": args.save,
         "save_result": save_result,
     }
@@ -127,6 +235,7 @@ def main() -> None:
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(result, ensure_ascii=False, indent=2))
+    raise SystemExit(0 if result["ok"] else 1)
 
 
 if __name__ == "__main__":
