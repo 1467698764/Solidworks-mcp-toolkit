@@ -220,6 +220,40 @@ class ComPropertyReadingTests(unittest.TestCase):
         self.assertEqual(calls[0], ("Select2", False, 0))
         self.assertIn(("Parameter", "D1@Cut-1"), calls)
 
+    def test_feature_state_reports_action_roles_and_change_scope(self):
+        before = {"name": "Cut-1", "suppressed": False}
+        after = {"name": "Cut-1", "suppressed": True}
+        action_result = {"select": True, "state": True}
+
+        evidence = feature_state_mod.action_evidence(
+            action="suppress",
+            before=before,
+            after=after,
+            before_feature_count=8,
+            after_feature_count=8,
+            action_result=action_result,
+        )
+
+        self.assertEqual(evidence["operation_role"], "feature_deactivation")
+        self.assertEqual(evidence["change_scope"], "feature_state")
+        self.assertEqual(evidence["changed_feature"], "Cut-1")
+        self.assertTrue(evidence["selection_evidence"]["selected"])
+        self.assertEqual(evidence["feature_count_delta"], 0)
+
+        dimension_evidence = feature_state_mod.action_evidence(
+            action="set-dimension",
+            before=before,
+            after={"name": "Cut-1", "suppressed": False},
+            before_feature_count=8,
+            after_feature_count=8,
+            action_result={"select": True, "dimension": {"name": "D1@Cut-1", "before_m": 0.004, "after_m": 0.012}},
+        )
+
+        self.assertEqual(dimension_evidence["operation_role"], "feature_parameter_adjustment")
+        self.assertEqual(dimension_evidence["change_scope"], "feature_dimension")
+        self.assertEqual(dimension_evidence["changed_parameter"], "D1@Cut-1")
+        self.assertEqual(dimension_evidence["parameter_delta_m"], 0.008)
+
     def test_component_state_hide_show_uses_assembly_selection_commands(self):
         calls = []
 

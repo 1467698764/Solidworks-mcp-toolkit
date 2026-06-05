@@ -10,7 +10,7 @@ This directory contains the MCP server, CLI router, Python implementation script
 
 ## Execution Layer
 
-Current write paths include guarded dimension edits, component state, component insertion, feature state, reviewed part feature specs, metadata writes, and mate group execution. Execution should be followed by rebuild, inspect, compare, and task-specific validation.
+Current write paths include guarded dimension edits, component state, component insertion, feature state, reviewed part feature specs, metadata writes, and mate group execution. `feature-state` reports operation role, change scope, changed feature, feature-count delta, and feature-scoped parameter deltas so selective repair plans can distinguish suppression, reactivation, deletion, and dimension edits. Execution should be followed by rebuild, inspect, compare, and task-specific validation.
 
 ## Validation Layer
 

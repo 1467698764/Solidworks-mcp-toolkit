@@ -215,6 +215,62 @@ def set_feature_dimension(model: Any, feature: Any, dimension_query: str, value_
     return {"name": resolved, "before_m": before, "after_m": after, "target_m": float(value_m)}
 
 
+def operation_role(action: str) -> str:
+    return {
+        "suppress": "feature_deactivation",
+        "unsuppress": "feature_reactivation",
+        "delete": "feature_removal",
+        "set-dimension": "feature_parameter_adjustment",
+    }.get(action, "feature_state_change")
+
+
+def action_evidence(
+    *,
+    action: str,
+    before: dict[str, Any] | None,
+    after: dict[str, Any] | None,
+    before_feature_count: int,
+    after_feature_count: int,
+    action_result: dict[str, Any],
+) -> dict[str, Any]:
+    dimension = action_result.get("dimension") if isinstance(action_result, dict) else None
+    before_value = dimension.get("before_m") if isinstance(dimension, dict) else None
+    after_value = dimension.get("after_m") if isinstance(dimension, dict) else None
+    parameter_delta = None
+    if isinstance(before_value, (int, float)) and isinstance(after_value, (int, float)):
+        parameter_delta = after_value - before_value
+    changed_feature = None
+    for candidate in (after, before):
+        if isinstance(candidate, dict) and isinstance(candidate.get("name"), str):
+            changed_feature = candidate["name"]
+            break
+    selected = action_result.get("select") if isinstance(action_result, dict) else None
+    change_scope = {
+        "suppress": "feature_state",
+        "unsuppress": "feature_state",
+        "delete": "feature_tree",
+        "set-dimension": "feature_dimension",
+    }.get(action, "feature")
+    evidence = {
+        "operation_role": operation_role(action),
+        "change_scope": change_scope,
+        "changed_feature": changed_feature,
+        "feature_count_delta": after_feature_count - before_feature_count,
+        "selection_evidence": {"selected": selected},
+    }
+    if isinstance(dimension, dict):
+        evidence.update(
+            {
+                "changed_parameter": dimension.get("name"),
+                "parameter_before_m": before_value,
+                "parameter_after_m": after_value,
+                "parameter_target_m": dimension.get("target_m"),
+                "parameter_delta_m": parameter_delta,
+            }
+        )
+    return evidence
+
+
 def apply_action(model: Any, feature: Any, action: str, dimension: str = "", value_m: float | None = None) -> Any:
     selection_result = select_feature(feature)
     if action == "suppress":
@@ -260,6 +316,14 @@ def main() -> None:
     rebuild_result = read(model, "ForceRebuild3", False)
     after = None if args.action == "delete" else snapshot(find_feature(model, args.feature))
     after_features = len(list_features(model))
+    evidence = action_evidence(
+        action=args.action,
+        before=before,
+        after=after,
+        before_feature_count=before_features,
+        after_feature_count=after_features,
+        action_result=action_result,
+    )
     save_result = save_model(model) if args.save else None
     result = {
         "timestamp": datetime.now().isoformat(timespec="seconds"),
@@ -276,6 +340,9 @@ def main() -> None:
         "before": before,
         "after": after,
         "action_result": action_result,
+        "execution_evidence": evidence,
+        "operation_role": evidence["operation_role"],
+        "change_scope": evidence["change_scope"],
         "rebuild_result": rebuild_result,
         "saved": args.save,
         "save_result": save_result,
