@@ -101,6 +101,31 @@ def validate_origin(value: Any) -> list[float]:
     return [float(value[0]), float(value[1]), float(value[2])]
 
 
+def validate_attachment(value: Any) -> dict[str, Any]:
+    if value in (None, ""):
+        return {
+            "role": "",
+            "host_component": "",
+            "host_interface_id": "",
+            "mate_group_id": "",
+            "required_mates": [],
+        }
+    if not isinstance(value, dict):
+        raise ValueError("attachment must be a JSON object when provided")
+    required_mates = value.get("required_mates", [])
+    if isinstance(required_mates, str):
+        required_mates = [item.strip() for item in required_mates.split(",") if item.strip()]
+    if not isinstance(required_mates, list):
+        raise ValueError("attachment.required_mates must be an array or comma-separated string")
+    return {
+        "role": str(value.get("role") or "").strip(),
+        "host_component": str(value.get("host_component") or "").strip(),
+        "host_interface_id": str(value.get("host_interface_id") or "").strip(),
+        "mate_group_id": str(value.get("mate_group_id") or "").strip(),
+        "required_mates": [str(item).strip() for item in required_mates if str(item).strip()],
+    }
+
+
 def validate_spec(spec: dict[str, Any]) -> dict[str, Any]:
     part_path = str(spec.get("part_path") or spec.get("component_path") or "").strip()
     if not part_path:
@@ -109,6 +134,9 @@ def validate_spec(spec: dict[str, Any]) -> dict[str, Any]:
     if suffix not in {".sldprt", ".sldasm"}:
         raise ValueError(f"component insert supports .SLDPRT or .SLDASM components, got {part_path}")
     origin_m = validate_origin(spec.get("origin_m", [0.0, 0.0, 0.0]))
+    attachment_intent = validate_attachment(spec.get("attachment"))
+    is_standard_part = bool(spec.get("standard_part", False)) or bool(attachment_intent["host_component"] or attachment_intent["host_interface_id"])
+    component_role = "standard_part" if is_standard_part else "detail_component"
     return {
         "part_path": part_path,
         "component_name": str(spec.get("component_name") or "").strip(),
@@ -116,6 +144,9 @@ def validate_spec(spec: dict[str, Any]) -> dict[str, Any]:
         "origin_m": origin_m,
         "fixed": bool(spec.get("fixed", False)),
         "lightweight": bool(spec.get("lightweight", False)),
+        "component_role": component_role,
+        "attachment_intent": attachment_intent,
+        "attachment_status": "awaiting_mate_group_execution" if is_standard_part else "placed_without_attachment_contract",
     }
 
 
@@ -165,6 +196,9 @@ def execute_insert(assembly: Any, plan: dict[str, Any]) -> dict[str, Any]:
         "insert": {key: value for key, value in insert.items() if key != "component"},
         "component": component_snapshot(component),
         "fix_result": fix_result,
+        "component_role": plan.get("component_role"),
+        "attachment_intent": plan.get("attachment_intent"),
+        "attachment_status": plan.get("attachment_status"),
     }
 
 

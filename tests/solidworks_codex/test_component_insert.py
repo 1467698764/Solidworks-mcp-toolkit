@@ -60,6 +60,29 @@ class ComponentInsertTests(unittest.TestCase):
         self.assertEqual(plan["origin_m"], [0.1, 0.2, 0.3])
         self.assertTrue(plan["fixed"])
 
+    def test_component_insert_preserves_standard_part_attachment_intent(self):
+        plan = mod.validate_spec({
+            "part_path": "C:/hardware/bolt_m6.SLDPRT",
+            "component_name": "standard_bolt_m6-1",
+            "origin_m": [0.0, 0.0, 0.0],
+            "standard_part": True,
+            "attachment": {
+                "role": "fastener",
+                "host_component": "base_plate-1",
+                "host_interface_id": "base_plate:h_m6_01",
+                "mate_group_id": "MG_standard_bolt_m6_01",
+                "required_mates": ["concentric", "coincident"],
+            },
+        })
+
+        self.assertEqual(plan["component_role"], "standard_part")
+        self.assertEqual(plan["attachment_intent"]["role"], "fastener")
+        self.assertEqual(plan["attachment_intent"]["host_component"], "base_plate-1")
+        self.assertEqual(plan["attachment_intent"]["host_interface_id"], "base_plate:h_m6_01")
+        self.assertEqual(plan["attachment_intent"]["mate_group_id"], "MG_standard_bolt_m6_01")
+        self.assertEqual(plan["attachment_intent"]["required_mates"], ["concentric", "coincident"])
+        self.assertEqual(plan["attachment_status"], "awaiting_mate_group_execution")
+
     def test_executes_component_insert_and_optional_fix(self):
         assembly = FakeAssembly()
         plan = mod.validate_spec({
