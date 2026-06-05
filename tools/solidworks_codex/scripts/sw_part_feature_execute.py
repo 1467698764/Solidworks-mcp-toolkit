@@ -554,6 +554,21 @@ def execute_extrude_cut(model: Any, params: dict[str, Any]) -> dict[str, Any]:
     return {"ok": bool(cut.get("ok")), "cut": cut, "depth_m": depth_m, "through_all": through_all}
 
 
+def selector_names(plan: dict[str, Any], *, kind: str | None = None, select_type: str | None = None) -> list[str]:
+    result = []
+    for selector in plan["selectors"]:
+        if kind is not None and selector["kind"] != kind:
+            continue
+        if select_type is not None and selector.get("type") != select_type:
+            continue
+        result.append(selector["name"])
+    return result
+
+
+def pattern_result(call_result: dict[str, Any], evidence: dict[str, Any]) -> dict[str, Any]:
+    return {"ok": bool(call_result.get("ok")), "call": call_result, "pattern_evidence": evidence}
+
+
 def execute_operation(model: Any, plan: dict[str, Any]) -> dict[str, Any]:
     feature_manager = read(model, "FeatureManager")
     if feature_manager is None or isinstance(feature_manager, dict):
@@ -590,25 +605,47 @@ def execute_operation(model: Any, plan: dict[str, Any]) -> dict[str, Any]:
     if operation == "linear_pattern":
         count = as_int(params, "count", 2)
         spacing_m = as_float(params, "spacing_m", mm_to_m(params.get("spacing_mm", 0)))
-        return invoke_first(feature_manager, [
+        call = invoke_first(feature_manager, [
             ("FeatureLinearPattern5", (count, 1, spacing_m, 0.0, False, False, "", "", False, False, False, False, False, False)),
             ("FeatureLinearPattern4", (count, 1, spacing_m, 0.0, False, False, "", "", False, False, False, False)),
             ("InsertFeatureLinearPattern", (count, spacing_m)),
         ])
+        return pattern_result(call, {
+            "pattern_type": "linear",
+            "seed_features": selector_names(plan, kind="feature"),
+            "direction_selector": next(iter(selector_names(plan, kind="entity")), None),
+            "expected_instance_count": count,
+            "spacing_m": spacing_m,
+        })
     if operation == "circular_pattern":
         count = as_int(params, "count", 2)
-        angle_rad = as_float(params, "angle_deg", 360.0) * 3.141592653589793 / 180.0
-        return invoke_first(feature_manager, [
+        angle_deg = as_float(params, "angle_deg", 360.0)
+        angle_rad = angle_deg * 3.141592653589793 / 180.0
+        call = invoke_first(feature_manager, [
             ("FeatureCircularPattern5", (count, angle_rad, False, "", False, False, False)),
             ("FeatureCircularPattern4", (count, angle_rad, False, "", False, False)),
             ("InsertFeatureCircularPattern", (count, angle_rad)),
         ])
+        return pattern_result(call, {
+            "pattern_type": "circular",
+            "seed_features": selector_names(plan, kind="feature"),
+            "axis_selector": next(iter(selector_names(plan, kind="entity", select_type="AXIS")), None) or next(iter(selector_names(plan, kind="entity")), None),
+            "expected_instance_count": count,
+            "angle_deg": angle_deg,
+            "angle_rad": angle_rad,
+        })
     if operation == "mirror":
-        return invoke_first(feature_manager, [
+        call = invoke_first(feature_manager, [
             ("InsertMirrorFeature2", (False, False, False, False)),
             ("InsertMirrorFeature", (False, False, False)),
             ("FeatureMirror", (False, False)),
         ])
+        return pattern_result(call, {
+            "pattern_type": "mirror",
+            "seed_features": selector_names(plan, kind="feature"),
+            "mirror_plane_selector": next(iter(selector_names(plan, kind="entity", select_type="PLANE")), None) or next(iter(selector_names(plan, kind="entity")), None),
+            "expected_instance_count": 2,
+        })
     raise ValueError(f"Unsupported operation: {operation}")
 
 

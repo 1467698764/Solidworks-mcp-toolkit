@@ -50,6 +50,10 @@ class FakeFeatureManager:
         self.calls.append(("FeatureLinearPattern5", args))
         return {"name": "Codex_LinearPattern"}
 
+    def FeatureCircularPattern5(self, *args):
+        self.calls.append(("FeatureCircularPattern5", args))
+        return {"name": "Codex_CircularPattern"}
+
     def InsertMirrorFeature2(self, *args):
         self.calls.append(("InsertMirrorFeature2", args))
         return {"name": "Codex_Mirror"}
@@ -151,6 +155,48 @@ class PartFeatureExecuteTests(unittest.TestCase):
         self.assertEqual(model.FeatureManager.calls[0][1][0], 3)
         self.assertAlmostEqual(model.FeatureManager.calls[0][1][2], 0.01)
         self.assertEqual(result["operation_role"], "repeat_seed_feature")
+        self.assertEqual(result["operation_result"]["pattern_evidence"]["pattern_type"], "linear")
+        self.assertEqual(result["operation_result"]["pattern_evidence"]["seed_features"], ["SeedCut"])
+        self.assertEqual(result["operation_result"]["pattern_evidence"]["expected_instance_count"], 3)
+        self.assertEqual(result["operation_result"]["pattern_evidence"]["spacing_m"], 0.01)
+        self.assertEqual(result["operation_result"]["pattern_evidence"]["direction_selector"], "Right Plane")
+
+    def test_circular_pattern_reports_instance_intent_and_axis_selector(self):
+        model = FakeModel()
+        plan = mod.validate_spec({
+            "operation": "circular_pattern",
+            "selectors": [
+                {"kind": "feature", "name": "SeedCut"},
+                {"kind": "entity", "name": "Axis1", "type": "AXIS"},
+            ],
+            "parameters": {"count": 6, "angle_deg": 180},
+        })
+
+        result = mod.execute(model, plan)
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["operation_result"]["pattern_evidence"]["pattern_type"], "circular")
+        self.assertEqual(result["operation_result"]["pattern_evidence"]["expected_instance_count"], 6)
+        self.assertEqual(result["operation_result"]["pattern_evidence"]["angle_deg"], 180.0)
+        self.assertEqual(result["operation_result"]["pattern_evidence"]["axis_selector"], "Axis1")
+
+    def test_mirror_reports_mirrored_instance_intent_and_plane_selector(self):
+        model = FakeModel()
+        plan = mod.validate_spec({
+            "operation": "mirror",
+            "selectors": [
+                {"kind": "feature", "name": "SeedCut"},
+                {"kind": "entity", "name": "Front Plane", "type": "PLANE"},
+            ],
+            "parameters": {},
+        })
+
+        result = mod.execute(model, plan)
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["operation_result"]["pattern_evidence"]["pattern_type"], "mirror")
+        self.assertEqual(result["operation_result"]["pattern_evidence"]["expected_instance_count"], 2)
+        self.assertEqual(result["operation_result"]["pattern_evidence"]["mirror_plane_selector"], "Front Plane")
 
     def test_dry_run_writes_reviewable_execution_plan(self):
         with tempfile.TemporaryDirectory() as td:
