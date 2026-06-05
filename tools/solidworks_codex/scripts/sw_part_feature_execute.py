@@ -24,6 +24,7 @@ SUPPORTED_OPERATIONS = {
     "fillet",
     "chamfer",
     "basic_hole",
+    "extrude_cut",
     "slot_cut",
     "pocket_cut",
     "linear_pattern",
@@ -35,6 +36,7 @@ OPERATION_ROLE_BY_OPERATION = {
     "fillet": "edge_rounding",
     "chamfer": "edge_break",
     "basic_hole": "cylindrical_hole_cut",
+    "extrude_cut": "reviewed_profile_extrude_cut",
     "slot_cut": "slot_profile_cut",
     "pocket_cut": "rectangular_pocket_cut",
     "linear_pattern": "repeat_seed_feature",
@@ -165,6 +167,8 @@ def operation_for(spec: dict[str, Any]) -> str:
         "hole": "basic_hole",
         "through_hole": "basic_hole",
         "blind_hole": "basic_hole",
+        "cut": "extrude_cut",
+        "extruded_cut": "extrude_cut",
         "slot": "slot_cut",
         "pocket": "pocket_cut",
         "linear": "linear_pattern",
@@ -234,6 +238,12 @@ def validate_spec(spec: dict[str, Any]) -> dict[str, Any]:
             raise ValueError("basic_hole depth must be positive unless through_all is true")
         if not any(s["kind"] == "entity" and s["type"] in {"PLANE", "FACE"} for s in selectors):
             raise ValueError("basic_hole requires a reviewed sketch plane or planar face selector")
+    if operation == "extrude_cut":
+        depth_m = float(params.get("depth_m", mm_to_m(params.get("depth_mm", 0))))
+        if depth_m <= 0 and not bool(params.get("through_all")):
+            raise ValueError("extrude_cut depth must be positive unless through_all is true")
+        if not any(s["kind"] == "entity" and s["type"] in {"SKETCH", "PLANE", "FACE"} for s in selectors):
+            raise ValueError("extrude_cut requires a reviewed sketch, sketch plane, or planar face selector")
     if operation == "slot_cut":
         length_m = float(params.get("length_m", mm_to_m(params.get("length_mm", 0))))
         width_m = float(params.get("width_m", mm_to_m(params.get("width_mm", 0))))
@@ -420,6 +430,20 @@ def execute_pocket_cut(model: Any, params: dict[str, Any]) -> dict[str, Any]:
     return {"ok": bool((cut.get("cut") or {}).get("ok")), "sketch": {"opened": sketch_context["opened"], "rectangle": rectangle}, **cut}
 
 
+def execute_extrude_cut(model: Any, params: dict[str, Any]) -> dict[str, Any]:
+    feature_manager = read(model, "FeatureManager")
+    if feature_manager is None or isinstance(feature_manager, dict):
+        raise RuntimeError("Model.FeatureManager is unavailable.")
+    depth_m = float(params.get("depth_m", mm_to_m(params.get("depth_mm", 0))))
+    through_all = bool(params.get("through_all"))
+    end_condition = 1 if through_all else 0
+    cut = invoke_first(feature_manager, [
+        ("FeatureCut3", (True, False, False, end_condition, 0, depth_m, depth_m, False, False, False, False, 0, 0, False, False, False, False, False, True, True, True, True, False, 0, 0, False)),
+        ("FeatureCut2", (True, False, False, end_condition, 0, depth_m, depth_m, False, False, False, False, 0, 0, False, False, False, False, False, True, True, True, True, False, 0, 0)),
+    ])
+    return {"ok": bool(cut.get("ok")), "cut": cut, "depth_m": depth_m, "through_all": through_all}
+
+
 def execute_operation(model: Any, plan: dict[str, Any]) -> dict[str, Any]:
     feature_manager = read(model, "FeatureManager")
     if feature_manager is None or isinstance(feature_manager, dict):
@@ -443,6 +467,8 @@ def execute_operation(model: Any, plan: dict[str, Any]) -> dict[str, Any]:
         ])
     if operation == "basic_hole":
         return execute_basic_hole(model, params)
+    if operation == "extrude_cut":
+        return execute_extrude_cut(model, params)
     if operation == "slot_cut":
         return execute_slot_cut(model, params)
     if operation == "pocket_cut":

@@ -115,7 +115,7 @@ Status values:
 | Capability | Status | Detail required | Acceptance |
 | --- | --- | --- | --- |
 | Extrude boss/base | present | Sketch isolation, named feature, bbox readback. | Reopened part shows feature and expected volume/bbox. |
-| Extrude cut | present but must remain guarded | Correct sketch selected, no stale selection, target body identified. | Cut consumes intended sketch; no wrong block/face cut. |
+| Extrude cut | present/guarded | `part-feature-execute` / `solidworks_part_feature_execute` executes reviewed `extrude_cut` specs from named sketch, plane, or planar face selectors, clears stale selection, selects the reviewed entity, calls `FeatureCut3` / `FeatureCut2`, and reports `operation_role=reviewed_profile_extrude_cut` plus cut depth/through-all evidence. | Cut consumes intended sketch; no wrong block/face cut. |
 | Revolve boss | present | Axis/reference validation, profile closure. | Feature exists after reopen and mass/bbox match. |
 | Revolved cut | present | Axis, sketch, target body, cut direction. | Feature readback and geometry evidence match. |
 | Hole wizard/basic holes | present/guarded | `part-feature-execute` / `solidworks_part_feature_execute` creates reviewed basic hole cuts from a selected plane/face with diameter, depth, through-all, center evidence, sketch creation, cut call evidence, and `operation_role=cylindrical_hole_cut`. Countersink/counterbore/Hole Wizard metadata remain separate tracks. | Hole axes appear in interface index. |

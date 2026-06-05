@@ -191,6 +191,22 @@ class PartFeatureExecuteTests(unittest.TestCase):
         self.assertIn(("CreateCircleByRadius", (0.01, 0.02, 0.0, 0.003)), model.SketchManager.calls)
         self.assertEqual(model.FeatureManager.calls[-1][0], "FeatureCut3")
 
+    def test_executes_extrude_cut_from_reviewed_sketch(self):
+        model = FakeModel()
+        plan = mod.validate_spec({
+            "operation": "extrude_cut",
+            "selectors": [{"kind": "entity", "name": "CutSketch", "type": "SKETCH"}],
+            "parameters": {"depth_mm": 9},
+        })
+
+        result = mod.execute(model, plan)
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["operation_role"], "reviewed_profile_extrude_cut")
+        self.assertEqual(model.Extension.calls[0][0], "SelectByID2")
+        self.assertEqual(model.FeatureManager.calls[-1][0], "FeatureCut3")
+        self.assertEqual(result["operation_result"]["cut"]["method"], "FeatureCut3")
+
     def test_executes_slot_cut_from_reviewed_plane(self):
         model = FakeModel()
         plan = mod.validate_spec({
