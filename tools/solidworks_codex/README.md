@@ -12,6 +12,8 @@ This directory contains the MCP server, CLI router, Python implementation script
 
 Current write paths include guarded dimension edits, component state, component insertion, feature state, reviewed part feature specs, metadata writes, and mate group execution. `feature-state` reports operation role, change scope, changed feature, feature-count delta, and feature-scoped parameter deltas so selective repair plans can distinguish suppression, reactivation, deletion, and dimension edits. Execution should be followed by rebuild, inspect, compare, and task-specific validation.
 
+`inspect` records document handoff evidence for active-document, specified native file, and provided-model-object paths. Reports carry the source, resolved path, doc type, and OpenDoc6 error/warning values so downstream diagnosis and repair plans know which model was actually read.
+
 ## Validation Layer
 
 The project uses validation profiles through `workflow-plan`: `draft_part`, `single_part`, `assembly`, `mechanism_assembly`, and `engineering_release`. `runtime_budget` and `extra_checks` keep validation proportional.

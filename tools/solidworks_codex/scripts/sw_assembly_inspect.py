@@ -295,9 +295,20 @@ def normalize_doc_type(value: Any) -> tuple[int | None, str]:
         return value, SW_DOC_TYPES.get(value, f"unknown:{value}")
     return None, "unknown"
 
-def open_model_if_requested(sw: Any, path: str | None, pythoncom: Any, win32_client: Any) -> Any:
+def open_model_if_requested(sw: Any, path: str | None, pythoncom: Any, win32_client: Any) -> tuple[Any, dict[str, Any]]:
     if not path:
-        return read_member(sw, "ActiveDoc")
+        model = read_member(sw, "ActiveDoc")
+        handoff = {
+            "source": "active_document",
+            "requested_path": None,
+            "resolved_path": None,
+            "doc_type_code": None,
+            "doc_type": None,
+            "open_options": None,
+            "open_errors": None,
+            "open_warnings": None,
+        }
+        return model, handoff
     model_path = str(Path(path).resolve())
     suffix = Path(model_path).suffix.lower()
     doc_type = {".sldprt": 1, ".sldasm": 2, ".slddrw": 3}.get(suffix)
@@ -308,7 +319,16 @@ def open_model_if_requested(sw: Any, path: str | None, pythoncom: Any, win32_cli
     model = sw.OpenDoc6(model_path, doc_type, 0, "", errors, warnings)
     if model is None:
         raise RuntimeError(f"OpenDoc6 failed: errors={errors.value}, warnings={warnings.value}, path={model_path}")
-    return model
+    return model, {
+        "source": "specified_model",
+        "requested_path": model_path,
+        "resolved_path": model_path,
+        "doc_type_code": doc_type,
+        "doc_type": SW_DOC_TYPES.get(doc_type, f"unknown:{doc_type}"),
+        "open_options": 0,
+        "open_errors": getattr(errors, "value", errors),
+        "open_warnings": getattr(warnings, "value", warnings),
+    }
 
 
 
@@ -326,6 +346,16 @@ def inspect_model_object(model: Any, started_by_probe: bool = False, revision_nu
         "started_by_probe": started_by_probe,
         "revision_number": revision_number,
         "visible": visible,
+        "document_handoff": {
+            "source": "provided_model_object",
+            "requested_path": None,
+            "resolved_path": None,
+            "doc_type_code": None,
+            "doc_type": None,
+            "open_options": None,
+            "open_errors": None,
+            "open_warnings": None,
+        },
     }
     if isinstance(model, dict) or model is None:
         report["active_document"] = None
@@ -342,6 +372,8 @@ def inspect_model_object(model: Any, started_by_probe: bool = False, revision_nu
         "configuration": None,
         "features": iter_features_from(model, 800, read_method_or_member),
         "dimensions": iter_display_dimensions(model, 800),
+        "source": "provided_model_object",
+        "handoff_path": read_method_or_member(model, "GetPathName"),
     }
     cfg_mgr = read_method_or_member(model, "ConfigurationManager")
     if not isinstance(cfg_mgr, dict) and cfg_mgr is not None:
@@ -368,7 +400,8 @@ def inspect(allow_start: bool, feature_limit: int, component_limit: int, dimensi
         "visible": read_member(sw, "Visible"),
     }
 
-    model = open_model_if_requested(sw, model_path, pythoncom, win32_client)
+    model, handoff = open_model_if_requested(sw, model_path, pythoncom, win32_client)
+    report["document_handoff"] = handoff
     if isinstance(model, dict) or model is None:
         report["active_document"] = None
         report["note"] = "No active SolidWorks document detected."
@@ -385,7 +418,14 @@ def inspect(allow_start: bool, feature_limit: int, component_limit: int, dimensi
         "configuration": None,
         "features": iter_features_from(model, feature_limit, read_member),
         "dimensions": iter_display_dimensions(model, dimension_limit),
+        "source": handoff["source"],
+        "handoff_path": handoff["resolved_path"],
     }
+    if handoff["doc_type_code"] is None:
+        handoff["doc_type_code"] = doc_type
+        handoff["doc_type"] = doc_type_label
+        handoff["resolved_path"] = active["path"]
+        active["handoff_path"] = active["path"]
 
     cfg_mgr = read_member(model, "ConfigurationManager")
     if not isinstance(cfg_mgr, dict) and cfg_mgr is not None:

@@ -50,6 +50,23 @@ class FakeAssemblyModel:
         return [FakeComponent()]
 
 
+class FakePartModel:
+    def __init__(self, path):
+        self._path = path
+
+    def GetType(self):
+        return 1
+
+    def GetTitle(self):
+        return "bracket.SLDPRT"
+
+    def GetPathName(self):
+        return self._path
+
+    def FirstFeature(self):
+        return None
+
+
 class InspectTransformTests(unittest.TestCase):
     def test_inspect_model_object_reads_current_assembly_without_starting_solidworks(self):
         report = mod.inspect_model_object(FakeAssemblyModel(), started_by_probe=False, revision_number="test", visible=False)
@@ -91,6 +108,49 @@ class InspectTransformTests(unittest.TestCase):
         report = mod.inspect_model_object(IndexedMateModel(), started_by_probe=False)
         mates = {item["name"]: item for item in report["active_document"]["mate_like_features"]}
         self.assertEqual(["left_part-1", "right_part-1"], mates["Indexed_Distance_Mate"]["components"])
+
+    def test_inspect_reports_requested_model_open_handoff_evidence(self):
+        class FakeVariantFactory:
+            VT_BYREF = 0
+            VT_I4 = 0
+
+            def CoInitialize(self):
+                pass
+
+            def VARIANT(self, _flags, value):
+                return type("Variant", (), {"value": value})()
+
+        class FakeWin32Client(FakeVariantFactory):
+            def GetActiveObject(self, _prog_id):
+                return fake_sw
+
+        class FakeSw:
+            RevisionNumber = "rev"
+            Visible = False
+
+            def __init__(self):
+                self.open_calls = []
+
+            def OpenDoc6(self, path, doc_type, options, config, errors, warnings):
+                self.open_calls.append((path, doc_type, options, config))
+                return FakePartModel(path)
+
+        fake_sw = FakeSw()
+        original = mod.load_pywin32
+        try:
+            mod.load_pywin32 = lambda: (FakeVariantFactory(), FakeWin32Client())
+            report = mod.inspect(False, 10, 10, 10, "C:/models/bracket.SLDPRT")
+        finally:
+            mod.load_pywin32 = original
+
+        self.assertEqual(report["document_handoff"]["source"], "specified_model")
+        self.assertEqual(report["document_handoff"]["requested_path"], "C:\\models\\bracket.SLDPRT")
+        self.assertEqual(report["document_handoff"]["doc_type"], "part")
+        self.assertEqual(report["document_handoff"]["open_options"], 0)
+        self.assertEqual(report["document_handoff"]["open_errors"], 0)
+        self.assertEqual(report["document_handoff"]["open_warnings"], 0)
+        self.assertEqual(report["active_document"]["source"], "specified_model")
+        self.assertEqual(report["active_document"]["handoff_path"], "C:\\models\\bracket.SLDPRT")
 
 
 class FakeMateEntity:
