@@ -444,6 +444,67 @@ def slot_selector(component: str, component_path: str | None, interface: dict[st
     }
 
 
+def perpendicular_axis_name(path_axis: str) -> str:
+    if path_axis == "x":
+        return "y"
+    if path_axis == "y":
+        return "x"
+    return "x"
+
+
+def slot_boundary_selector(
+    component: str,
+    component_path: str | None,
+    interface: dict[str, Any],
+    boundary_name: str,
+    boundary_type: str,
+    kind: str,
+    fallback: dict[str, Any],
+) -> dict[str, Any]:
+    stable_id = f"{interface['interface_id']}:{boundary_name}"
+    geometry_signature = {
+        **fallback,
+        "source_feature": interface.get("source_feature"),
+        "source": interface.get("source"),
+    }
+    return {
+        "stable_id": stable_id,
+        "component": component,
+        "component_path": component_path,
+        "strategy": "native_identity_then_stable_id_then_slot_boundary_fallback",
+        "native_identity": native_identity_envelope(component, component_path, stable_id, kind, geometry_signature),
+        "live_identity_capture_protocol": live_identity_capture_protocol(component, component_path, stable_id, kind, geometry_signature),
+        "fallback": geometry_signature,
+        "boundary_role": boundary_type,
+        "tags": ["slot_boundary_selector", "review_before_live_selection", "native_identity_envelope", "capture_protocol"],
+    }
+
+
+def slot_boundary_selectors(component: str, component_path: str | None, interface: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    width_m = interface.get("width_m") or 0.0
+    half_width = float(width_m) / 2.0
+    path_axis = interface["path_axis"]
+    side_axis = perpendicular_axis_name(path_axis)
+    centerline = interface["centerline_m"]
+    common = {
+        "path_axis": path_axis,
+        "side_axis": side_axis,
+        "centerline_m": centerline,
+        "width_m": width_m,
+        "length_m": interface.get("length_m"),
+    }
+    boundaries = {
+        "side_a": ("slot_side_wall", "face", {**common, "type": "slot_side_wall", "side": "negative", "offset_m": -half_width}),
+        "side_b": ("slot_side_wall", "face", {**common, "type": "slot_side_wall", "side": "positive", "offset_m": half_width}),
+        "end_a": ("slot_end_arc", "edge_or_face", {**common, "type": "slot_end_arc", "end": "start", "origin_m": centerline["start"]}),
+        "end_b": ("slot_end_arc", "edge_or_face", {**common, "type": "slot_end_arc", "end": "end", "origin_m": centerline["end"]}),
+    }
+    return {
+        name: slot_boundary_selector(component, component_path, interface, name, boundary_type, kind, fallback)
+        for name, (boundary_type, kind, fallback) in boundaries.items()
+    }
+
+
 def slot_path_interfaces_for_component(
     component: dict[str, Any],
     component_names: list[str],
@@ -490,6 +551,11 @@ def slot_path_interfaces_for_component(
             "confidence": 0.66 if width_m is not None and length_m is not None else 0.56,
         }
         interface["selector"] = slot_selector(name, component.get("path"), interface)
+        interface["slot_boundary_selectors"] = slot_boundary_selectors(name, component.get("path"), interface)
+        interface["mate_selector_refs"] = {
+            "slot_centerline": interface["interface_id"],
+            **{key: selector["stable_id"] for key, selector in interface["slot_boundary_selectors"].items()},
+        }
         result.append(apply_confidence_policy(interface))
     return result
 

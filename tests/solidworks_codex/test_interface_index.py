@@ -329,6 +329,16 @@ class InterfaceIndexTests(unittest.TestCase):
             self.assertEqual(slot["centerline_m"]["start"], [0.04, 0.03, 0.006])
             self.assertEqual(slot["centerline_m"]["end"], [0.16, 0.03, 0.006])
             self.assertEqual(slot["selector"]["fallback"]["type"], "slot_centerline")
+            self.assertEqual(slot["slot_boundary_selectors"]["side_a"]["fallback"]["type"], "slot_side_wall")
+            self.assertEqual(slot["slot_boundary_selectors"]["side_b"]["fallback"]["type"], "slot_side_wall")
+            self.assertEqual(slot["slot_boundary_selectors"]["end_a"]["fallback"]["type"], "slot_end_arc")
+            self.assertEqual(slot["slot_boundary_selectors"]["end_b"]["fallback"]["type"], "slot_end_arc")
+            self.assertEqual(slot["slot_boundary_selectors"]["side_a"]["fallback"]["offset_m"], -0.006)
+            self.assertEqual(slot["slot_boundary_selectors"]["side_b"]["fallback"]["offset_m"], 0.006)
+            self.assertEqual(slot["mate_selector_refs"]["slot_centerline"], "guide_plate-1:slot:SliderSlot_L120_W12_X")
+            self.assertEqual(slot["mate_selector_refs"]["side_a"], "guide_plate-1:slot:SliderSlot_L120_W12_X:side_a")
+            self.assertEqual(slot["slot_boundary_selectors"]["side_a"]["native_identity"]["kind"], "face")
+            self.assertEqual(slot["slot_boundary_selectors"]["end_a"]["native_identity"]["kind"], "edge_or_face")
             self.assertIn("slot_path_interfaces_from_feature_dimension_bbox_evidence", data["operator_notes"])
 
     def test_swctl_routes_interface_index(self):
