@@ -4,7 +4,7 @@ A practical SolidWorks MCP/control layer for real mechanical CAD work. The proje
 
 ## Current Scope
 
-- **50 MCP tools** exposed by `tools/solidworks_codex/mcp/server.cjs` and routed through `swctl.ps1` plus Python scripts.
+- **53 MCP tools** exposed by `tools/solidworks_codex/mcp/server.cjs` and routed through `swctl.ps1` plus Python scripts.
 - General SolidWorks MCP coverage for parts, assemblies, dimensions, features, mates, Transform2/origin placement, interference, mass properties, and native `.SLDASM/.SLDPRT` readback.
 - Execution-layer support for component insertion, part feature execution, metadata writes, component state changes, dimension edits, and mate group planning/selection/validation/execution checks.
 - Evidence-first handoff through `inspect`, `model-understand`, `assembly-diagnose`, `interface-index`, `report-context`, `worklog`, and `handoff-bundle`.

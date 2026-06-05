@@ -1,6 +1,6 @@
 {
-  "timestamp": "2026-06-05T13:06:58",
-  "count": 52,
+  "timestamp": "2026-06-05T13:41:20",
+  "count": 53,
   "tools": [
     {
       "name": "solidworks_assembly_diagnose",
@@ -497,6 +497,20 @@
       ]
     },
     {
+      "name": "solidworks_part_geometry_validate",
+      "group": "export_verify",
+      "description": "Validate part inspect readback against a geometry contract: body count, bbox, volume, required features, semantic feature counts, and interface evidence.",
+      "required": [
+        "report",
+        "contract"
+      ],
+      "properties": [
+        "contract",
+        "out",
+        "report"
+      ]
+    },
+    {
       "name": "solidworks_preflight",
       "group": "export_verify",
       "description": "Run deterministic environment/toolchain preflight before touching a real SolidWorks model.",
@@ -740,6 +754,7 @@
       "solidworks_export",
       "solidworks_finalize",
       "solidworks_interference_check",
+      "solidworks_part_geometry_validate",
       "solidworks_preflight"
     ],
     "write_guarded": [

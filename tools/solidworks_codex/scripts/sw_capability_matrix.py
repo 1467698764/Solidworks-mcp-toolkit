@@ -46,6 +46,7 @@ WORKFLOW_BY_CLI = {
     "compare": "verify_export",
     "change-verify": "verify_export",
     "assembly-contract": "verify_export",
+    "part-geometry-validate": "verify_export",
     "visual-validate": "verify_export",
     "mate-group-execution-check": "verify_export",
     "interference": "verify_export",
@@ -102,7 +103,7 @@ SOLIDWORKS_NOT_REQUIRED = {
     "summary", "compare", "issue-report", "design-review", "change-plan", "workflow-plan", "report-search", "report-context", "model-understand", "engineering-lite", "assembly-diagnose", "assembly-repair-plan", "interface-index", "mate-group-plan", "mate-group-validate", "mate-selection-check", "mate-group-live-protocol", "assembly-review-pipeline",
     "worklog", "handoff-bundle", "tool-catalog", "offline-demo", "preflight", "audit", "finalize",
     "github-readiness", "repo-health", "release-tree", "public-copy-guard", "template-macro", "mate-macro", "mate-group-macro",
-    "mcp-tools", "session-snapshot", "capability-matrix", "backup", "backup-status", "restore-backup", "change-verify", "assembly-contract", "visual-validate", "mate-group-execution-check",
+    "mcp-tools", "session-snapshot", "capability-matrix", "backup", "backup-status", "restore-backup", "change-verify", "assembly-contract", "part-geometry-validate", "visual-validate", "mate-group-execution-check",
 }
 
 MCP_TO_CLI = {
@@ -140,6 +141,7 @@ MCP_TO_CLI = {
     "solidworks_report_context": "report-context",
     "solidworks_model_understand": "model-understand",
     "solidworks_engineering_lite": "engineering-lite",
+    "solidworks_part_geometry_validate": "part-geometry-validate",
     "solidworks_assembly_diagnose": "assembly-diagnose",
     "solidworks_assembly_repair_plan": "assembly-repair-plan",
     "solidworks_interface_index": "interface-index",

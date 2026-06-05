@@ -4,7 +4,7 @@ This repository is a SolidWorks MCP/control layer. Contributions should improve 
 
 ## Development Rules
 
-- Keep public behavior aligned with the current `50 MCP tools` catalog.
+- Keep public behavior aligned with the current `53 MCP tools` catalog.
 - Prefer generic CAD mechanisms over fixture-specific assumptions.
 - Treat `.SLDASM/.SLDPRT` native file readback as primary CAD evidence; STEP optional smoke is supplemental.
 - Preserve safety around writes: backup, execute, rebuild, inspect, compare, and verify.

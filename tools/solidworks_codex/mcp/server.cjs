@@ -303,6 +303,11 @@ const toolSchemas = [
     inputSchema: { type: 'object', properties: { report: { type: 'string' }, out: { type: 'string' }, json_out: { type: 'string' } }, required: ['report'], additionalProperties: false }
   },
   {
+    name: 'solidworks_part_geometry_validate',
+    description: 'Validate part inspect readback against a geometry contract: body count, bbox, volume, required features, semantic feature counts, and interface evidence.',
+    inputSchema: { type: 'object', properties: { report: { type: 'string' }, contract: { type: 'string' }, out: { type: 'string' } }, required: ['report', 'contract'], additionalProperties: false }
+  },
+  {
     name: 'solidworks_mate_group_live_protocol',
     description: 'Generate a controlled per-group live SolidWorks work order for reviewed mate group macros: backup, selection evidence, macro run, rebuild, inspect, execution check, interference, and cleanup.',
     inputSchema: { type: 'object', properties: { macro_manifest: { type: 'string' }, validation_report: { type: 'string' }, model: { type: 'string' }, out: { type: 'string' }, markdown_out: { type: 'string' } }, required: ['macro_manifest', 'validation_report'], additionalProperties: false }
@@ -663,6 +668,10 @@ async function callTool(name, input) {
       args.push('engineering-lite', '-Report', input.report);
       if (input?.out) args.push('-Out', input.out);
       if (input?.json_out) args.push('-JsonOut', input.json_out);
+      break;
+    case 'solidworks_part_geometry_validate':
+      args.push('part-geometry-validate', '-Report', input.report, '-Manifest', input.contract);
+      if (input?.out) args.push('-Out', input.out);
       break;
     case 'solidworks_mate_group_live_protocol':
       args.push('mate-group-live-protocol', '-Report', input.macro_manifest, '-FromReport', input.validation_report);

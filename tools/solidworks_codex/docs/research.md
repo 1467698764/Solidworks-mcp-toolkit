@@ -11,7 +11,7 @@ This project has absorbed ideas from existing SolidWorks MCP wrappers, but its d
 
 ## Current Differentiators
 
-- 50 MCP tools with CLI-backed routing.
+- 53 MCP tools with CLI-backed routing.
 - Assembly diagnosis and interface indexing before mate execution.
 - Execution tools for component insert, part features, metadata, dimensions, component state, and mate groups.
 - Validation profiles instead of one global acceptance checklist.

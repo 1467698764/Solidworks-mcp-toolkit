@@ -16,6 +16,7 @@ class McpSmokeCoverageTests(unittest.TestCase):
         self.assertIn("solidworks_mate_group_live_protocol", text)
         self.assertIn("solidworks_motion_sweep_lite", text)
         self.assertIn("solidworks_engineering_lite", text)
+        self.assertIn("solidworks_part_geometry_validate", text)
         self.assertIn("componentInsert_is_error", text)
         self.assertIn("partFeatureExecute_is_error", text)
         self.assertIn("metadataExecute_is_error", text)
@@ -24,6 +25,8 @@ class McpSmokeCoverageTests(unittest.TestCase):
         self.assertIn("mateGroupLiveProtocol_is_error", text)
         self.assertIn("motionSweepLite_is_error", text)
         self.assertIn("engineeringLite_is_error", text)
+        self.assertIn("partGeometryValidate_is_error", text)
+        self.assertIn("mcp_part_geometry_report.json", text)
 
 
 if __name__ == "__main__":

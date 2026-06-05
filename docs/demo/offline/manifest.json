@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-06-05T13:06:59",
+  "timestamp": "2026-06-05T13:41:20",
   "ok": true,
   "out_dir": "docs/demo/offline",
   "files": [
@@ -24,7 +24,7 @@
         "docs/demo/offline/tool_catalog.json"
       ],
       "returncode": 0,
-      "stdout": "{\n  \"ok\": true,\n  \"count\": 52,\n  \"out\": \"<repo>\\\\docs\\\\demo\\\\offline\\\\tool_catalog.md\",\n  \"json_out\": \"<repo>\\\\docs\\\\demo\\\\offline\\\\tool_catalog.json\"\n}\n",
+      "stdout": "{\n  \"ok\": true,\n  \"count\": 53,\n  \"out\": \"<repo>\\\\docs\\\\demo\\\\offline\\\\tool_catalog.md\",\n  \"json_out\": \"<repo>\\\\docs\\\\demo\\\\offline\\\\tool_catalog.json\"\n}\n",
       "stderr": ""
     },
     {
@@ -64,7 +64,7 @@
         "Generate handoff bundle"
       ],
       "returncode": 0,
-      "stdout": "{\n  \"ok\": true,\n  \"log\": \"<repo>\\\\docs\\\\demo\\\\offline\\\\worklog.jsonl\",\n  \"summary\": \"<repo>\\\\docs\\\\demo\\\\offline\\\\worklog.md\",\n  \"events\": 10\n}\n",
+      "stdout": "{\n  \"ok\": true,\n  \"log\": \"<repo>\\\\docs\\\\demo\\\\offline\\\\worklog.jsonl\",\n  \"summary\": \"<repo>\\\\docs\\\\demo\\\\offline\\\\worklog.md\",\n  \"events\": 11\n}\n",
       "stderr": ""
     },
     {

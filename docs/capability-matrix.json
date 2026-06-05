@@ -1,6 +1,6 @@
 {
-  "timestamp": "2026-06-05T13:06:58",
-  "count": 71,
+  "timestamp": "2026-06-05T13:41:20",
+  "count": 72,
   "capabilities": [
     {
       "cli": "assembly-contract",
@@ -645,6 +645,23 @@
       "description": "Execute a reviewed part feature spec in SolidWorks: basic holes, slot cuts, pocket cuts, fillet, chamfer, linear pattern, circular pattern, or mirror with named feature/entity selectors."
     },
     {
+      "cli": "part-geometry-validate",
+      "mcp": "solidworks_part_geometry_validate",
+      "workflow": "verify_export",
+      "safety": "verification_or_export",
+      "solidworks_required": false,
+      "required": [
+        "report",
+        "contract"
+      ],
+      "properties": [
+        "contract",
+        "out",
+        "report"
+      ],
+      "description": "Validate part inspect readback against a geometry contract: body count, bbox, volume, required features, semantic feature counts, and interface evidence."
+    },
+    {
       "cli": "preflight",
       "mcp": "solidworks_preflight",
       "workflow": "release_gate",
@@ -1059,9 +1076,9 @@
     }
   ],
   "coverage": {
-    "cli_commands": 71,
-    "mcp_tools": 52,
-    "mapped_mcp_tools": 52,
+    "cli_commands": 72,
+    "mcp_tools": 53,
+    "mapped_mcp_tools": 53,
     "has_cli_for_every_local_mcp": true,
     "has_safety_for_every_capability": true,
     "has_workflow_for_every_capability": true,

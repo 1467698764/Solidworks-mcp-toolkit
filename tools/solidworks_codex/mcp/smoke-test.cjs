@@ -8,13 +8,33 @@ const serverPath = path.join(__dirname, 'server.cjs');
 const sample = path.join(workspace, 'tools', 'solidworks_codex', 'sandbox', 'mcp_sample.SLDPRT');
 fs.mkdirSync(path.dirname(sample), { recursive: true });
 fs.writeFileSync(sample, 'mcp smoke sample\n');
+const partGeometryReport = path.join(workspace, 'tools', 'solidworks_codex', 'sandbox', 'mcp_part_geometry_report.json');
 const mateGroupManifest = path.join(workspace, 'tools', 'solidworks_codex', 'sandbox', 'mcp_mate_group_manifest.json');
 const mateSelectionReport = path.join(workspace, 'tools', 'solidworks_codex', 'sandbox', 'mcp_mate_selection_report.json');
 const mateGroupValidation = path.join(workspace, 'tools', 'solidworks_codex', 'sandbox', 'mcp_mate_group_validation.json');
 const motionSweepSpec = path.join(workspace, 'tools', 'solidworks_codex', 'sandbox', 'mcp_motion_sweep_lite.json');
+const partGeometryContract = path.join(workspace, 'tools', 'solidworks_codex', 'sandbox', 'mcp_part_geometry_contract.json');
 const partFeatureSpec = path.join(workspace, 'tools', 'solidworks_codex', 'sandbox', 'mcp_part_feature_spec.json');
 const componentInsertSpec = path.join(workspace, 'tools', 'solidworks_codex', 'sandbox', 'mcp_component_insert_spec.json');
 const metadataSpec = path.join(workspace, 'tools', 'solidworks_codex', 'sandbox', 'mcp_metadata_spec.json');
+fs.writeFileSync(partGeometryReport, JSON.stringify({
+  active_document: {
+    title: 'mcp_fixture_plate.SLDPRT',
+    path: 'C:/cad/projects/mcp_fixture_plate.SLDPRT',
+    type: 'part',
+    body_count: 1,
+    bbox_m: [0, 0, 0, 0.06, 0.04, 0.006],
+    volume_m3: 0.000012,
+    features: [
+      { name: 'Base-Extrude1', type: 'Boss', semantic: 'boss' },
+      { name: 'MountingHolePattern', type: 'Cut', semantic: 'through_hole', count: 2 }
+    ],
+    interfaces: [
+      { stable_id: 'mcp_fixture_plate:top_face', type: 'bbox_planar_face' },
+      { stable_id: 'mcp_fixture_plate:hole_axis_1', type: 'cylindrical_axis' }
+    ]
+  }
+}, null, 2));
 fs.writeFileSync(mateGroupManifest, JSON.stringify({
   mode: 'reviewable_mate_group_macros',
   macros: [{
@@ -71,6 +91,14 @@ fs.writeFileSync(componentInsertSpec, JSON.stringify({
 fs.writeFileSync(metadataSpec, JSON.stringify({
   material: '6061 Aluminum',
   properties: { PartNo: 'MCP-001', Finish: 'as modeled' }
+}, null, 2));
+fs.writeFileSync(partGeometryContract, JSON.stringify({
+  minimum_body_count: 1,
+  minimum_volume_m3: 0.000001,
+  minimum_bbox_size_m: [0.01, 0.01, 0.001],
+  required_features: ['Base-Extrude1'],
+  required_semantics: { through_hole: { min_count: 2 } },
+  minimum_interface_count: 1
 }, null, 2));
 
 const child = spawn(process.execPath, [serverPath], { cwd: workspace, stdio: ['pipe', 'pipe', 'pipe'] });
@@ -134,6 +162,7 @@ child.stderr.on('data', (d) => { stderr += d.toString(); });
   const mateGroupExecute = await send('tools/call', { name: 'solidworks_mate_group_execute', arguments: { macro_manifest: 'tools/solidworks_codex/sandbox/mcp_mate_group_manifest.json', dry_run: true, out: 'tools/solidworks_codex/reports/mcp_mate_group_execute.json' } });
   const motionSweepLite = await send('tools/call', { name: 'solidworks_motion_sweep_lite', arguments: { spec: 'tools/solidworks_codex/sandbox/mcp_motion_sweep_lite.json', macro_manifest: 'tools/solidworks_codex/sandbox/mcp_mate_group_manifest.json', dry_run: true, out: 'tools/solidworks_codex/reports/mcp_motion_sweep_lite.json' } });
   const engineeringLite = await send('tools/call', { name: 'solidworks_engineering_lite', arguments: { report: 'tools/solidworks_codex/sandbox/report_after.json', out: 'tools/solidworks_codex/reports/mcp_engineering_lite.md', json_out: 'tools/solidworks_codex/reports/mcp_engineering_lite.json' } });
+  const partGeometryValidate = await send('tools/call', { name: 'solidworks_part_geometry_validate', arguments: { report: 'tools/solidworks_codex/sandbox/mcp_part_geometry_report.json', contract: 'tools/solidworks_codex/sandbox/mcp_part_geometry_contract.json', out: 'tools/solidworks_codex/reports/mcp_part_geometry_validate.json' } });
   const mateGroupLiveProtocol = await send('tools/call', { name: 'solidworks_mate_group_live_protocol', arguments: { macro_manifest: 'tools/solidworks_codex/sandbox/mcp_mate_group_manifest.json', validation_report: 'tools/solidworks_codex/sandbox/mcp_mate_group_validation.json', model: 'C:/models/mcp_fixture.SLDASM', out: 'tools/solidworks_codex/reports/mcp_mate_group_live_protocol.json', markdown_out: 'tools/solidworks_codex/reports/mcp_mate_group_live_protocol.md' } });
   const designReview = await send('tools/call', { name: 'solidworks_design_review', arguments: { report: 'tools/solidworks_codex/sandbox/report_after.json', intent: 'locating interfaces, floating components, editable dimensions, and manufacturability evidence', out: 'tools/solidworks_codex/reports/mcp_design_review.md', json_out: 'tools/solidworks_codex/reports/mcp_design_review.json' } });
   const changePlan = await send('tools/call', { name: 'solidworks_change_plan', arguments: { report: 'tools/solidworks_codex/sandbox/report_after.json', goal: 'adjust a critical mounting dimension and verify assembly, clearance, and manufacturing evidence', session_name: 'mcp-change', out: 'tools/solidworks_codex/reports/mcp_change_plan.md', json_out: 'tools/solidworks_codex/reports/mcp_change_plan.json' } });
@@ -167,6 +196,7 @@ child.stderr.on('data', (d) => { stderr += d.toString(); });
     mateGroupExecute_is_error: mateGroupExecute.isError === true,
     motionSweepLite_is_error: motionSweepLite.isError === true,
     engineeringLite_is_error: engineeringLite.isError === true,
+    partGeometryValidate_is_error: partGeometryValidate.isError === true,
     mateGroupLiveProtocol_is_error: mateGroupLiveProtocol.isError === true,
     designReview_is_error: designReview.isError === true,
     changePlan_is_error: changePlan.isError === true,

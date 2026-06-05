@@ -1,7 +1,7 @@
 # SolidWorks MCP Tool Catalog
 
-- Timestamp: `2026-06-05T13:06:58`
-- Tool count: `52`
+- Timestamp: `2026-06-05T13:41:20`
+- Tool count: `53`
 
 ## Operator notes
 - Do not blindly replay templates: inspect the current report, context, worklog, and handoff artifacts before choosing a tool.
@@ -10,7 +10,7 @@
 
 ## Groups
 - `analysis`: `solidworks_assembly_diagnose`, `solidworks_change_plan`, `solidworks_design_review`, `solidworks_engineering_lite`, `solidworks_issue_report`, `solidworks_model_understand`, `solidworks_report_context`, `solidworks_report_search`
-- `export_verify`: `solidworks_audit`, `solidworks_compare_reports`, `solidworks_export`, `solidworks_finalize`, `solidworks_interference_check`, `solidworks_preflight`
+- `export_verify`: `solidworks_audit`, `solidworks_compare_reports`, `solidworks_export`, `solidworks_finalize`, `solidworks_interference_check`, `solidworks_part_geometry_validate`, `solidworks_preflight`
 - `external_reference`: `solidworks_existing_mcp_tools`
 - `handoff`: `solidworks_handoff_bundle`, `solidworks_worklog`
 - `live_protocol`: `solidworks_mate_group_live_protocol`
@@ -271,6 +271,13 @@
 - Description: Execute a reviewed part feature spec in SolidWorks: basic holes, slot cuts, pocket cuts, fillet, chamfer, linear pattern, circular pattern, or mirror with named feature/entity selectors.
 - Required: `spec`
 - Properties: `dry_run, model, out, save, spec, start`
+
+### `solidworks_part_geometry_validate`
+
+- Group: `export_verify`
+- Description: Validate part inspect readback against a geometry contract: body count, bbox, volume, required features, semantic feature counts, and interface evidence.
+- Required: `report, contract`
+- Properties: `contract, out, report`
 
 ### `solidworks_preflight`
 
