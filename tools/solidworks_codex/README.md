@@ -18,6 +18,8 @@ Current write paths include guarded dimension edits, component state, component 
 
 `assembly-repair-plan` emits an `affected_subgraph` for each action. The subgraph lists local components, affected mates, native file paths, and the diagnosis evidence used to choose the boundary, keeping mate repair focused on the damaged area.
 
+`preflight` emits runtime hygiene evidence: memory budget, generated lock files, generated/report roots, screenshot roots, file counts, and cleanup scope. It treats memory-budget excess and generated lock files as blockers before live work continues.
+
 ## Validation Layer
 
 The project uses validation profiles through `workflow-plan`: `draft_part`, `single_part`, `assembly`, `mechanism_assembly`, and `engineering_release`. `runtime_budget` and `extra_checks` keep validation proportional.

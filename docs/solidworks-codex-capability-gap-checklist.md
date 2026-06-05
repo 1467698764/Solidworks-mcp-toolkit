@@ -183,11 +183,11 @@ Status values:
 
 | Capability | Status | Detail required | Acceptance |
 | --- | --- | --- | --- |
-| Serial SolidWorks sessions | present/partial | Avoid parallel COM sessions and window storms. | Live gate records one controlled session unless intentionally inspecting. |
-| Memory budget | partial | Check process memory before heavy stages and after cleanup. | Repeated low-memory crashes become blockers with evidence. |
-| Lock-file scan | present/partial | Scan `~$*` generated locks before/after live work. | No accepted run leaves generated lock files after close/cleanup. |
-| Generated artifact hygiene | partial | Separate source, generated native files, reports, screenshots, failed attempts. | Cleanup never touches user models or unrelated directories. |
-| Window/screenshot discipline | partial | Capture target app/window only; avoid unnecessary windows. | Visual evidence is attached without leaving clutter. |
+| Serial SolidWorks sessions | present/guarded | Live fixture/runtime gates avoid parallel COM sessions and `preflight` reports configured runtime boundaries before heavy work. | Live gate records one controlled session unless intentionally inspecting. |
+| Memory budget | present/guarded | `preflight` emits a runtime report with memory budget, process memory rows, peak private memory, and `memory_budget_exceeded` blocker when supplied process evidence crosses the ceiling. | Repeated low-memory crashes become blockers with evidence. |
+| Lock-file scan | present/guarded | `preflight`, assembly diagnosis, and live gates scan configured generated roots for `~$*` lock files and report `generated_lock_files_present` before live work continues. | No accepted run leaves generated lock files after close/cleanup. |
+| Generated artifact hygiene | present/guarded | `preflight` records generated roots, report roots, generated/report file counts, and cleanup scope as configured generated roots only; release-tree gates keep generated artifacts out of publishable release paths. | Cleanup never touches user models or unrelated directories. |
+| Window/screenshot discipline | present/guarded | `preflight` records configured screenshot roots/counts and visual validation requires explicit screenshot evidence, keeping visual artifacts separated from source and reports. | Visual evidence is attached without leaving clutter. |
 
 ## 7. What The Retained Mechanism Fixture Should Test
 

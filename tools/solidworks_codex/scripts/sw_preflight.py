@@ -40,10 +40,86 @@ def file_check(rel: str) -> dict[str, Any]:
     return {"path": rel, "exists": path.exists(), "length": path.stat().st_size if path.exists() else None}
 
 
+def resolved_existing_dirs(paths: list[Path]) -> list[Path]:
+    return [path.resolve() for path in paths if path.exists() and path.is_dir()]
+
+
+def scan_lock_files(roots: list[Path]) -> list[str]:
+    locks: list[str] = []
+    for root in resolved_existing_dirs(roots):
+        locks.extend(str(path.resolve()) for path in root.rglob("~$*"))
+    return sorted(locks)
+
+
+def count_files(roots: list[Path], suffixes: set[str] | None = None) -> int:
+    total = 0
+    for root in resolved_existing_dirs(roots):
+        for path in root.rglob("*"):
+            if not path.is_file():
+                continue
+            if suffixes is not None and path.suffix.lower() not in suffixes:
+                continue
+            total += 1
+    return total
+
+
+def runtime_environment_report(
+    *,
+    generated_roots: list[Path],
+    report_roots: list[Path],
+    screenshot_roots: list[Path],
+    memory_budget_mb: int,
+    process_rows: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    rows = process_rows or []
+    memory_values = []
+    for row in rows:
+        try:
+            memory_values.append(float(row.get("private_memory_mb", 0)))
+        except (TypeError, ValueError):
+            continue
+    peak_memory = max(memory_values) if memory_values else 0
+    locks = scan_lock_files(generated_roots)
+    failed: list[str] = []
+    if memory_budget_mb > 0 and peak_memory > memory_budget_mb:
+        failed.append("memory_budget_exceeded")
+    if locks:
+        failed.append("generated_lock_files_present")
+    generated_resolved = [str(path) for path in resolved_existing_dirs(generated_roots)]
+    report_resolved = [str(path) for path in resolved_existing_dirs(report_roots)]
+    screenshot_resolved = [str(path) for path in resolved_existing_dirs(screenshot_roots)]
+    return {
+        "ok": not failed,
+        "failed": failed,
+        "memory": {
+            "budget_mb": memory_budget_mb,
+            "peak_private_memory_mb": peak_memory,
+            "processes": rows,
+        },
+        "lock_files": {"count": len(locks), "paths": locks},
+        "artifact_hygiene": {
+            "generated_roots": generated_resolved,
+            "report_roots": report_resolved,
+            "generated_file_count": count_files(generated_roots),
+            "report_file_count": count_files(report_roots),
+            "cleanup_scope": "configured_generated_roots_only",
+        },
+        "screenshots": {
+            "roots": screenshot_resolved,
+            "count": count_files(screenshot_roots, {".png", ".jpg", ".jpeg", ".webp", ".bmp"}),
+            "discipline": "configured_screenshot_roots_only",
+        },
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--out", default="tools/solidworks_codex/reports/preflight.json")
     parser.add_argument("--run-mcp-smoke", action="store_true")
+    parser.add_argument("--generated-root", action="append", default=["tools/solidworks_codex/generated", "tools/solidworks_codex/exports"])
+    parser.add_argument("--report-root", action="append", default=["tools/solidworks_codex/reports"])
+    parser.add_argument("--screenshot-root", action="append", default=["tools/solidworks_codex/screenshots"])
+    parser.add_argument("--memory-budget-mb", type=int, default=3500)
     args = parser.parse_args()
     codex_python = ROOT.home() / ".cache" / "codex-runtimes" / "codex-primary-runtime" / "dependencies" / "python" / "python.exe"
     python_sources = [
@@ -64,6 +140,13 @@ def main() -> None:
             file_check("tools/solidworks_codex/mcp/smoke-test.cjs"),
             file_check("docs/solidworks-codex-usage.md"),
         ],
+        "runtime": runtime_environment_report(
+            generated_roots=[ROOT / item for item in args.generated_root],
+            report_roots=[ROOT / item for item in args.report_root],
+            screenshot_roots=[ROOT / item for item in args.screenshot_root],
+            memory_budget_mb=args.memory_budget_mb,
+            process_rows=[],
+        ),
         "mcp_smoke": None,
     }
     if args.run_mcp_smoke:
@@ -73,6 +156,7 @@ def main() -> None:
     ok = ok and all(f["exists"] for f in checks["files"])
     if checks["mcp_smoke"] is not None:
         ok = ok and checks["mcp_smoke"].get("ok") is True
+    ok = ok and checks["runtime"].get("ok") is True
     report = {"timestamp": datetime.now().isoformat(timespec="seconds"), "ok": ok, "checks": checks}
     out = ROOT / args.out
     out.parent.mkdir(parents=True, exist_ok=True)
