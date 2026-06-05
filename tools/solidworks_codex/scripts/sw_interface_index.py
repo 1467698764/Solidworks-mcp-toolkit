@@ -304,6 +304,61 @@ def edge_treatment_role(feature: dict[str, Any]) -> str | None:
     return None
 
 
+def edge_treatment_definition_type(role: str, feature: dict[str, Any]) -> str:
+    text = str(feature.get("type") or feature.get("kind") or feature.get("name") or "")
+    if "chamfer" in text.lower() or role == "edge_break":
+        return "Chamfer"
+    return "Fillet"
+
+
+def edge_treatment_definition_readback(
+    feature: dict[str, Any],
+    role: str,
+    feature_dims: list[dict[str, Any]],
+    radius_m: float | None,
+    distance_m: float | None,
+) -> dict[str, Any]:
+    parameters: dict[str, Any] = {}
+    if radius_m is not None:
+        parameters["radius_m"] = radius_m
+    if distance_m is not None:
+        parameters["distance_m"] = distance_m
+    angle_maybe = dimension_value_for_feature(feature_dims, ("angle", "d2@", "chamferangle"))
+    if angle_maybe is not None and role == "edge_break":
+        parameters["angle_rad"] = angle_maybe
+    return {
+        "source": "inspect_feature_dimension_readback",
+        "definition_type": edge_treatment_definition_type(role, feature),
+        "feature_type": feature.get("type") or feature.get("kind"),
+        "feature_name": item_name(feature),
+        "parameters": parameters,
+        "dimensions": [
+            {
+                "full_name": dim.get("full_name") or dim.get("name"),
+                "system_value_m": dim.get("system_value_m"),
+                "feature": dim.get("feature"),
+            }
+            for dim in feature_dims
+        ],
+        "feature_definition_fields": feature.get("definition") if isinstance(feature.get("definition"), dict) else {},
+    }
+
+
+def edge_treatment_definition_edit_spec(interface: dict[str, Any]) -> dict[str, Any]:
+    edits = []
+    if interface.get("role") == "edge_rounding" and interface.get("radius_m") is not None:
+        edits.append({"property": "DefaultRadius", "value": interface["radius_m"], "source_parameter": "radius_m"})
+    if interface.get("role") == "edge_break" and interface.get("distance_m") is not None:
+        edits.append({"property": "Distance", "value": interface["distance_m"], "source_parameter": "distance_m"})
+    return {
+        "tool": "solidworks_feature_state",
+        "action": "edit-definition",
+        "feature": interface.get("source_feature"),
+        "edits": edits,
+        "review_policy": "review_values_before_live_feature_definition_edit",
+    }
+
+
 def edge_treatment_selector(component: str, component_path: str | None, interface: dict[str, Any]) -> dict[str, Any]:
     geometry_signature = {
         "type": "edge_treatment_feature",
@@ -355,6 +410,8 @@ def edge_treatment_interfaces_for_component(
             "source": "feature_dimension_evidence",
             "confidence": 0.67 if radius_m is not None or distance_m is not None else 0.57,
         }
+        interface["definition_readback"] = edge_treatment_definition_readback(feature, role, feature_dims, radius_m, distance_m)
+        interface["definition_edit_spec"] = edge_treatment_definition_edit_spec(interface)
         interface["selector"] = edge_treatment_selector(name, component.get("path"), interface)
         result.append(apply_confidence_policy(interface))
     return result

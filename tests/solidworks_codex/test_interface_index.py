@@ -374,10 +374,18 @@ class InterfaceIndexTests(unittest.TestCase):
             chamfer = treatments["cover_plate-1:edge_treatment:Chamfer_C1p5_bottom_front"]
             self.assertEqual(fillet["role"], "edge_rounding")
             self.assertEqual(fillet["radius_m"], 0.003)
+            self.assertEqual(fillet["definition_readback"]["definition_type"], "Fillet")
+            self.assertEqual(fillet["definition_readback"]["parameters"]["radius_m"], 0.003)
+            self.assertEqual(fillet["definition_readback"]["dimensions"][0]["full_name"], "R@EdgeFillet_R3_top_outer@cover_plate.SLDPRT")
+            self.assertEqual(fillet["definition_edit_spec"]["action"], "edit-definition")
+            self.assertEqual(fillet["definition_edit_spec"]["edits"][0]["property"], "DefaultRadius")
             self.assertEqual(fillet["selector"]["fallback"]["type"], "edge_treatment_feature")
             self.assertEqual(fillet["selector"]["native_identity"]["kind"], "edge_or_face")
             self.assertEqual(chamfer["role"], "edge_break")
             self.assertEqual(chamfer["distance_m"], 0.0015)
+            self.assertEqual(chamfer["definition_readback"]["definition_type"], "Chamfer")
+            self.assertEqual(chamfer["definition_readback"]["parameters"]["distance_m"], 0.0015)
+            self.assertEqual(chamfer["definition_edit_spec"]["edits"][0]["property"], "Distance")
             self.assertIn("edge_treatment_selectors_from_feature_dimension_evidence", data["operator_notes"])
 
     def test_swctl_routes_interface_index(self):

@@ -24,6 +24,8 @@ Current write paths include guarded dimension edits, component state, component 
 
 `interface-index` emits planar, cylindrical, slot/path, and coordinate-system selectors with stable ids, native identity envelopes, geometry fallbacks, and live identity capture protocols. Those protocols name the SolidWorks selection/readback calls, capture fields, patch target, and blocking policy used before mate execution trusts a selector.
 
+`interface-index` also emits edge-treatment interfaces for fillets and chamfers. Each interface carries radius or distance readback, source dimensions, a definition readback envelope, and a reviewed `feature-state edit-definition` spec so edge-rounding and edge-break edits can move from discovery to execution without losing parameter provenance.
+
 `engineering-lite` converts inspect evidence into BOM rows, normalized drawing BOM rows, and optional `drawing_bom.csv` artifacts through `-OutDir` / MCP `out_dir`. The output carries item numbers, part numbers, configurations, quantities, materials, descriptions, and instances so material gaps and drawing handoff state are visible before release.
 
 `engineering-lite` also samples manufacturability evidence from inspected features: hole-edge clearance, deep pockets, wall/rib/web thickness from feature thickness or bbox minimum axis, and tool access from open-face plus depth/width evidence. The JSON report exposes `dfm_sampling` so warning findings can be traced back to the sampled feature.
