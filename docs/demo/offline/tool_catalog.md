@@ -268,7 +268,7 @@
 ### `solidworks_part_feature_execute`
 
 - Group: `other`
-- Description: Execute a reviewed part feature spec in SolidWorks: basic holes, slot cuts, pocket cuts, fillet, chamfer, linear pattern, circular pattern, or mirror with named feature/entity selectors.
+- Description: Execute a reviewed part feature spec in SolidWorks: extrude cuts, basic/countersink/counterbore holes, slot cuts, pocket cuts, fillet, chamfer, linear pattern, circular pattern, or mirror with named feature/entity selectors.
 - Required: `spec`
 - Properties: `dry_run, model, out, save, spec, start`
 

@@ -58,6 +58,10 @@ class FakeFeatureManager:
         self.calls.append(("FeatureCut3", args))
         return {"name": "Codex_Cut"}
 
+    def HoleWizard5(self, *args):
+        self.calls.append(("HoleWizard5", args))
+        return {"name": "Codex_HoleWizard"}
+
 
 class FakeSketchManager:
     _oleobj_ = True
@@ -190,6 +194,57 @@ class PartFeatureExecuteTests(unittest.TestCase):
         self.assertEqual(result["operation_role"], "cylindrical_hole_cut")
         self.assertIn(("CreateCircleByRadius", (0.01, 0.02, 0.0, 0.003)), model.SketchManager.calls)
         self.assertEqual(model.FeatureManager.calls[-1][0], "FeatureCut3")
+
+    def test_executes_countersink_hole_with_reviewed_hole_wizard_metadata(self):
+        model = FakeModel()
+        plan = mod.validate_spec({
+            "operation": "countersink_hole",
+            "selectors": [{"kind": "entity", "name": "Front Plane", "type": "PLANE"}],
+            "parameters": {
+                "diameter_mm": 5,
+                "depth_mm": 18,
+                "countersink_diameter_mm": 10,
+                "countersink_angle_deg": 82,
+                "center": {"x": 0.01, "y": 0.02, "z": 0},
+            },
+        })
+
+        result = mod.execute(model, plan)
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(plan["selectors"][0]["point"], {"x": 0.01, "y": 0.02, "z": 0.0})
+        self.assertEqual(result["operation_role"], "countersunk_hole_cut")
+        self.assertEqual(model.FeatureManager.calls[-1][0], "HoleWizard5")
+        self.assertEqual(result["operation_result"]["hole_variant"], "countersink")
+        self.assertEqual(result["operation_result"]["hole_metadata"]["diameter_m"], 0.005)
+        self.assertEqual(result["operation_result"]["hole_metadata"]["countersink_diameter_m"], 0.01)
+        self.assertEqual(result["operation_result"]["hole_metadata"]["countersink_angle_deg"], 82.0)
+        self.assertEqual(result["operation_result"]["wizard_call"]["method"], "HoleWizard5")
+
+    def test_executes_counterbore_hole_with_reviewed_hole_wizard_metadata(self):
+        model = FakeModel()
+        plan = mod.validate_spec({
+            "operation": "counterbore_hole",
+            "selectors": [{"kind": "entity", "name": "Front Plane", "type": "PLANE"}],
+            "parameters": {
+                "diameter_mm": 6,
+                "depth_mm": 20,
+                "counterbore_diameter_mm": 12,
+                "counterbore_depth_mm": 4,
+                "center": {"x": 0.01, "y": 0.02, "z": 0},
+            },
+        })
+
+        result = mod.execute(model, plan)
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["operation_role"], "counterbored_hole_cut")
+        self.assertEqual(model.FeatureManager.calls[-1][0], "HoleWizard5")
+        self.assertEqual(result["operation_result"]["hole_variant"], "counterbore")
+        self.assertEqual(result["operation_result"]["hole_metadata"]["diameter_m"], 0.006)
+        self.assertEqual(result["operation_result"]["hole_metadata"]["counterbore_diameter_m"], 0.012)
+        self.assertEqual(result["operation_result"]["hole_metadata"]["counterbore_depth_m"], 0.004)
+        self.assertEqual(result["operation_result"]["wizard_call"]["method"], "HoleWizard5")
 
     def test_executes_extrude_cut_from_reviewed_sketch(self):
         model = FakeModel()

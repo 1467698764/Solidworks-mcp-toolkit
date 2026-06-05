@@ -178,7 +178,7 @@ const toolSchemas = [
   },
   {
     name: 'solidworks_part_feature_execute',
-    description: 'Execute a reviewed part feature spec in SolidWorks: extrude cuts, basic holes, slot cuts, pocket cuts, fillet, chamfer, linear pattern, circular pattern, or mirror with named feature/entity selectors.',
+    description: 'Execute a reviewed part feature spec in SolidWorks: extrude cuts, basic/countersink/counterbore holes, slot cuts, pocket cuts, fillet, chamfer, linear pattern, circular pattern, or mirror with named feature/entity selectors.',
     inputSchema: { type: 'object', properties: { spec: { type: 'string', description: 'JSON spec with operation, selectors, and parameters.' }, model: { type: 'string' }, start: { type: 'boolean' }, save: { type: 'boolean' }, dry_run: { type: 'boolean' }, out: { type: 'string' } }, required: ['spec'], additionalProperties: false }
   },
   {

@@ -12,7 +12,7 @@ This directory contains the MCP server, CLI router, Python implementation script
 
 Current write paths include guarded dimension edits, component state, component insertion, feature state, reviewed part feature specs, metadata writes, and mate group execution. `feature-state` reports operation role, change scope, changed feature, feature-count delta, and feature-scoped parameter deltas so selective repair plans can distinguish suppression, reactivation, deletion, and dimension edits. Execution should be followed by rebuild, inspect, compare, and task-specific validation.
 
-`part-feature-execute` supports reviewed extrude cuts, basic holes, slot cuts, pocket cuts, fillets, chamfers, linear/circular patterns, and mirrors. Each operation reports an operation role and selection/call evidence from named feature/entity selectors.
+`part-feature-execute` supports reviewed extrude cuts, basic holes, countersink holes, counterbore holes, slot cuts, pocket cuts, fillets, chamfers, linear/circular patterns, and mirrors. Hole variants report operation role, reviewed center/depth/diameter metadata, and HoleWizard call evidence; each operation reports selection/call evidence from named feature/entity selectors.
 
 `set-dimension` reports dimension edit scope directly: dimension token, owner feature, owner document, before/after/requested values, delta, target reached, operation role, and change scope. `safe-set-dimension` keeps the full backup/inspect/compare/change-verify envelope around it.
 

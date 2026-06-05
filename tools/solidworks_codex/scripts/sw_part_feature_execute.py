@@ -24,6 +24,8 @@ SUPPORTED_OPERATIONS = {
     "fillet",
     "chamfer",
     "basic_hole",
+    "countersink_hole",
+    "counterbore_hole",
     "extrude_cut",
     "slot_cut",
     "pocket_cut",
@@ -36,6 +38,8 @@ OPERATION_ROLE_BY_OPERATION = {
     "fillet": "edge_rounding",
     "chamfer": "edge_break",
     "basic_hole": "cylindrical_hole_cut",
+    "countersink_hole": "countersunk_hole_cut",
+    "counterbore_hole": "counterbored_hole_cut",
     "extrude_cut": "reviewed_profile_extrude_cut",
     "slot_cut": "slot_profile_cut",
     "pocket_cut": "rectangular_pocket_cut",
@@ -167,6 +171,10 @@ def operation_for(spec: dict[str, Any]) -> str:
         "hole": "basic_hole",
         "through_hole": "basic_hole",
         "blind_hole": "basic_hole",
+        "countersink": "countersink_hole",
+        "countersunk_hole": "countersink_hole",
+        "counterbore": "counterbore_hole",
+        "counterbored_hole": "counterbore_hole",
         "cut": "extrude_cut",
         "extruded_cut": "extrude_cut",
         "slot": "slot_cut",
@@ -229,15 +237,34 @@ def validate_spec(spec: dict[str, Any]) -> dict[str, Any]:
             raise ValueError("chamfer distance must be positive")
         if float(params.get("angle_deg", 45)) <= 0:
             raise ValueError("chamfer angle_deg must be positive")
-    if operation == "basic_hole":
+    if operation in {"basic_hole", "countersink_hole", "counterbore_hole"}:
         diameter_m = float(params.get("diameter_m", mm_to_m(params.get("diameter_mm", 0))))
         depth_m = float(params.get("depth_m", mm_to_m(params.get("depth_mm", 0))))
         if diameter_m <= 0:
-            raise ValueError("basic_hole diameter must be positive")
+            raise ValueError(f"{operation} diameter must be positive")
         if depth_m <= 0 and not bool(params.get("through_all")):
-            raise ValueError("basic_hole depth must be positive unless through_all is true")
+            raise ValueError(f"{operation} depth must be positive unless through_all is true")
         if not any(s["kind"] == "entity" and s["type"] in {"PLANE", "FACE"} for s in selectors):
-            raise ValueError("basic_hole requires a reviewed sketch plane or planar face selector")
+            raise ValueError(f"{operation} requires a reviewed sketch plane or planar face selector")
+    if operation == "countersink_hole":
+        countersink_diameter_m = float(params.get("countersink_diameter_m", mm_to_m(params.get("countersink_diameter_mm", 0))))
+        countersink_angle_deg = float(params.get("countersink_angle_deg", 0))
+        diameter_m = float(params.get("diameter_m", mm_to_m(params.get("diameter_mm", 0))))
+        if countersink_diameter_m <= diameter_m:
+            raise ValueError("countersink_hole countersink diameter must be greater than pilot diameter")
+        if countersink_angle_deg <= 0:
+            raise ValueError("countersink_hole countersink_angle_deg must be positive")
+    if operation == "counterbore_hole":
+        counterbore_diameter_m = float(params.get("counterbore_diameter_m", mm_to_m(params.get("counterbore_diameter_mm", 0))))
+        counterbore_depth_m = float(params.get("counterbore_depth_m", mm_to_m(params.get("counterbore_depth_mm", 0))))
+        diameter_m = float(params.get("diameter_m", mm_to_m(params.get("diameter_mm", 0))))
+        depth_m = float(params.get("depth_m", mm_to_m(params.get("depth_mm", 0))))
+        if counterbore_diameter_m <= diameter_m:
+            raise ValueError("counterbore_hole counterbore diameter must be greater than pilot diameter")
+        if counterbore_depth_m <= 0:
+            raise ValueError("counterbore_hole counterbore_depth must be positive")
+        if depth_m > 0 and counterbore_depth_m >= depth_m:
+            raise ValueError("counterbore_hole counterbore_depth must be less than hole depth")
     if operation == "extrude_cut":
         depth_m = float(params.get("depth_m", mm_to_m(params.get("depth_mm", 0))))
         if depth_m <= 0 and not bool(params.get("through_all")):
@@ -278,6 +305,8 @@ def validate_spec(spec: dict[str, Any]) -> dict[str, Any]:
             raise ValueError("circular_pattern angle_deg must be positive")
     if operation == "mirror" and not any(s["kind"] == "entity" and s["type"] == "PLANE" for s in selectors):
         raise ValueError("mirror requires a reviewed PLANE entity selector")
+    if operation in {"basic_hole", "countersink_hole", "counterbore_hole"}:
+        selectors = apply_hole_center_to_plane_selectors(selectors, params)
     return {"operation": operation, "operation_role": OPERATION_ROLE_BY_OPERATION[operation], "selectors": selectors, "parameters": params}
 
 
@@ -361,6 +390,17 @@ def point_params(params: dict[str, Any]) -> dict[str, float]:
     }
 
 
+def apply_hole_center_to_plane_selectors(selectors: list[dict[str, Any]], params: dict[str, Any]) -> list[dict[str, Any]]:
+    center = point_params(params)
+    result: list[dict[str, Any]] = []
+    for selector in selectors:
+        updated = dict(selector)
+        if updated["kind"] == "entity" and updated["type"] in {"PLANE", "FACE"}:
+            updated["point"] = dict(center)
+        result.append(updated)
+    return result
+
+
 def sketch_manager_for(model: Any) -> Any:
     sketch_manager = read(model, "SketchManager")
     if sketch_manager is None or isinstance(sketch_manager, dict):
@@ -397,6 +437,76 @@ def execute_basic_hole(model: Any, params: dict[str, Any]) -> dict[str, Any]:
     circle = read(sketch_manager, "CreateCircleByRadius", center["x"], center["y"], center["z"], diameter_m / 2.0)
     cut = finish_cut(model, sketch_context, depth_m, bool(params.get("through_all")))
     return {"ok": bool((cut.get("cut") or {}).get("ok")), "sketch": {"opened": sketch_context["opened"], "circle": circle}, **cut}
+
+
+def hole_metadata(params: dict[str, Any], variant: str) -> dict[str, Any]:
+    metadata = {
+        "variant": variant,
+        "diameter_m": float(params.get("diameter_m", mm_to_m(params.get("diameter_mm", 0)))),
+        "depth_m": float(params.get("depth_m", mm_to_m(params.get("depth_mm", 0)))),
+        "through_all": bool(params.get("through_all")),
+        "center": point_params(params),
+    }
+    if variant == "countersink":
+        metadata["countersink_diameter_m"] = float(params.get("countersink_diameter_m", mm_to_m(params.get("countersink_diameter_mm", 0))))
+        metadata["countersink_angle_deg"] = float(params.get("countersink_angle_deg", 0))
+    if variant == "counterbore":
+        metadata["counterbore_diameter_m"] = float(params.get("counterbore_diameter_m", mm_to_m(params.get("counterbore_diameter_mm", 0))))
+        metadata["counterbore_depth_m"] = float(params.get("counterbore_depth_m", mm_to_m(params.get("counterbore_depth_mm", 0))))
+    return metadata
+
+
+def hole_wizard_args(metadata: dict[str, Any]) -> tuple[Any, ...]:
+    variant_code = {"basic": 0, "counterbore": 1, "countersink": 2}[metadata["variant"]]
+    diameter_m = metadata["diameter_m"]
+    depth_m = metadata["depth_m"]
+    head_diameter_m = metadata.get("counterbore_diameter_m") or metadata.get("countersink_diameter_m") or -1
+    head_depth_m = metadata.get("counterbore_depth_m") or -1
+    countersink_angle_rad = float(metadata.get("countersink_angle_deg", 118.0)) * 3.141592653589793 / 180.0
+    return (
+        variant_code,
+        8,
+        139,
+        "Ansi Metric",
+        0,
+        diameter_m,
+        head_diameter_m,
+        head_depth_m,
+        0,
+        depth_m,
+        0,
+        1,
+        countersink_angle_rad,
+        0,
+        0,
+        0,
+        -1,
+        -1,
+        -1,
+        "",
+        False,
+        True,
+        True,
+        True,
+        True,
+        False,
+    )
+
+
+def execute_hole_wizard(model: Any, params: dict[str, Any], variant: str) -> dict[str, Any]:
+    feature_manager = read(model, "FeatureManager")
+    if feature_manager is None or isinstance(feature_manager, dict):
+        raise RuntimeError("Model.FeatureManager is unavailable.")
+    metadata = hole_metadata(params, variant)
+    wizard_call = invoke_first(feature_manager, [
+        ("HoleWizard5", hole_wizard_args(metadata)),
+    ])
+    return {
+        "ok": bool(wizard_call.get("ok")),
+        "hole_variant": variant,
+        "hole_metadata": metadata,
+        "wizard_call": wizard_call,
+    }
 
 
 def execute_slot_cut(model: Any, params: dict[str, Any]) -> dict[str, Any]:
@@ -467,6 +577,10 @@ def execute_operation(model: Any, plan: dict[str, Any]) -> dict[str, Any]:
         ])
     if operation == "basic_hole":
         return execute_basic_hole(model, params)
+    if operation == "countersink_hole":
+        return execute_hole_wizard(model, params, "countersink")
+    if operation == "counterbore_hole":
+        return execute_hole_wizard(model, params, "counterbore")
     if operation == "extrude_cut":
         return execute_extrude_cut(model, params)
     if operation == "slot_cut":
