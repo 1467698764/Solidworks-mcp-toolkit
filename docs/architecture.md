@@ -4,7 +4,7 @@
 
 Contract terms for release gates: Layer map, Data flow, Safety model.
 
-- **MCP server**: `tools/solidworks_codex/mcp/server.cjs` exposes 50 MCP tools and translates JSON arguments into local CLI commands.
+- **MCP server**: `tools/solidworks_codex/mcp/server.cjs` exposes 51 MCP tools and translates JSON arguments into local CLI commands.
 - **CLI router**: `tools/solidworks_codex/swctl.ps1` provides stable PowerShell commands for scripts, CI, and human use.
 - **Python control scripts**: `tools/solidworks_codex/scripts/` implement inspection, evidence modeling, execution, validation, handoff, and release gates.
 - **SolidWorks boundary**: COM automation and generated macros touch the live SolidWorks process; offline tests validate parsing and orchestration without requiring SolidWorks.

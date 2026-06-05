@@ -293,6 +293,11 @@ const toolSchemas = [
     inputSchema: { type: 'object', properties: { macro_manifest: { type: 'string' }, after_report: { type: 'string' }, out: { type: 'string' } }, required: ['macro_manifest', 'after_report'], additionalProperties: false }
   },
   {
+    name: 'solidworks_motion_sweep_lite',
+    description: 'Execute or dry-run sampled mechanism driver positions against executable mate evidence, rebuild each sample, and block collisions/dead layouts.',
+    inputSchema: { type: 'object', properties: { spec: { type: 'string' }, macro_manifest: { type: 'string' }, model: { type: 'string' }, dry_run: { type: 'boolean' }, out: { type: 'string' } }, required: ['spec'], additionalProperties: false }
+  },
+  {
     name: 'solidworks_mate_group_live_protocol',
     description: 'Generate a controlled per-group live SolidWorks work order for reviewed mate group macros: backup, selection evidence, macro run, rebuild, inspect, execution check, interference, and cleanup.',
     inputSchema: { type: 'object', properties: { macro_manifest: { type: 'string' }, validation_report: { type: 'string' }, model: { type: 'string' }, out: { type: 'string' }, markdown_out: { type: 'string' } }, required: ['macro_manifest', 'validation_report'], additionalProperties: false }
@@ -640,6 +645,13 @@ async function callTool(name, input) {
       break;
     case 'solidworks_mate_group_execution_check':
       args.push('mate-group-execution-check', '-Report', input.macro_manifest, '-After', input.after_report);
+      if (input?.out) args.push('-Out', input.out);
+      break;
+    case 'solidworks_motion_sweep_lite':
+      args.push('motion-sweep-lite', '-Report', input.spec);
+      if (input?.macro_manifest) args.push('-Manifest', input.macro_manifest);
+      if (input?.model) args.push('-Model', input.model);
+      if (input?.dry_run) args.push('-ValidateOnly');
       if (input?.out) args.push('-Out', input.out);
       break;
     case 'solidworks_mate_group_live_protocol':

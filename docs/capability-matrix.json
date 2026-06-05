@@ -1,6 +1,6 @@
 {
-  "timestamp": "2026-06-05T12:29:42",
-  "count": 69,
+  "timestamp": "2026-06-05T12:44:34",
+  "count": 70,
   "capabilities": [
     {
       "cli": "assembly-contract",
@@ -580,6 +580,24 @@
       "description": "Build a compact task-scoped model understanding pack from an inspect report: baseline facts, relevant CAD objects, relationship hypotheses, risks, and next minimal queries."
     },
     {
+      "cli": "motion-sweep-lite",
+      "mcp": "solidworks_motion_sweep_lite",
+      "workflow": "guarded_edit",
+      "safety": "guarded_write",
+      "solidworks_required": true,
+      "required": [
+        "spec"
+      ],
+      "properties": [
+        "dry_run",
+        "macro_manifest",
+        "model",
+        "out",
+        "spec"
+      ],
+      "description": "Execute or dry-run sampled mechanism driver positions against executable mate evidence, rebuild each sample, and block collisions/dead layouts."
+    },
+    {
       "cli": "offline-demo",
       "mcp": "solidworks_offline_demo",
       "workflow": "handoff",
@@ -1025,9 +1043,9 @@
     }
   ],
   "coverage": {
-    "cli_commands": 69,
-    "mcp_tools": 50,
-    "mapped_mcp_tools": 50,
+    "cli_commands": 70,
+    "mcp_tools": 51,
+    "mapped_mcp_tools": 51,
     "has_cli_for_every_local_mcp": true,
     "has_safety_for_every_capability": true,
     "has_workflow_for_every_capability": true,

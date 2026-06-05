@@ -1,7 +1,7 @@
 # SolidWorks MCP Tool Catalog
 
-- Timestamp: `2026-06-05T09:08:19`
-- Tool count: `50`
+- Timestamp: `2026-06-05T12:46:34`
+- Tool count: `51`
 
 ## Operator notes
 - Do not blindly replay templates: inspect the current report, context, worklog, and handoff artifacts before choosing a tool.
@@ -17,7 +17,7 @@
 - `macro_generation`: `solidworks_mate_group_macro`, `solidworks_mate_macro`, `solidworks_template_macro`
 - `other`: `solidworks_assembly_repair_plan`, `solidworks_assembly_review_pipeline`, `solidworks_change_verify`, `solidworks_interface_index`, `solidworks_mate_group_execution_check`, `solidworks_mate_group_plan`, `solidworks_mate_group_validate`, `solidworks_offline_demo`, `solidworks_part_feature_execute`, `solidworks_session_snapshot`, `solidworks_tool_catalog`
 - `read_only`: `solidworks_inspect`, `solidworks_mass_properties`, `solidworks_mate_selection_check`, `solidworks_probe`, `solidworks_report_summary`, `solidworks_selection_report`, `solidworks_start_inspect`, `solidworks_start_probe`
-- `write_guarded`: `solidworks_backup`, `solidworks_backup_status`, `solidworks_component_insert`, `solidworks_component_state`, `solidworks_feature_state`, `solidworks_mate_group_execute`, `solidworks_metadata_execute`, `solidworks_rebuild`, `solidworks_restore_backup`, `solidworks_safe_set_dimension`, `solidworks_set_dimension`
+- `write_guarded`: `solidworks_backup`, `solidworks_backup_status`, `solidworks_component_insert`, `solidworks_component_state`, `solidworks_feature_state`, `solidworks_mate_group_execute`, `solidworks_metadata_execute`, `solidworks_motion_sweep_lite`, `solidworks_rebuild`, `solidworks_restore_backup`, `solidworks_safe_set_dimension`, `solidworks_set_dimension`
 
 ## Tools
 ### `solidworks_assembly_diagnose`
@@ -243,6 +243,13 @@
 - Description: Build a compact task-scoped model understanding pack from an inspect report: baseline facts, relevant CAD objects, relationship hypotheses, risks, and next minimal queries.
 - Required: `report`
 - Properties: `json_out, out, report, task, view`
+
+### `solidworks_motion_sweep_lite`
+
+- Group: `write_guarded`
+- Description: Execute or dry-run sampled mechanism driver positions against executable mate evidence, rebuild each sample, and block collisions/dead layouts.
+- Required: `spec`
+- Properties: `dry_run, macro_manifest, model, out, spec`
 
 ### `solidworks_offline_demo`
 

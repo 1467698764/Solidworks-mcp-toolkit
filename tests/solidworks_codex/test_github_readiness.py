@@ -47,7 +47,7 @@ class GithubReadinessTests(unittest.TestCase):
             ]:
                 self.assertTrue(required[key]["ok"], key)
             readme = (ROOT / "README.md").read_text(encoding="utf-8-sig")
-            self.assertIn("50 MCP tools", readme)
+            self.assertIn("51 MCP tools", readme)
             self.assertNotIn("30 conservative MCP tools", readme)
             self.assertNotIn("29", readme)
             self.assertNotIn("35 conservative MCP tools", readme)
@@ -63,7 +63,7 @@ class GithubReadinessTests(unittest.TestCase):
             self.assertIn("sell, rent, sublicense", license_text)
             self.assertNotIn("MIT License", license_text)
             usage = (ROOT / "docs/solidworks-codex-usage.md").read_text(encoding="utf-8-sig")
-            self.assertIn("50 MCP tools", usage)
+            self.assertIn("51 MCP tools", usage)
             self.assertNotRegex(usage, r"29 .{1,3} MCP tools")
             self.assertNotIn("35 MCP tools", usage)
             self.assertNotIn("36 MCP tools", usage)

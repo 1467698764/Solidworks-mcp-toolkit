@@ -1,13 +1,13 @@
 # SolidWorks Codex Capability Matrix
 
-- Timestamp: `2026-06-05T12:29:42`
-- Capability count: `69`
+- Timestamp: `2026-06-05T12:44:34`
+- Capability count: `70`
 
 ## Coverage
 
-- CLI commands: `69`
-- MCP tools: `50`
-- MCP tools mapped to CLI: `50`
+- CLI commands: `70`
+- MCP tools: `51`
+- MCP tools mapped to CLI: `51`
 - CLI for every local MCP tool: `True`
 - Safety label for every capability: `True`
 - Workflow label for every capability: `True`
@@ -58,6 +58,7 @@
 | `mcp-tools` | `solidworks_existing_mcp_tools` | `external_reference` | `offline_reference` | `False` | `-` |
 | `metadata-execute` | `solidworks_metadata_execute` | `guarded_edit` | `guarded_write` | `True` | `spec` |
 | `model-understand` | `solidworks_model_understand` | `analysis` | `read_only` | `False` | `report` |
+| `motion-sweep-lite` | `solidworks_motion_sweep_lite` | `guarded_edit` | `guarded_write` | `True` | `spec` |
 | `offline-demo` | `solidworks_offline_demo` | `handoff` | `offline_or_read_only` | `False` | `-` |
 | `part-feature-execute` | `solidworks_part_feature_execute` | `guarded_edit` | `guarded_write` | `True` | `spec` |
 | `preflight` | `solidworks_preflight` | `release_gate` | `offline_gate` | `False` | `-` |

@@ -1,6 +1,6 @@
 {
-  "timestamp": "2026-06-05T09:08:19",
-  "count": 50,
+  "timestamp": "2026-06-05T12:46:34",
+  "count": 51,
   "tools": [
     {
       "name": "solidworks_assembly_diagnose",
@@ -444,6 +444,21 @@
       ]
     },
     {
+      "name": "solidworks_motion_sweep_lite",
+      "group": "write_guarded",
+      "description": "Execute or dry-run sampled mechanism driver positions against executable mate evidence, rebuild each sample, and block collisions/dead layouts.",
+      "required": [
+        "spec"
+      ],
+      "properties": [
+        "dry_run",
+        "macro_manifest",
+        "model",
+        "out",
+        "spec"
+      ]
+    },
+    {
       "name": "solidworks_offline_demo",
       "group": "other",
       "description": "Generate a 5-minute offline demo bundle for GitHub readers without requiring SolidWorks to be open.",
@@ -721,6 +736,7 @@
       "solidworks_feature_state",
       "solidworks_mate_group_execute",
       "solidworks_metadata_execute",
+      "solidworks_motion_sweep_lite",
       "solidworks_rebuild",
       "solidworks_restore_backup",
       "solidworks_safe_set_dimension",
