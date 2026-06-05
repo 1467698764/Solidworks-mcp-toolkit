@@ -285,6 +285,71 @@ def select_entity(entity: Any, assembly: Any, append: bool) -> bool:
     return ok
 
 
+def entity_identity_value(entity: Any, key: str) -> Any:
+    for attr in (key, key.lower(), key.upper()):
+        value = getattr(entity, attr, None)
+        if value not in (None, ""):
+            return value
+    method_names = {
+        "tracking_id": ("GetTrackingID", "GetTrackingId", "TrackingID"),
+        "persistent_reference": ("GetPersistReference", "GetPersistReference3"),
+        "select_name": ("GetNameForSelection", "GetName", "Name"),
+    }.get(key, tuple())
+    for method in method_names:
+        func = getattr(entity, method, None)
+        if not callable(func):
+            continue
+        try:
+            value = func()
+        except Exception:
+            continue
+        if value not in (None, ""):
+            return value
+    return None
+
+
+def identity_matches(entity: Any, native_identity: dict[str, Any]) -> bool:
+    for key in ("persistent_reference", "tracking_id", "select_name"):
+        expected = native_identity.get(key)
+        if expected in (None, ""):
+            continue
+        actual = entity_identity_value(entity, key)
+        if isinstance(expected, list) and not isinstance(actual, str):
+            actual = as_list(actual)
+        if str(actual) == str(expected):
+            return True
+    return False
+
+
+def component_entities_for_action(component: Any, fallback_type: str) -> list[Any]:
+    if fallback_type in {"bbox_planar_face", "cylindrical_axis"}:
+        return component_faces(component)
+    if fallback_type == "slot_centerline":
+        return component_edges(component)
+    if fallback_type in {"bbox_vertex", "point"}:
+        return component_vertices(component)
+    return []
+
+
+def select_by_native_identity(assembly: Any, component: Any, action: dict[str, Any]) -> dict[str, Any]:
+    native_identity = action.get("native_identity") if isinstance(action.get("native_identity"), dict) else {}
+    fallback_type = str(action.get("fallback_type") or "")
+    select_name = native_identity.get("select_name")
+    if select_name:
+        try:
+            ok = bool(assembly.Extension.SelectByID2(str(select_name), action["type"], 0, 0, 0, bool(action["append"]), 0, None, 0))
+        except Exception:
+            ok = False
+        if ok:
+            return {"ok": True, "method": "SelectByID2:native_identity", "component": component_display_name(component)}
+    for entity in component_entities_for_action(component, fallback_type):
+        if not identity_matches(entity, native_identity):
+            continue
+        ok = select_entity(entity, assembly, bool(action["append"]))
+        return {"ok": ok, "method": "native_identity.Select4", "component": component_display_name(component), "entity": entity}
+    return {"ok": False, "method": "native_identity", "error": "identity_not_found"}
+
+
 def best_planar_face(component: Any, fallback: dict[str, Any]) -> Any | None:
     expected_normal = vector(fallback.get("normal"), [0.0, 0.0, 0.0])
     expected_origin = vector(fallback.get("origin_m"), [0.0, 0.0, 0.0])
@@ -391,6 +456,9 @@ def native_select_with_action(assembly: Any, action: dict[str, Any]) -> dict[str
     component = find_component(assembly, str(action.get("component") or ""))
     if component is None:
         return {"ok": False, "method": "native_component_face", "error": "component_not_found"}
+    identity_report = select_by_native_identity(assembly, component, action)
+    if identity_report.get("ok"):
+        return identity_report
     fallback = action.get("fallback") if isinstance(action.get("fallback"), dict) else {}
     if action.get("fallback_type") == "bbox_planar_face":
         entity = best_planar_face(component, fallback)
@@ -425,6 +493,7 @@ def selection_action(selector: dict[str, Any], append: bool) -> dict[str, Any]:
         "xyz_m": origin,
         "append": append,
         "strategy": selector.get("strategy"),
+        "native_identity": selector.get("native_identity") if isinstance(selector.get("native_identity"), dict) else {},
         "fallback_type": fallback_type,
         "fallback": fallback,
         "width_role": selector.get("width_role") or fallback.get("width_role"),

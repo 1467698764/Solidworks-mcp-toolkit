@@ -1,8 +1,9 @@
 ﻿"""Build a heuristic component/interface index from a SolidWorks inspect report.
 
-The index is deliberately evidence-scoped: it records bbox-derived proximity and
-role hints, not exact CAD face/axis identities. Live face/edge selection should
-refine these candidates before applying mates.
+The index is deliberately evidence-scoped: it records bbox-derived proximity,
+role hints, and a stable native-identity envelope. Live face/edge selection can
+fill persisted COM references or tracking ids into that envelope before applying
+mates.
 """
 from __future__ import annotations
 
@@ -65,20 +66,37 @@ def clean_vector(values: list[float]) -> list[float]:
     return [round(float(value), 12) for value in values]
 
 
+def native_identity_envelope(component: str, component_path: str | None, stable_id: str, kind: str, geometry_signature: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "stable_id": stable_id,
+        "component": component,
+        "component_path": component_path,
+        "kind": kind,
+        "persistent_reference": None,
+        "tracking_id": None,
+        "select_name": None,
+        "geometry_signature": geometry_signature,
+        "source": "interface_index_selector_signature",
+        "resolution_order": ["persistent_reference", "tracking_id", "select_name", "geometry_signature_fallback"],
+    }
+
+
 def planar_selector(component: str, component_path: str | None, interface_id: str, face_name: str, face: dict[str, Any]) -> dict[str, Any]:
+    geometry_signature = {
+        "type": "bbox_planar_face",
+        "face": face_name,
+        "origin_m": face["local_frame"]["origin_m"],
+        "normal": face["normal"],
+        "source": face["source"],
+    }
     return {
         "stable_id": interface_id,
         "component": component,
         "component_path": component_path,
-        "strategy": "stable_id_then_bbox_fallback",
-        "fallback": {
-            "type": "bbox_planar_face",
-            "face": face_name,
-            "origin_m": face["local_frame"]["origin_m"],
-            "normal": face["normal"],
-            "source": face["source"],
-        },
-        "tags": ["reopen_repair_selector", "review_before_live_selection"],
+        "strategy": "native_identity_then_stable_id_then_bbox_fallback",
+        "native_identity": native_identity_envelope(component, component_path, interface_id, "face", geometry_signature),
+        "fallback": geometry_signature,
+        "tags": ["reopen_repair_selector", "review_before_live_selection", "native_identity_envelope"],
     }
 
 
@@ -276,20 +294,22 @@ def cylinder_axis_from_text(text: str, box: list[float] | None) -> tuple[str, li
 
 
 def cylinder_selector(component: str, component_path: str | None, interface: dict[str, Any]) -> dict[str, Any]:
+    geometry_signature = {
+        "type": "cylindrical_axis",
+        "axis": interface["axis"],
+        "origin_m": interface["origin_m"],
+        "radius_m": interface.get("radius_m"),
+        "source_feature": interface.get("source_feature"),
+        "source": interface.get("source"),
+    }
     return {
         "stable_id": interface["interface_id"],
         "component": component,
         "component_path": component_path,
-        "strategy": "stable_id_then_feature_dimension_bbox_fallback",
-        "fallback": {
-            "type": "cylindrical_axis",
-            "axis": interface["axis"],
-            "origin_m": interface["origin_m"],
-            "radius_m": interface.get("radius_m"),
-            "source_feature": interface.get("source_feature"),
-            "source": interface.get("source"),
-        },
-        "tags": ["reopen_repair_selector", "review_before_live_selection"],
+        "strategy": "native_identity_then_stable_id_then_feature_dimension_bbox_fallback",
+        "native_identity": native_identity_envelope(component, component_path, interface["interface_id"], "face_or_axis", geometry_signature),
+        "fallback": geometry_signature,
+        "tags": ["reopen_repair_selector", "review_before_live_selection", "native_identity_envelope"],
     }
 
 
@@ -371,20 +391,22 @@ def slot_role(feature: dict[str, Any]) -> str | None:
 
 
 def slot_selector(component: str, component_path: str | None, interface: dict[str, Any]) -> dict[str, Any]:
+    geometry_signature = {
+        "type": "slot_centerline",
+        "path_axis": interface["path_axis"],
+        "centerline_m": interface["centerline_m"],
+        "width_m": interface.get("width_m"),
+        "source_feature": interface.get("source_feature"),
+        "source": interface.get("source"),
+    }
     return {
         "stable_id": interface["interface_id"],
         "component": component,
         "component_path": component_path,
-        "strategy": "stable_id_then_feature_dimension_bbox_fallback",
-        "fallback": {
-            "type": "slot_centerline",
-            "path_axis": interface["path_axis"],
-            "centerline_m": interface["centerline_m"],
-            "width_m": interface.get("width_m"),
-            "source_feature": interface.get("source_feature"),
-            "source": interface.get("source"),
-        },
-        "tags": ["reopen_repair_selector", "review_before_live_selection"],
+        "strategy": "native_identity_then_stable_id_then_feature_dimension_bbox_fallback",
+        "native_identity": native_identity_envelope(component, component_path, interface["interface_id"], "edge_or_curve", geometry_signature),
+        "fallback": geometry_signature,
+        "tags": ["reopen_repair_selector", "review_before_live_selection", "native_identity_envelope"],
     }
 
 
@@ -439,18 +461,20 @@ def slot_path_interfaces_for_component(
 
 
 def coordinate_system_selector(component: str, component_path: str | None, coordinate_system: dict[str, Any]) -> dict[str, Any]:
+    geometry_signature = {
+        "type": "bbox_center_coordinate_system",
+        "origin_m": coordinate_system["origin_m"],
+        "axes": coordinate_system["axes"],
+        "source": coordinate_system["source"],
+    }
     return {
         "stable_id": coordinate_system["coordinate_system_id"],
         "component": component,
         "component_path": component_path,
-        "strategy": "stable_id_then_bbox_fallback",
-        "fallback": {
-            "type": "bbox_center_coordinate_system",
-            "origin_m": coordinate_system["origin_m"],
-            "axes": coordinate_system["axes"],
-            "source": coordinate_system["source"],
-        },
-        "tags": ["reopen_repair_selector", "review_before_live_selection"],
+        "strategy": "native_identity_then_stable_id_then_bbox_fallback",
+        "native_identity": native_identity_envelope(component, component_path, coordinate_system["coordinate_system_id"], "coordinate_system", geometry_signature),
+        "fallback": geometry_signature,
+        "tags": ["reopen_repair_selector", "review_before_live_selection", "native_identity_envelope"],
     }
 
 
@@ -599,7 +623,7 @@ def build_index(report: dict[str, Any], *, near_tolerance_m: float, standard_par
             "heuristic_bbox_only",
             "use_live_face_axis_selection_before_applying_mates",
             "standard_part_role_is_name_based_and_may_require_confirmation",
-            "selectors_are_stable_ids_with_bbox_fallbacks_not_native_entity_ids",
+            "selectors_carry_native_identity_envelopes_with_geometry_fallbacks",
             "interface_confidence_scoring_blocks_weak_bbox_only_targets",
             "named_cylindrical_interfaces_from_feature_and_dimension_evidence",
             "slot_path_interfaces_from_feature_dimension_bbox_evidence",

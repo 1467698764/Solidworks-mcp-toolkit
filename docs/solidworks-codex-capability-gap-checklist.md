@@ -135,7 +135,7 @@ Status values:
 | Slot/path interfaces | present | `interface-index` emits feature/dimension/bbox-derived `slot_path_interfaces` with stable ids, path axis/vector, centerline endpoints, width, length, role, confidence policy, source feature, and selector fallback. | Path can drive slot/path/cam mate or validation. |
 | Coordinate systems/datums | present | `interface-index` emits per-component `coordinate_systems` from bbox evidence with stable ids, origin role, axes, size, confidence, and source; live/native coordinate systems remain a refinement layer. | Downstream drawing/CAM/assembly checks know orientation. |
 | Interface confidence scoring | present | `interface-index` assigns confidence levels and selection policies to bbox-derived planar interfaces and coordinate systems; weak bbox-only candidates block automatic selection until live/native evidence is supplied. | Low confidence blocks or asks for alternative, not silent mate creation. |
-| Interface persistence | present | `interface-index` emits per-interface and coordinate-system selectors with stable ids, component path, bbox fallback data, strategy, and review tags; native entity ids remain a future refinement. | Reopen/repair can find the same interface. |
+| Interface persistence | present/guarded | `interface-index` emits per-interface and coordinate-system selectors with stable ids, component path, native identity envelopes, resolution order, tracking/persist/select-name placeholders, geometry signatures, fallback data, strategy, and review tags. `mate-group-execute` now tries native identity before geometry fallback. | Reopen/repair can find the same interface, and reviewed native ids win over bbox proximity. |
 
 ### 6.4 Assembly Planning And Mates
 
@@ -222,7 +222,7 @@ This order matters because later work depends on earlier evidence.
 | 1 | Existing assembly diagnosis | Implemented offline. | Given an inspect report, report inventory, mate graph, isolated nodes, fixed/floating, bad mates, bbox gaps, standard-part host gaps, and locks. |
 | 2 | Interface index extraction | Implemented offline heuristic. | Component bbox, nearest-neighbor, contact candidates, fixed-root hints, and standard-part hints are indexed; live face/axis identity is pending. |
 | 3 | Repair planning | Implemented offline. | Diagnosis turns into ordered repair actions and read-only assembly review pipeline artifacts. |
-| 4 | Mate group executor | Partial/guarded. | Mate group plans, validation gates, reviewable macro drafts, live execution protocols, native face/axis selection, AddMate5 group execution, bad-mate suppress/delete actions, and after-inspect execution checks exist; stronger persistent native entity ids remain next. |
+| 4 | Mate group executor | Present/guarded. | Mate group plans, validation gates, reviewable macro drafts, live execution protocols, native identity envelopes, native face/axis/edge/point selection, AddMate5 group execution, bad-mate suppress/delete actions, and after-inspect execution checks exist; richer live capture of SolidWorks persist-reference bytes remains a hardening track. |
 | 5 | Visual validation gate | Catches failures humans see immediately. | SolidWorks window screenshot is part of blocking evidence for assemblies. |
 | 6 | Mechanism_lite | Makes simple machines credible. | Slider-crank/quick-return samples limits and collisions. |
 | 7 | Engineering_lite | Moves from usable CAD to practical review. | BOM/material/mass/fit/DFM/DFA warnings are available when requested. |

@@ -148,12 +148,20 @@ class InterfaceIndexTests(unittest.TestCase):
             self.assertEqual(selector["fallback"]["type"], "bbox_planar_face")
             self.assertEqual(selector["fallback"]["face"], "z_max")
             self.assertEqual(selector["fallback"]["origin_m"], [0.1, 0.05, 0.012])
+            self.assertEqual(selector["strategy"], "native_identity_then_stable_id_then_bbox_fallback")
+            self.assertEqual(selector["native_identity"]["stable_id"], "base_plate-1:plane:z_max")
+            self.assertEqual(selector["native_identity"]["component_path"], "C:/m/base_plate.SLDPRT")
+            self.assertEqual(selector["native_identity"]["kind"], "face")
+            self.assertEqual(selector["native_identity"]["geometry_signature"]["type"], "bbox_planar_face")
+            self.assertIn("tracking_id", selector["native_identity"]["resolution_order"])
+            self.assertIn("native_identity_envelope", selector["tags"])
             self.assertIn("reopen_repair_selector", selector["tags"])
 
             systems = {item["component"]: item for item in data["coordinate_systems"]}
             csys_selector = systems["base_plate-1"]["selector"]
             self.assertEqual(csys_selector["stable_id"], "base_plate-1:csys:bbox_center")
             self.assertEqual(csys_selector["fallback"]["type"], "bbox_center_coordinate_system")
+            self.assertEqual(csys_selector["native_identity"]["kind"], "coordinate_system")
             self.assertEqual(data["interfaces"][0]["selector_refs"]["a"], "base_plate-1:plane:z_max")
             self.assertEqual(data["interfaces"][0]["selector_refs"]["b"], "cover_plate-1:plane:z_min")
 

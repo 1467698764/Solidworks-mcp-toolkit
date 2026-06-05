@@ -60,9 +60,10 @@ class FakeSurface:
 
 
 class FakeFace:
-    def __init__(self, surface, box):
+    def __init__(self, surface, box, tracking_id=None):
         self.surface = surface
         self.box = box
+        self.tracking_id = tracking_id
         self.select_calls = []
 
     def GetSurface(self):
@@ -74,6 +75,9 @@ class FakeFace:
     def Select4(self, append, select_data):
         self.select_calls.append((append, select_data))
         return True
+
+    def GetTrackingID(self):
+        return self.tracking_id
 
 
 class FakeCurve:
@@ -297,6 +301,39 @@ class MateGroupExecuteTests(unittest.TestCase):
         self.assertEqual(asm.Extension.calls, [])
         guard = result["executed_mates"][0]["selection_guard"]
         self.assertEqual([call["method"] for call in guard["select_by_id_calls"]], ["Face.Select4", "Face.Select4"])
+
+    def test_native_identity_tracking_id_takes_priority_over_bbox_fallback(self):
+        manifest = self.manifest()
+        manifest["macros"][0]["selection_selectors"][0]["native_identity"] = {"tracking_id": "face:bolt:bottom"}
+        manifest["macros"][0]["selection_selectors"][1]["native_identity"] = {"tracking_id": "face:cover:top"}
+        wrong_but_close = FakeFace(
+            FakeSurface("plane", [0.0, 0.0, 0.024, 0.0, 0.0, -1.0]),
+            [0.052, 0.052, 0.023, 0.056, 0.056, 0.025],
+            tracking_id="face:bolt:wrong",
+        )
+        selected_bottom = FakeFace(
+            FakeSurface("plane", [0.0, 0.0, 0.024, 0.0, 0.0, -1.0]),
+            [0.0, 0.0, 0.023, 0.1, 0.1, 0.025],
+            tracking_id="face:bolt:bottom",
+        )
+        selected_top = FakeFace(
+            FakeSurface("plane", [0.0, 0.0, 0.024, 0.0, 0.0, 1.0]),
+            [0.0, 0.0, 0.023, 0.2, 0.1, 0.025],
+            tracking_id="face:cover:top",
+        )
+        asm = FakeAssembly([
+            FakeComponent("bolt_m6-1", [wrong_but_close, selected_bottom]),
+            FakeComponent("cover_plate-1", [selected_top]),
+        ])
+
+        result = mod.execute_manifest(manifest, asm)
+
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(wrong_but_close.select_calls, [])
+        self.assertEqual(selected_bottom.select_calls, [(False, {"mark": 0})])
+        self.assertEqual(selected_top.select_calls, [(True, {"mark": 0})])
+        guard = result["executed_mates"][0]["selection_guard"]
+        self.assertEqual([call["method"] for call in guard["select_by_id_calls"]], ["native_identity.Select4", "native_identity.Select4"])
 
     def test_selects_native_cylindrical_faces_for_concentric_mate(self):
         manifest = self.manifest()
