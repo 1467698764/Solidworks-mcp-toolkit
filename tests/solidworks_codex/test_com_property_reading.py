@@ -324,6 +324,23 @@ class ComPropertyReadingTests(unittest.TestCase):
         self.assertTrue(started)
         self.assertEqual(calls, [("GetActiveObject", "SldWorks.Application"), ("Dispatch", "SldWorks.Application")])
 
+    def test_set_dimension_reports_edit_scope_and_delta(self):
+        evidence = set_dimension_mod.dimension_edit_evidence(
+            "D1@Sketch1@plate.SLDPRT",
+            old_value=0.01,
+            new_value=0.012,
+            requested_value=0.012,
+        )
+
+        self.assertEqual(evidence["operation_role"], "sketch_dimension_adjustment")
+        self.assertEqual(evidence["change_scope"], "dimension")
+        self.assertEqual(evidence["dimension"], "D1@Sketch1@plate.SLDPRT")
+        self.assertEqual(evidence["dimension_token"], "D1")
+        self.assertEqual(evidence["owner_feature"], "Sketch1")
+        self.assertEqual(evidence["owner_document"], "plate.SLDPRT")
+        self.assertEqual(evidence["delta_m"], 0.002)
+        self.assertTrue(evidence["target_reached"])
+
 
 if __name__ == "__main__":
     unittest.main()

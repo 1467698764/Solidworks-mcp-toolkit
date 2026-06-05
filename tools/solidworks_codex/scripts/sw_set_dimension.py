@@ -101,6 +101,27 @@ def save_model(model: Any) -> dict[str, Any]:
     return {"ok": bool(ok), "errors": getattr(errors, "value", errors), "warnings": getattr(warnings, "value", warnings)}
 
 
+def dimension_edit_evidence(dimension_name: str, *, old_value: Any, new_value: Any, requested_value: float) -> dict[str, Any]:
+    parts = str(dimension_name).split("@")
+    before = old_value if isinstance(old_value, (int, float)) else None
+    after = new_value if isinstance(new_value, (int, float)) else None
+    delta = (after - before) if before is not None and after is not None else None
+    target_reached = abs(after - float(requested_value)) <= 1e-9 if after is not None else False
+    return {
+        "operation_role": "sketch_dimension_adjustment",
+        "change_scope": "dimension",
+        "dimension": dimension_name,
+        "dimension_token": parts[0] if parts else dimension_name,
+        "owner_feature": parts[1] if len(parts) > 1 else "",
+        "owner_document": "@".join(parts[2:]) if len(parts) > 2 else "",
+        "before_m": before,
+        "after_m": after,
+        "requested_m": float(requested_value),
+        "delta_m": delta,
+        "target_reached": target_reached,
+    }
+
+
 def set_dimension(model: Any, dimension_name: str, value_m: float, save: bool) -> dict[str, Any]:
     param = read_member(model, "Parameter", dimension_name)
     if param is None or isinstance(param, dict):
@@ -110,6 +131,12 @@ def set_dimension(model: Any, dimension_name: str, value_m: float, save: bool) -
     param.SystemValue = value_m
     rebuild_result = read_member(model, "ForceRebuild3", False)
     new_value = read_member(param, "SystemValue")
+    evidence = dimension_edit_evidence(
+        dimension_name,
+        old_value=old_value,
+        new_value=new_value,
+        requested_value=value_m,
+    )
 
     save_result: Any = None
     if save:
@@ -120,6 +147,9 @@ def set_dimension(model: Any, dimension_name: str, value_m: float, save: bool) -
         "old_system_value_m": old_value,
         "new_system_value_m": new_value,
         "requested_system_value_m": value_m,
+        "execution_evidence": evidence,
+        "operation_role": evidence["operation_role"],
+        "change_scope": evidence["change_scope"],
         "rebuild_result": rebuild_result,
         "saved": save,
         "save_result": save_result,
