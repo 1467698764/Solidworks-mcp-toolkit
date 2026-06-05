@@ -100,6 +100,55 @@ def object_summary(obj: Any) -> dict[str, Any]:
     return summary
 
 
+def persist_reference_value(model: Any, obj: Any) -> list[int] | None:
+    extension = getattr(model, "Extension", None)
+    if extension is None:
+        extension = read(model, "Extension")
+    func = getattr(extension, "GetPersistReference3", None)
+    if not callable(func):
+        return None
+    try:
+        raw = func(obj)
+    except Exception:
+        return None
+    if raw in (None, ""):
+        return None
+    values = raw if isinstance(raw, (list, tuple, bytes, bytearray)) else val(raw)
+    if isinstance(values, (bytes, bytearray)):
+        return [int(item) for item in values]
+    if isinstance(values, (list, tuple)):
+        try:
+            return [int(item) for item in values]
+        except (TypeError, ValueError):
+            return None
+    return None
+
+
+def identity_member(obj: Any, names: tuple[str, ...]) -> Any:
+    for name in names:
+        got = read(obj, name)
+        if got is not None and not (isinstance(got, dict) and "error" in got):
+            return got
+    return None
+
+
+def native_identity(model: Any, obj: Any, comp: Any) -> dict[str, Any]:
+    summary = object_summary(obj)
+    component_summary = object_summary(comp)
+    component_name = component_summary.get("Name2") or component_summary.get("Name") or component_summary.get("GetName")
+    component_path = component_summary.get("GetPathName")
+    select_name = identity_member(obj, ("GetNameForSelection", "GetName", "Name"))
+    return {
+        "persistent_reference": persist_reference_value(model, obj),
+        "tracking_id": identity_member(obj, ("GetTrackingID", "GetTrackingId", "TrackingID")),
+        "select_name": select_name,
+        "component": component_name,
+        "component_path": component_path,
+        "object_type": summary.get("GetTypeName2"),
+        "resolution_order": ["persistent_reference", "tracking_id", "select_name", "geometry_signature_fallback"],
+    }
+
+
 def report(start: bool) -> dict[str, Any]:
     pythoncom_mod, _win32_client = require_pywin32()
     pythoncom_mod.CoInitialize()
@@ -125,6 +174,7 @@ def report(start: bool) -> dict[str, Any]:
                 "mark": mark,
                 "object": object_summary(obj),
                 "component": object_summary(comp),
+                "native_identity": native_identity(model, obj, comp),
             })
     return {
         "timestamp": datetime.now().isoformat(timespec="seconds"),

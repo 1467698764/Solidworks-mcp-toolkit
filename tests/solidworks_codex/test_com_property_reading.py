@@ -77,6 +77,42 @@ class ComPropertyReadingTests(unittest.TestCase):
         self.assertIs(selection_mod.val([prop])[0], prop)
         self.assertIs(set_dimension_mod.safe_value([prop])[0], prop)
 
+    def test_selection_report_native_identity_captures_persist_tracking_and_select_name(self):
+        class FakeExtension:
+            def GetPersistReference3(self, obj):
+                self.last = obj
+                return bytes([1, 2, 3, 255])
+
+        class FakeModel:
+            Extension = FakeExtension()
+
+        class FakeObject:
+            Name = "Face<1>"
+
+            def GetTrackingID(self):
+                return 42
+
+            def GetNameForSelection(self):
+                return "Face<1>@plate-1"
+
+            def GetTypeName2(self):
+                return "FACE"
+
+        class FakeComponent:
+            Name2 = "plate-1"
+
+            def GetPathName(self):
+                return "C:/m/plate.SLDPRT"
+
+        identity = selection_mod.native_identity(FakeModel(), FakeObject(), FakeComponent())
+        self.assertEqual(identity["persistent_reference"], [1, 2, 3, 255])
+        self.assertEqual(identity["tracking_id"], 42)
+        self.assertEqual(identity["select_name"], "Face<1>@plate-1")
+        self.assertEqual(identity["component"], "plate-1")
+        self.assertEqual(identity["component_path"], "C:/m/plate.SLDPRT")
+        self.assertEqual(identity["object_type"], "FACE")
+        self.assertIn("geometry_signature_fallback", identity["resolution_order"])
+
     def test_feature_state_finds_exact_subfeature_and_rejects_ambiguous_contains(self):
         class FakeFeature:
             _oleobj_ = object()
