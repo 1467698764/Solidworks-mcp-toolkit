@@ -462,16 +462,17 @@ def best_planar_face(component: Any, fallback: dict[str, Any]) -> Any | None:
     expected_origin = vector(fallback.get("origin_m"), [0.0, 0.0, 0.0])
     best: tuple[float, Any] | None = None
     for face in component_faces(component):
+        face_center = transform_point(component, center_from_box(entity_box(face), [0.0, 0.0, 0.0]))
         surface = surface_for_face(face)
         if surface is None or not surface_bool(surface, "IsPlane"):
-            continue
-        params = surface_params(surface, "PlaneParams")
-        normal_candidates = [params[:3], params[3:6]] if len(params) >= 6 else [expected_normal]
-        normal_score = max((abs(dot(transform_normal(component, normal), expected_normal)) for normal in normal_candidates), default=1.0) if any(expected_normal) else 1.0
-        if normal_score < 0.8:
-            continue
-        face_center = transform_point(component, center_from_box(entity_box(face), [0.0, 0.0, 0.0]))
-        score = distance(face_center, expected_origin) - normal_score
+            score = distance(face_center, expected_origin)
+        else:
+            params = surface_params(surface, "PlaneParams")
+            normal_candidates = [params[:3], params[3:6]] if len(params) >= 6 else [expected_normal]
+            normal_score = max((abs(dot(transform_normal(component, normal), expected_normal)) for normal in normal_candidates), default=1.0) if any(expected_normal) else 1.0
+            if normal_score < 0.8:
+                continue
+            score = distance(face_center, expected_origin) - normal_score
         if best is None or score < best[0]:
             best = (score, face)
     return best[1] if best else None

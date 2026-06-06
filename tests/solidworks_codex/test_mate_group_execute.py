@@ -436,6 +436,15 @@ class MateGroupExecuteTests(unittest.TestCase):
 
         self.assertIs(selected, face)
 
+    def test_best_planar_face_falls_back_to_face_box_when_surface_is_unavailable(self):
+        face = FakeFace(None, [0.0, 0.0, 0.023, 0.1, 0.1, 0.025])
+        component = FakeComponent("plate-1", [face])
+        component.Transform2 = FakeTransform([1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0.0, 0.0])
+
+        selected = mod.best_planar_face(component, {"normal": [1.0, 0.0, 0.0], "origin_m": [0.55, 0.05, 0.024]})
+
+        self.assertIs(selected, face)
+
     def test_best_cylindrical_face_uses_component_rotation_and_translation(self):
         face = FakeFace(
             FakeSurface("cylinder", [0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.01]),
