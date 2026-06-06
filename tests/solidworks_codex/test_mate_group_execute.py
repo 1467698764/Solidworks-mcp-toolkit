@@ -41,6 +41,21 @@ class FakeExtension:
         return True
 
 
+class FakeThrowingExtension(FakeExtension):
+    def SelectByID2(self, name, entity_type, x, y, z, append, mark, callout, option):
+        self.calls.append(
+            {
+                "name": name,
+                "type": entity_type,
+                "xyz": [x, y, z],
+                "append": append,
+                "mark": mark,
+                "option": option,
+            }
+        )
+        raise TypeError("COM type mismatch")
+
+
 class FakeSurface:
     def __init__(self, kind, params):
         self.kind = kind
@@ -233,6 +248,13 @@ class FakeAssembly:
         return self.features.get(name)
 
 
+class FakeSelectByIdTypeMismatchAssembly(FakeAssembly):
+    def __init__(self, components=None, features=None):
+        super().__init__(components, features)
+        self.Extension = FakeThrowingExtension()
+        self.SelectionManager = FakeSelectionManager(self, self.Extension)
+
+
 class FakeFalseAddMateAssembly(FakeAssembly):
     def AddMate5(self, *args):
         self.mates.append(args)
@@ -324,6 +346,20 @@ class MateGroupExecuteTests(unittest.TestCase):
         self.assertEqual(asm.Extension.calls, [])
         guard = result["executed_mates"][0]["selection_guard"]
         self.assertEqual([call["method"] for call in guard["select_by_id_calls"]], ["Face.Select4", "Face.Select4"])
+
+    def test_selectbyid_com_type_mismatch_is_reported_not_raised(self):
+        asm = FakeSelectByIdTypeMismatchAssembly()
+
+        result = mod.execute_manifest(self.manifest(), asm)
+
+        self.assertFalse(result["ok"], result)
+        self.assertEqual(result["counts"]["executed_mates"], 0)
+        blocking = result["findings"]["blocking"][0]
+        self.assertEqual("selection_failed", blocking["kind"])
+        reports = blocking["detail"]["selection_reports"]
+        self.assertEqual("SelectByID2", reports[0]["method"])
+        self.assertIn("COM type mismatch", reports[0]["error"])
+        self.assertEqual(asm.mates, [])
 
     def test_native_identity_tracking_id_takes_priority_over_bbox_fallback(self):
         manifest = self.manifest()

@@ -553,7 +553,14 @@ def select_with_action(assembly: Any, action: dict[str, Any]) -> dict[str, Any]:
     try:
         ok = bool(assembly.Extension.SelectByID2("", action["type"], x, y, z, bool(action["append"]), 0, callout, 0))
     except TypeError:
-        ok = bool(assembly.Extension.SelectByID2("", action["type"], x, y, z, bool(action["append"]), 0, None, 0))
+        try:
+            ok = bool(assembly.Extension.SelectByID2("", action["type"], x, y, z, bool(action["append"]), 0, None, 0))
+        except Exception as exc:
+            action["method"] = "SelectByID2"
+            return {"ok": False, "method": "SelectByID2", "error": repr(exc), "native_attempt": native}
+    except Exception as exc:
+        action["method"] = "SelectByID2"
+        return {"ok": False, "method": "SelectByID2", "error": repr(exc), "native_attempt": native}
     action["method"] = "SelectByID2"
     return {"ok": ok, "method": "SelectByID2", "native_attempt": native}
 
