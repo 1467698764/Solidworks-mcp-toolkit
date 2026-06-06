@@ -194,6 +194,8 @@ def mate_selection_evidence_ok(mate: dict[str, Any]) -> bool:
     return (
         int_equals(mate.get("selected_entities"), 2)
         and int_equals(guard.get("cleared_selection_count"), 0)
+        and guard.get("left_selected") is True
+        and guard.get("right_selected") is True
         and int_equals(guard.get("selection_count_before_mate"), 2)
     )
 
@@ -638,24 +640,20 @@ def select_front_plane(model: Any) -> None:
     feat = read_member(model, "FirstFeature")
     while feat is not None:
         if read_member(feat, "GetTypeName2") == "RefPlane":
-            feat.Select2(False, 0)
-            return
+            if feat.Select2(False, 0):
+                return
         feat = read_member(feat, "GetNextFeature")
     raise RuntimeError("Could not select front/ref plane")
 
 
 def new_part(sw: Any) -> Any:
     model = sw.NewDocument(default_template(sw, 8, "part"), 0, 0, 0)
-    if model is None:
-        raise RuntimeError("NewDocument(part) returned None")
-    return model
+    return require_com_created(model, "NewDocument(part)")
 
 
 def new_assembly(sw: Any) -> Any:
     asm = sw.NewDocument(default_template(sw, 9, "assembly"), 0, 0, 0)
-    if asm is None:
-        raise RuntimeError("NewDocument(assembly) returned None")
-    return asm
+    return require_com_created(asm, "NewDocument(assembly)")
 
 
 
@@ -669,7 +667,7 @@ def save_as(model: Any, path: Path) -> None:
         extension_result = model.Extension.SaveAs(str(path.resolve()), 0, 1, empty_dispatch_variant(), errors, warnings)
     except Exception:
         extension_result = None
-    if extension_result not in (False, 0, None):
+    if extension_result not in (False, 0, None) and path.exists():
         return
     save_as3_result = read_member(model, "SaveAs3", str(path.resolve()), 0, 2)
     if save_as3_result is False or save_as3_result == 0 or not path.exists():
@@ -1147,11 +1145,13 @@ def select_faces(asm: Any, first: Any, second: Any, component_pair: list[str] | 
     asm.ClearSelection2(True)
     cleared_count = int(asm.SelectionManager.GetSelectedObjectCount2(-1))
     empty = empty_dispatch_variant()
-    first.Select4(False, empty)
-    second.Select4(True, empty)
+    left_selected = bool(first.Select4(False, empty))
+    right_selected = bool(second.Select4(True, empty))
     selected_count = int(asm.SelectionManager.GetSelectedObjectCount2(-1))
     return {
         "cleared_selection_count": cleared_count,
+        "left_selected": left_selected,
+        "right_selected": right_selected,
         "selection_count_before_mate": selected_count,
         "component_pair": component_pair or [],
     }

@@ -32,6 +32,8 @@ def sample_shaper_mates(module):
             "selected_entities": 2,
             "selection_guard": {
                 "cleared_selection_count": 0,
+                "left_selected": True,
+                "right_selected": True,
                 "selection_count_before_mate": 2,
                 "component_pair": [f"{expected['semantic_pair'][0]}-1", f"{expected['semantic_pair'][1]}-1"],
             },
@@ -171,6 +173,84 @@ class CompleteShaperSpecTests(unittest.TestCase):
                 self.module.create_cut_from_selected_sketch(Model(), 0.01, "FalseCut")
         finally:
             self.module.select_front_plane = original
+
+    def test_live_builder_treats_false_new_document_as_failure(self):
+        class Sw:
+            def __init__(self, result):
+                self.result = result
+
+            def GetUserPreferenceStringValue(self, value):
+                return "template"
+
+            def NewDocument(self, *args):
+                return self.result
+
+        with self.assertRaisesRegex(RuntimeError, "NewDocument\\(part\\).*False"):
+            self.module.new_part(Sw(False))
+
+        with self.assertRaisesRegex(RuntimeError, "NewDocument\\(assembly\\).*0"):
+            self.module.new_assembly(Sw(0))
+
+    def test_select_front_plane_rejects_false_fallback_selection(self):
+        class Feature:
+            def GetTypeName2(self):
+                return "RefPlane"
+
+            def Select2(self, append, mark):
+                return False
+
+            def GetNextFeature(self):
+                return None
+
+        class Extension:
+            def SelectByID2(self, *args):
+                return False
+
+        class Model:
+            def __init__(self):
+                self.Extension = Extension()
+                self.FirstFeature = Feature()
+
+        original = self.module.empty_dispatch_variant
+        self.module.empty_dispatch_variant = lambda: object()
+        try:
+            with self.assertRaisesRegex(RuntimeError, "Could not select front/ref plane"):
+                self.module.select_front_plane(Model())
+        finally:
+            self.module.empty_dispatch_variant = original
+
+    def test_save_as_requires_created_file_even_when_extension_reports_success(self):
+        class VariantFactory:
+            def VARIANT(self, *args):
+                return type("Variant", (), {"value": 0})()
+
+        class PythonCom:
+            VT_BYREF = 0
+            VT_I4 = 0
+            VT_DISPATCH = 0
+
+        class Extension:
+            def SaveAs(self, *args):
+                return True
+
+        class Model:
+            def __init__(self):
+                self.Extension = Extension()
+
+            def SaveAs3(self, *args):
+                return True
+
+        original_require = self.module.require_pywin32
+        original_empty = self.module.empty_dispatch_variant
+        self.module.require_pywin32 = lambda: (PythonCom(), VariantFactory())
+        self.module.empty_dispatch_variant = lambda: object()
+        try:
+            with TemporaryDirectory() as tmp:
+                with self.assertRaisesRegex(RuntimeError, "SaveAs failed"):
+                    self.module.save_as(Model(), Path(tmp) / "missing.SLDPRT")
+        finally:
+            self.module.require_pywin32 = original_require
+            self.module.empty_dispatch_variant = original_empty
 
     def test_live_builder_places_visible_attached_detail_instances(self):
         detail_placements = self.module.detail_instance_placements()
@@ -321,7 +401,7 @@ class CompleteShaperSpecTests(unittest.TestCase):
                 "semantic_pair": ["base_plate", "cover_plate"],
                 "components": ["base_plate-1", "cover_plate-1"],
                 "selected_entities": 2,
-                "selection_guard": {"cleared_selection_count": 0, "selection_count_before_mate": 2, "component_pair": ["base_plate-1", "cover_plate-1"]},
+                "selection_guard": {"cleared_selection_count": 0, "left_selected": True, "right_selected": True, "selection_count_before_mate": 2, "component_pair": ["base_plate-1", "cover_plate-1"]},
             },
             {
                 "name": "Shaft_Bearing_Concentric",
@@ -330,7 +410,7 @@ class CompleteShaperSpecTests(unittest.TestCase):
                 "semantic_pair": ["drive_shaft", "bearing_block"],
                 "components": ["drive_shaft-1", "bearing_block-1"],
                 "selected_entities": 2,
-                "selection_guard": {"cleared_selection_count": 0, "selection_count_before_mate": 2, "component_pair": ["drive_shaft-1", "bearing_block-1"]},
+                "selection_guard": {"cleared_selection_count": 0, "left_selected": True, "right_selected": True, "selection_count_before_mate": 2, "component_pair": ["drive_shaft-1", "bearing_block-1"]},
             },
         ]
         self.assertEqual([], self.module.validate_semantic_mate_network(mates, contract))
@@ -351,7 +431,7 @@ class CompleteShaperSpecTests(unittest.TestCase):
             "semantic_pair": ["base_plate", "cover_plate"],
             "components": ["base_plate-1", "cover_plate-1"],
             "selected_entities": 2,
-            "selection_guard": {"cleared_selection_count": 0, "selection_count_before_mate": 2, "component_pair": ["base_plate-1", "cover_plate-1"]},
+            "selection_guard": {"cleared_selection_count": 0, "left_selected": True, "right_selected": True, "selection_count_before_mate": 2, "component_pair": ["base_plate-1", "cover_plate-1"]},
         }
 
         failed = self.module.validate_semantic_mate_network([mate], contract)
@@ -372,6 +452,55 @@ class CompleteShaperSpecTests(unittest.TestCase):
 
         self.assertFalse(result["ok"])
         self.assertEqual("AddMate5 returned False", result["error"])
+
+    def test_face_selection_guard_records_each_select4_result(self):
+        class SelectionManager:
+            def GetSelectedObjectCount2(self, mark):
+                return 2
+
+        class Asm:
+            def ClearSelection2(self, value):
+                return True
+
+            def __init__(self):
+                self.SelectionManager = SelectionManager()
+
+        class Face:
+            def __init__(self, selected):
+                self.selected = selected
+
+            def Select4(self, *args):
+                return self.selected
+
+        original = self.module.empty_dispatch_variant
+        self.module.empty_dispatch_variant = lambda: object()
+        try:
+            guard = self.module.select_faces(Asm(), Face(False), Face(True), ["left-1", "right-1"])
+        finally:
+            self.module.empty_dispatch_variant = original
+
+        self.assertFalse(guard["left_selected"])
+        self.assertTrue(guard["right_selected"])
+
+    def test_live_validation_rejects_false_face_selection_results(self):
+        base = {
+            "ok": True,
+            "part_count": 24,
+            "component_count": self.module.expected_assembly_component_minimum(),
+            "layout": {"ok": True},
+            "mates": sample_shaper_mates(self.module),
+            "callbacks": {"mass": {"available": True, "mass_kg": 14.81}, "interference": {"available": True, "count": 0}},
+            "post_cleanup": {"locked_files": [], "lock_files": []},
+            "inspect": self.module.sample_expected_shaper_inspect_evidence(),
+            "model_understanding": self.module.sample_expected_shaper_understanding_evidence(),
+            "part_feature_evidence": sample_part_feature_evidence(self.module),
+            "design_layout_fixed_components": sample_design_layout_fixed_components(self.module),
+        }
+        bad_mates = sample_shaper_mates(self.module)
+        bad_mates[0]["selection_guard"] = dict(bad_mates[0]["selection_guard"], left_selected=False)
+        base["mates"] = bad_mates
+
+        self.assertIn(f"mate_selection:{bad_mates[0]['name']}", self.module.validate_live_result(base)["failed"])
 
 
     def test_complete_shaper_uses_real_interface_mates_without_fixing_motion_parts(self):
