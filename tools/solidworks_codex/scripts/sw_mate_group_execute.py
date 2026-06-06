@@ -167,12 +167,33 @@ def component_bodies(component: Any) -> list[Any]:
 
 def body_faces(body: Any) -> list[Any]:
     func = getattr(body, "GetFaces", None)
-    if not callable(func):
+    if callable(func):
+        try:
+            faces = as_list(func())
+        except Exception:
+            faces = []
+        if faces:
+            return faces
+    first_face = getattr(body, "GetFirstFace", None)
+    if not callable(first_face):
         return []
+    faces: list[Any] = []
     try:
-        return as_list(func())
+        face = first_face()
     except Exception:
         return []
+    seen: set[int] = set()
+    while face is not None and id(face) not in seen and len(faces) < 2048:
+        seen.add(id(face))
+        faces.append(face)
+        next_face = getattr(face, "GetNextFace", None)
+        if not callable(next_face):
+            break
+        try:
+            face = next_face()
+        except Exception:
+            break
+    return faces
 
 
 def body_edges(body: Any) -> list[Any]:

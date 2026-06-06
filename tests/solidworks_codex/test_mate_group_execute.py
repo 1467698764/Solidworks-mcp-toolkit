@@ -152,6 +152,25 @@ class FakeBody:
         return self.vertices
 
 
+class FakeLinkedBody:
+    def __init__(self, faces):
+        self.faces = faces
+
+    def GetFirstFace(self):
+        for index, face in enumerate(self.faces):
+            face.next_face = self.faces[index + 1] if index + 1 < len(self.faces) else None
+        return self.faces[0] if self.faces else None
+
+
+class FakeLinkedFace(FakeFace):
+    def __init__(self, surface, box):
+        super().__init__(surface, box)
+        self.next_face = None
+
+    def GetNextFace(self):
+        return self.next_face
+
+
 class FakeComponent:
     def __init__(self, name, faces, edges=None, vertices=None):
         self.Name2 = name
@@ -161,6 +180,14 @@ class FakeComponent:
 
     def GetBodies3(self, body_type, visible_only):
         return [FakeBody(self.faces, self.edges, self.vertices)]
+
+
+class FakeLinkedBodyComponent(FakeComponent):
+    def GetBodies3(self, body_type, visible_only):
+        raise TypeError("GetBodies3 unavailable for this COM wrapper")
+
+    def GetBodies2(self, body_type):
+        return [FakeLinkedBody(self.faces)]
 
 
 class FakeSelectionManager:
@@ -344,6 +371,28 @@ class MateGroupExecuteTests(unittest.TestCase):
         self.assertEqual(bottom_face.select_calls, [(False, {"mark": 0})])
         self.assertEqual(top_face.select_calls, [(True, {"mark": 0})])
         self.assertEqual(asm.Extension.calls, [])
+        guard = result["executed_mates"][0]["selection_guard"]
+        self.assertEqual([call["method"] for call in guard["select_by_id_calls"]], ["Face.Select4", "Face.Select4"])
+
+    def test_enumerates_faces_from_getfirstface_when_getfaces_is_unavailable(self):
+        bottom_face = FakeLinkedFace(
+            FakeSurface("plane", [0.0, 0.0, 0.024, 0.0, 0.0, -1.0]),
+            [0.0, 0.0, 0.023, 0.1, 0.1, 0.025],
+        )
+        top_face = FakeLinkedFace(
+            FakeSurface("plane", [0.0, 0.0, 0.024, 0.0, 0.0, 1.0]),
+            [0.0, 0.0, 0.023, 0.2, 0.1, 0.025],
+        )
+        asm = FakeAssembly([
+            FakeLinkedBodyComponent("bolt_m6-1", [bottom_face]),
+            FakeLinkedBodyComponent("cover_plate-1", [top_face]),
+        ])
+
+        result = mod.execute_manifest(self.manifest(), asm)
+
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(bottom_face.select_calls, [(False, {"mark": 0})])
+        self.assertEqual(top_face.select_calls, [(True, {"mark": 0})])
         guard = result["executed_mates"][0]["selection_guard"]
         self.assertEqual([call["method"] for call in guard["select_by_id_calls"]], ["Face.Select4", "Face.Select4"])
 
