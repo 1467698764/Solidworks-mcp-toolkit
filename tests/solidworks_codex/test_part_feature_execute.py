@@ -62,6 +62,18 @@ class FakeFeatureManager:
         self.calls.append(("FeatureCut3", args))
         return {"name": "Codex_Cut"}
 
+    def FeatureExtrusion3(self, *args):
+        self.calls.append(("FeatureExtrusion3", args))
+        return {"name": "Codex_BossExtrude"}
+
+    def FeatureRevolve2(self, *args):
+        self.calls.append(("FeatureRevolve2", args))
+        return {"name": "Codex_Revolve"}
+
+    def FeatureRevolveCut2(self, *args):
+        self.calls.append(("FeatureRevolveCut2", args))
+        return {"name": "Codex_RevolvedCut"}
+
     def HoleWizard5(self, *args):
         self.calls.append(("HoleWizard5", args))
         return {"name": "Codex_HoleWizard"}
@@ -337,6 +349,64 @@ class PartFeatureExecuteTests(unittest.TestCase):
         self.assertEqual(result["operation_role"], "rectangular_pocket_cut")
         self.assertTrue(any(call[0] == "CreateCenterRectangle" for call in model.SketchManager.calls))
         self.assertEqual(model.FeatureManager.calls[-1][0], "FeatureCut3")
+
+    def test_executes_extrude_boss_from_reviewed_sketch(self):
+        model = FakeModel()
+        plan = mod.validate_spec({
+            "operation": "extrude_boss",
+            "selectors": [{"kind": "entity", "name": "BossSketch", "type": "SKETCH"}],
+            "parameters": {"depth_mm": 25, "feature_name": "DriveGearBlank"},
+        })
+
+        result = mod.execute(model, plan)
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["operation_role"], "reviewed_profile_extrude_boss")
+        self.assertEqual(model.Extension.calls[0][0], "SelectByID2")
+        self.assertEqual(model.FeatureManager.calls[-1][0], "FeatureExtrusion3")
+        self.assertEqual(result["operation_result"]["boss"]["method"], "FeatureExtrusion3")
+        self.assertEqual(result["operation_result"]["feature_name"], "DriveGearBlank")
+        self.assertEqual(result["operation_result"]["depth_m"], 0.025)
+
+    def test_executes_revolve_boss_with_reviewed_axis(self):
+        model = FakeModel()
+        plan = mod.validate_spec({
+            "operation": "revolve_boss",
+            "selectors": [
+                {"kind": "entity", "name": "ToothProfile", "type": "SKETCH"},
+                {"kind": "entity", "name": "Axis1", "type": "AXIS"},
+            ],
+            "parameters": {"angle_deg": 360, "feature_name": "GearHub"},
+        })
+
+        result = mod.execute(model, plan)
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["operation_role"], "reviewed_profile_revolve_boss")
+        self.assertEqual(model.FeatureManager.calls[-1][0], "FeatureRevolve2")
+        self.assertEqual(result["operation_result"]["revolve"]["method"], "FeatureRevolve2")
+        self.assertEqual(result["operation_result"]["axis_selector"], "Axis1")
+        self.assertAlmostEqual(result["operation_result"]["angle_rad"], 6.283185307179586)
+
+    def test_executes_revolved_cut_with_reviewed_axis_and_cut_direction(self):
+        model = FakeModel()
+        plan = mod.validate_spec({
+            "operation": "revolved_cut",
+            "selectors": [
+                {"kind": "entity", "name": "ReliefProfile", "type": "SKETCH"},
+                {"kind": "entity", "name": "Axis1", "type": "AXIS"},
+            ],
+            "parameters": {"angle_deg": 180, "reverse_direction": True, "feature_name": "HalfRelief"},
+        })
+
+        result = mod.execute(model, plan)
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["operation_role"], "reviewed_profile_revolved_cut")
+        self.assertEqual(model.FeatureManager.calls[-1][0], "FeatureRevolveCut2")
+        self.assertEqual(result["operation_result"]["revolve_cut"]["method"], "FeatureRevolveCut2")
+        self.assertEqual(result["operation_result"]["axis_selector"], "Axis1")
+        self.assertTrue(result["operation_result"]["reverse_direction"])
 
 
 if __name__ == "__main__":

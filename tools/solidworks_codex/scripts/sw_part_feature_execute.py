@@ -26,7 +26,10 @@ SUPPORTED_OPERATIONS = {
     "basic_hole",
     "countersink_hole",
     "counterbore_hole",
+    "extrude_boss",
     "extrude_cut",
+    "revolve_boss",
+    "revolved_cut",
     "slot_cut",
     "pocket_cut",
     "linear_pattern",
@@ -40,7 +43,10 @@ OPERATION_ROLE_BY_OPERATION = {
     "basic_hole": "cylindrical_hole_cut",
     "countersink_hole": "countersunk_hole_cut",
     "counterbore_hole": "counterbored_hole_cut",
+    "extrude_boss": "reviewed_profile_extrude_boss",
     "extrude_cut": "reviewed_profile_extrude_cut",
+    "revolve_boss": "reviewed_profile_revolve_boss",
+    "revolved_cut": "reviewed_profile_revolved_cut",
     "slot_cut": "slot_profile_cut",
     "pocket_cut": "rectangular_pocket_cut",
     "linear_pattern": "repeat_seed_feature",
@@ -175,8 +181,15 @@ def operation_for(spec: dict[str, Any]) -> str:
         "countersunk_hole": "countersink_hole",
         "counterbore": "counterbore_hole",
         "counterbored_hole": "counterbore_hole",
+        "boss": "extrude_boss",
+        "boss_extrude": "extrude_boss",
+        "extruded_boss": "extrude_boss",
+        "extrude": "extrude_boss",
         "cut": "extrude_cut",
         "extruded_cut": "extrude_cut",
+        "revolve": "revolve_boss",
+        "revolved_boss": "revolve_boss",
+        "revolve_cut": "revolved_cut",
         "slot": "slot_cut",
         "pocket": "pocket_cut",
         "linear": "linear_pattern",
@@ -265,12 +278,20 @@ def validate_spec(spec: dict[str, Any]) -> dict[str, Any]:
             raise ValueError("counterbore_hole counterbore_depth must be positive")
         if depth_m > 0 and counterbore_depth_m >= depth_m:
             raise ValueError("counterbore_hole counterbore_depth must be less than hole depth")
-    if operation == "extrude_cut":
+    if operation in {"extrude_boss", "extrude_cut"}:
         depth_m = float(params.get("depth_m", mm_to_m(params.get("depth_mm", 0))))
         if depth_m <= 0 and not bool(params.get("through_all")):
-            raise ValueError("extrude_cut depth must be positive unless through_all is true")
+            raise ValueError(f"{operation} depth must be positive unless through_all is true")
         if not any(s["kind"] == "entity" and s["type"] in {"SKETCH", "PLANE", "FACE"} for s in selectors):
-            raise ValueError("extrude_cut requires a reviewed sketch, sketch plane, or planar face selector")
+            raise ValueError(f"{operation} requires a reviewed sketch, sketch plane, or planar face selector")
+    if operation in {"revolve_boss", "revolved_cut"}:
+        angle_deg = float(params.get("angle_deg", 360.0))
+        if angle_deg <= 0 or angle_deg > 360:
+            raise ValueError(f"{operation} angle_deg must be greater than 0 and no more than 360")
+        if not any(s["kind"] == "entity" and s["type"] == "SKETCH" for s in selectors):
+            raise ValueError(f"{operation} requires a reviewed profile sketch selector")
+        if not any(s["kind"] == "entity" and s["type"] == "AXIS" for s in selectors):
+            raise ValueError(f"{operation} requires a reviewed axis selector")
     if operation == "slot_cut":
         length_m = float(params.get("length_m", mm_to_m(params.get("length_mm", 0))))
         width_m = float(params.get("width_m", mm_to_m(params.get("width_mm", 0))))
@@ -554,6 +575,65 @@ def execute_extrude_cut(model: Any, params: dict[str, Any]) -> dict[str, Any]:
     return {"ok": bool(cut.get("ok")), "cut": cut, "depth_m": depth_m, "through_all": through_all}
 
 
+def apply_feature_name(call_result: dict[str, Any], feature_name: str | None) -> dict[str, Any]:
+    raw = call_result.get("raw")
+    if feature_name and hasattr(raw, "_oleobj_"):
+        try:
+            setattr(raw, "Name", feature_name)
+            call_result = {**call_result, "assigned_feature_name": feature_name}
+        except Exception as exc:
+            call_result = {**call_result, "assigned_feature_name_error": f"{type(exc).__name__}: {exc}"}
+    return call_result
+
+
+def execute_extrude_boss(model: Any, params: dict[str, Any]) -> dict[str, Any]:
+    feature_manager = read(model, "FeatureManager")
+    if feature_manager is None or isinstance(feature_manager, dict):
+        raise RuntimeError("Model.FeatureManager is unavailable.")
+    depth_m = float(params.get("depth_m", mm_to_m(params.get("depth_mm", 0))))
+    through_all = bool(params.get("through_all"))
+    end_condition = 1 if through_all else 0
+    feature_name = str(params.get("feature_name") or params.get("name") or "").strip() or None
+    boss = invoke_first(feature_manager, [
+        ("FeatureExtrusion3", (True, False, False, end_condition, 0, depth_m, depth_m, False, False, False, False, 0, 0, False, False, False, False, True, True, True, 0, 0, False)),
+        ("FeatureExtrusion2", (True, False, False, end_condition, 0, depth_m, depth_m, False, False, False, False, 0, 0, False, False, False, False, True, True, True, 0, 0)),
+        ("FeatureExtrusion", (True, False, False, end_condition, 0, depth_m, depth_m, False, False, False, False, 0, 0)),
+    ])
+    boss = apply_feature_name(boss, feature_name)
+    return {"ok": bool(boss.get("ok")), "boss": boss, "depth_m": depth_m, "through_all": through_all, "feature_name": feature_name}
+
+
+def execute_revolve(model: Any, plan: dict[str, Any], cut: bool) -> dict[str, Any]:
+    feature_manager = read(model, "FeatureManager")
+    if feature_manager is None or isinstance(feature_manager, dict):
+        raise RuntimeError("Model.FeatureManager is unavailable.")
+    params = plan["parameters"]
+    angle_deg = float(params.get("angle_deg", 360.0))
+    angle_rad = angle_deg * 3.141592653589793 / 180.0
+    reverse_direction = bool(params.get("reverse_direction"))
+    thin_feature = bool(params.get("thin_feature"))
+    feature_name = str(params.get("feature_name") or params.get("name") or "").strip() or None
+    candidates = [
+        ("FeatureRevolveCut2" if cut else "FeatureRevolve2", (True, reverse_direction, False, False, False, False, angle_rad, 0.0, thin_feature, 0.0, 0.0, 0, 0, True, True, True)),
+        ("FeatureRevolveCut" if cut else "FeatureRevolve", (True, reverse_direction, angle_rad)),
+    ]
+    call = invoke_first(feature_manager, candidates)
+    call = apply_feature_name(call, feature_name)
+    axis_selector = next(iter(selector_names(plan, kind="entity", select_type="AXIS")), None)
+    key = "revolve_cut" if cut else "revolve"
+    return {
+        "ok": bool(call.get("ok")),
+        key: call,
+        "axis_selector": axis_selector,
+        "profile_selectors": selector_names(plan, kind="entity", select_type="SKETCH"),
+        "angle_deg": angle_deg,
+        "angle_rad": angle_rad,
+        "reverse_direction": reverse_direction,
+        "thin_feature": thin_feature,
+        "feature_name": feature_name,
+    }
+
+
 def selector_names(plan: dict[str, Any], *, kind: str | None = None, select_type: str | None = None) -> list[str]:
     result = []
     for selector in plan["selectors"]:
@@ -596,8 +676,14 @@ def execute_operation(model: Any, plan: dict[str, Any]) -> dict[str, Any]:
         return execute_hole_wizard(model, params, "countersink")
     if operation == "counterbore_hole":
         return execute_hole_wizard(model, params, "counterbore")
+    if operation == "extrude_boss":
+        return execute_extrude_boss(model, params)
     if operation == "extrude_cut":
         return execute_extrude_cut(model, params)
+    if operation == "revolve_boss":
+        return execute_revolve(model, plan, cut=False)
+    if operation == "revolved_cut":
+        return execute_revolve(model, plan, cut=True)
     if operation == "slot_cut":
         return execute_slot_cut(model, params)
     if operation == "pocket_cut":
