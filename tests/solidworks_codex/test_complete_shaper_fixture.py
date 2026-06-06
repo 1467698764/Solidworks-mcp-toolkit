@@ -287,6 +287,9 @@ class CompleteShaperSpecTests(unittest.TestCase):
             def Select4(self, *args):
                 return True
 
+            def IsFixed(self):
+                return False
+
         original_empty = self.module.empty_dispatch_variant
         original_restore = self.module.restore_component_origin
         self.module.empty_dispatch_variant = lambda: object()
@@ -303,6 +306,74 @@ class CompleteShaperSpecTests(unittest.TestCase):
 
         self.assertFalse(fixed[0]["ok"])
         self.assertEqual("FixComponent returned False", fixed[0]["error"])
+
+    def test_fix_primary_layout_accepts_void_fixcomponent_with_fixed_readback(self):
+        class Asm:
+            def ClearSelection2(self, value):
+                return True
+
+            def FixComponent(self):
+                return None
+
+        class Component:
+            Name2 = "cast_bed_with_t_slots-1"
+
+            def Select4(self, *args):
+                return True
+
+            def IsFixed(self):
+                return True
+
+        original_empty = self.module.empty_dispatch_variant
+        original_restore = self.module.restore_component_origin
+        self.module.empty_dispatch_variant = lambda: object()
+        self.module.restore_component_origin = lambda sw, component, origin: {
+            "component": component.Name2,
+            "restored": True,
+            "restored_origin_m": list(origin),
+        }
+        try:
+            fixed = self.module.fix_primary_design_layout_components(object(), Asm(), [Component()])
+        finally:
+            self.module.empty_dispatch_variant = original_empty
+            self.module.restore_component_origin = original_restore
+
+        self.assertTrue(fixed[0]["ok"], fixed)
+        self.assertTrue(fixed[0]["fixed_readback"])
+
+    def test_fix_primary_layout_rejects_void_fixcomponent_without_fixed_readback(self):
+        class Asm:
+            def ClearSelection2(self, value):
+                return True
+
+            def FixComponent(self):
+                return None
+
+        class Component:
+            Name2 = "cast_bed_with_t_slots-1"
+
+            def Select4(self, *args):
+                return True
+
+            def IsFixed(self):
+                return False
+
+        original_empty = self.module.empty_dispatch_variant
+        original_restore = self.module.restore_component_origin
+        self.module.empty_dispatch_variant = lambda: object()
+        self.module.restore_component_origin = lambda sw, component, origin: {
+            "component": component.Name2,
+            "restored": True,
+            "restored_origin_m": list(origin),
+        }
+        try:
+            fixed = self.module.fix_primary_design_layout_components(object(), Asm(), [Component()])
+        finally:
+            self.module.empty_dispatch_variant = original_empty
+            self.module.restore_component_origin = original_restore
+
+        self.assertFalse(fixed[0]["ok"])
+        self.assertEqual("FixComponent returned None and IsFixed readback was not true", fixed[0]["error"])
 
     def test_live_builder_treats_false_rebuild_return_as_failure(self):
         class Model:

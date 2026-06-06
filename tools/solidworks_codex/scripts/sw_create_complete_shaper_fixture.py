@@ -1619,14 +1619,20 @@ def fix_primary_design_layout_components(sw: Any, asm: Any, components: list[Any
             asm.ClearSelection2(True)
             selected = bool(component.Select4(False, empty, False))
             result = read_member(asm, "FixComponent") if selected else None
-            fixed_ok = bool(selected) and bool(restore.get("restored")) and com_created(result)
+            fixed_readback = bool(read_member(component, "IsFixed")) if selected else False
+            api_allows_success = result is None or com_created(result)
+            fixed_ok = bool(selected) and bool(restore.get("restored")) and api_allows_success and fixed_readback
             error = None
             if not selected:
                 error = "component selection returned False"
-            elif not com_created(result):
+            elif result is False or result == 0:
                 returned = "None" if result is None else repr(result)
                 error = f"FixComponent returned {returned}"
-            row = {"component": name, "ok": fixed_ok, "selected": selected, "api_result": result, **restore}
+            elif result is None and not fixed_readback:
+                error = "FixComponent returned None and IsFixed readback was not true"
+            elif not fixed_readback:
+                error = "IsFixed readback was not true"
+            row = {"component": name, "ok": fixed_ok, "selected": selected, "api_result": result, "fixed_readback": fixed_readback, **restore}
             if error is not None:
                 row["error"] = error
             fixed.append(row)
