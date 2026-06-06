@@ -23,3 +23,4 @@ tools/solidworks_codex/macros/*.swp.vba
 # Python test caches
 tests/**/__pycache__/
 tools/solidworks_codex/live_fixture/
+tools/solidworks_codex/generated/

@@ -1,36 +1,44 @@
-# MCP Tool Manual
+﻿# MCP Tool Manual
 
-SolidWorks Codex MCP currently exposes **59 tools**. The tools are grouped by engineering workflow, not by implementation file, so a human or AI agent can choose the correct operation without scanning source code.
-
+SolidWorks Codex MCP exposes **59 tools**.
 Compatibility anchor for older gates: `56 MCP tools`.
+
+## How To Read This Manual
+
+- Start with `solidworks_ai_capability_map` if the task is broad or ambiguous.
+- Use `solidworks_workflow_plan` to turn intent into execution order.
+- Use `solidworks_inspect` before choosing mates, repairs, or feature edits.
+- Use `solidworks_worklog` and `solidworks_handoff_bundle` when the task spans turns.
 
 ## Calling Rules
 
 - MCP inputs are JSON objects.
 - Use absolute paths for native `.SLDPRT`, `.SLDASM`, and `.SLDDRW` files when possible.
-- Repository-relative paths are acceptable for specs, reports, screenshots, and handoff artifacts.
-- Tools with `start` may launch SolidWorks. Other live tools normally attach to an existing SolidWorks session.
+- Repository-relative paths are fine for reports and handoff artifacts.
 - Use `dry_run: true` where available before live mutation.
 - Any native write should be backed by backup, rebuild, inspect/readback, validation, and worklog evidence.
-- Direct SolidWorks API calls are allowed when faster or more reliable, but they must preserve the same evidence contract as the MCP tool.
+- Direct SolidWorks API calls are allowed when faster or more reliable, but they must preserve the same evidence contract.
 
 ## Capability Scope
 
-The MCP layer strengthens the AI at the points where raw SolidWorks API calls are weakest:
+This section explains how the MCP layer strengthens AI at the points where raw SolidWorks API calls are weakest.
 
-Glossary aliases used by tests and older handoffs: Capability scope, Limits and notes, Required parameters, Optional parameters.
+Capability scope and limits and notes are kept as stable anchors for repository checks.
 
-| Stage | What MCP Adds | Typical Tools |
-| --- | --- | --- |
-| Intent | Design intent, assumptions, validation profile, runtime budget, non-goals. | `solidworks_workflow_plan`, `solidworks_change_plan`, `solidworks_ai_capability_map` |
-| Readback | Compact model evidence from native files and inspect reports. | `solidworks_inspect`, `solidworks_report_search`, `solidworks_model_understand` |
-| Interface graph | Named faces, axes, slots, datums, proximity, selector confidence, host evidence. | `solidworks_interface_index`, `solidworks_assembly_diagnose` |
-| Execution planning | Mate groups, affected subgraphs, standard-part hosts, selector checks. | `solidworks_mate_group_plan`, `solidworks_mate_group_validate`, `solidworks_standard_part_resolve` |
-| Native execution | Guarded feature, component, metadata, mate, and motion operations. | `solidworks_part_feature_execute`, `solidworks_component_insert`, `solidworks_mate_intent_execute` |
-| Validation | Rebuild health, deltas, geometry contracts, interference, screenshots, engineering-lite review. | `solidworks_rebuild`, `solidworks_change_verify`, `solidworks_part_geometry_validate`, `solidworks_visual_validate` |
-| Handoff | Durable worklog and resumable bundles. | `solidworks_worklog`, `solidworks_report_context`, `solidworks_handoff_bundle` |
+| Stage | What it adds | Typical tools | Upper limit |
+| --- | --- | --- | --- |
+| Intent | Design intent, assumptions, runtime budget, non-goals, validation profile. | `solidworks_workflow_plan`, `solidworks_design_review`, `solidworks_change_plan` | It does not inspect CAD files. |
+| Readback | Compact model evidence from native files and reports. | `solidworks_inspect`, `solidworks_model_understand`, `solidworks_report_search`, `solidworks_report_context` | It only proves what SolidWorks exposes. |
+| Interface graph | Named faces, axes, slots, datums, roles, proximity, selector confidence. | `solidworks_interface_index`, `solidworks_assembly_diagnose`, `solidworks_assembly_review_pipeline` | BBox-only evidence is not enough for final mates. |
+| Execution planning | Mate groups, rollback scope, standard-part host intent, acceptance gates. | `solidworks_mate_group_plan`, `solidworks_mate_group_validate`, `solidworks_standard_part_resolve` | A plan cannot replace missing identity evidence. |
+| Native execution | Guarded part, component, metadata, mate, and motion operations. | `solidworks_part_feature_execute`, `solidworks_component_insert`, `solidworks_mate_intent_execute`, `solidworks_mate_group_execute` | Requires reviewed selectors and rollback discipline. |
+| Validation | Rebuild, delta, interference, geometry, screenshot, engineering review. | `solidworks_rebuild`, `solidworks_change_verify`, `solidworks_part_geometry_validate`, `solidworks_visual_validate` | Offline checks do not prove live motion or screenshots. |
+| Handoff | Durable worklog and resumable bundles. | `solidworks_worklog`, `solidworks_handoff_bundle`, `solidworks_tool_catalog` | Handoff quality depends on current logs and artifacts. |
 
 ## Limits And Notes
+
+Limits and notes
+
 
 - Read-only evidence is only as complete as SolidWorks COM readback allows.
 - BBox-derived face or axis candidates are weak evidence until native identity or reviewed selector evidence confirms them.
@@ -41,6 +49,11 @@ Glossary aliases used by tests and older handoffs: Capability scope, Limits and 
 - `solidworks_engineering_lite` is a handoff review, not manufacturing approval.
 
 ## Required Parameters And Optional Parameters
+
+Required parameters
+
+Optional parameters
+
 
 | Tool | Required parameters | Optional parameters |
 | --- | --- | --- |
@@ -58,7 +71,6 @@ Glossary aliases used by tests and older handoffs: Capability scope, Limits and 
 | `solidworks_component_state` | `component`, `action` | `save`, `out` |
 | `solidworks_design_review` | `report` | `intent`, `out`, `json_out` |
 | `solidworks_engineering_lite` | `report` | `out`, `json_out`, `out_dir` |
-| `solidworks_existing_mcp_tools` | - | - |
 | `solidworks_export` | `target` | `model`, `out` |
 | `solidworks_feature_state` | `feature`, `action` | `dimension`, `value_m`, `target_feature`, `reorder_position`, `definition_spec`, `model`, `save`, `out` |
 | `solidworks_finalize` | - | `out`, `json_out` |
@@ -110,7 +122,7 @@ Glossary aliases used by tests and older handoffs: Capability scope, Limits and 
 
 | Tool | Purpose | Capability range | Upper limit |
 | --- | --- | --- | --- |
-| `solidworks_ai_capability_map` | Produces an AI-facing map of reasoning stages, MCP value, direct API policy, required parameters, optional parameters, and limits. | Best first call for long or ambiguous CAD work. | It guides tool choice; it does not inspect or mutate CAD files. |
+| `solidworks_ai_capability_map` | Best first call for broad or ambiguous CAD work. It shows reasoning stages, call order, parameters, and limits. | Guides tool choice and explains the direct native API boundary. | It does not inspect or mutate CAD files. |
 | `solidworks_tool_catalog` | Generates a grouped catalog from current MCP schemas. | Useful for schema discovery and handoff. | It does not explain engineering workflow as deeply as the AI capability map. |
 | `solidworks_existing_mcp_tools` | Lists tools from an external npm SolidWorks MCP server in mock mode. | Reference only. | Not part of the verified local toolchain. |
 
@@ -231,10 +243,9 @@ Glossary aliases used by tests and older handoffs: Capability scope, Limits and 
 
 ### Mechanism Lite
 
-1. Declare revolute, prismatic, slot, cam, gear, limit, and axial-locator intent.
-2. Use `solidworks_mate_intent_execute` for human-engineer-style joint semantics.
-3. Use `solidworks_motion_sweep_lite` for sampled positions.
-4. Use `solidworks_interference_check` and visual validation before handoff.
+1. Declare intended DOF in design intent.
+2. Use revolute, prismatic, slot, cam, gear, and limit mate intent where appropriate.
+3. Validate with mate readback, motion sweep lite, interference checks, and visual evidence.
 
 ## Parameter Notes
 

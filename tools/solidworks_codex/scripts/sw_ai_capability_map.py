@@ -15,7 +15,7 @@ STAGES = [
     {
         "stage": "intent",
         "purpose": "Turn user language into design intent, validation profile, editable parameters, interfaces, and non-goals.",
-        "preferred_tools": ["solidworks_workflow_plan", "solidworks_change_plan", "solidworks_design_review"],
+        "preferred_tools": ["solidworks_workflow_plan", "solidworks_design_review", "solidworks_model_understand"],
         "mcp_value": "Keeps the reasoning model from jumping straight into native API calls before scope, evidence, and acceptance weight are explicit.",
         "native_api_policy": "Do not call native SolidWorks APIs here; this stage is reasoning and artifact generation.",
         "upper_limit": "Cannot invent missing engineering constraints; assumptions must be recorded and later verified.",
@@ -30,17 +30,17 @@ STAGES = [
     },
     {
         "stage": "interface_graph",
-        "purpose": "Name candidate faces, axes, slots, datums, component roles, proximity, and attachment evidence.",
+        "purpose": "Name candidate faces, axes, slots, datums, component roles, attachment evidence, and DOF hints.",
         "preferred_tools": ["solidworks_interface_index", "solidworks_assembly_diagnose", "solidworks_assembly_review_pipeline"],
-        "mcp_value": "Turns geometry into an engineering interface graph instead of relying on visual closeness.",
+        "mcp_value": "Turns geometry into an engineering interface graph instead of relying on visual closeness or gut feel.",
         "native_api_policy": "Use direct API capture when stable native identity is unavailable or selector confidence blocks execution.",
         "upper_limit": "BBox-only candidates are review evidence, not permission to create final mates.",
     },
     {
         "stage": "execution_plan",
-        "purpose": "Convert intent and interfaces into part feature specs, component specs, mate intents, and validation gates.",
+        "purpose": "Convert intent and interfaces into the next concrete operation order with selectors, rollback scope, and acceptance gates.",
         "preferred_tools": ["solidworks_mate_group_plan", "solidworks_mate_group_validate", "solidworks_standard_part_resolve"],
-        "mcp_value": "Groups operations by engineering intent, DOF, affected files, rollback scope, and verification sequence.",
+        "mcp_value": "Explains what to do first, what to do next, and what evidence must exist before mutation starts.",
         "native_api_policy": "Direct API is acceptable for faster spec execution only after the MCP artifact names selectors and expected readback.",
         "upper_limit": "A plan cannot compensate for absent face/axis identity or contradictory mechanism intent.",
     },
@@ -54,9 +54,9 @@ STAGES = [
     },
     {
         "stage": "validation",
-        "purpose": "Prove the native result matches the selected profile and can be resumed or repaired.",
+        "purpose": "Prove the native result matches the selected profile and can be resumed, repaired, or rejected with evidence.",
         "preferred_tools": ["solidworks_rebuild", "solidworks_compare_reports", "solidworks_change_verify", "solidworks_interference_check", "solidworks_part_geometry_validate", "solidworks_visual_validate", "solidworks_engineering_lite"],
-        "mcp_value": "Separates visual recognizability, mate health, clearance, geometry, BOM, and handoff evidence.",
+        "mcp_value": "Separates visual recognizability, mate health, clearance, geometry, BOM, and handoff evidence into reviewable checks.",
         "native_api_policy": "Direct API checks are welcome when they add evidence; they do not replace report artifacts.",
         "upper_limit": "Offline validation cannot prove live motion or screenshots; live profile must say what remains unproven.",
     },
@@ -109,12 +109,23 @@ def build_map() -> dict[str, Any]:
         required = list(tool.get("required") or [])
         properties = list(tool.get("properties") or [])
         optional = [item for item in properties if item not in required]
+        parameters = [{"name": item, "required": item in required} for item in properties]
         tool_index.append({
             "name": tool["name"],
             "reasoning_role": _role_for_tool(tool["name"], tool["group"]),
             "mcp_group": tool["group"],
             "required": required,
             "optional": optional,
+            "parameters": parameters,
+            "call_order_hint": (
+                "First call" if tool["name"] in {"solidworks_ai_capability_map", "solidworks_workflow_plan"} else
+                "Use after readback" if tool["name"] in {"solidworks_inspect", "solidworks_report_search", "solidworks_model_understand", "solidworks_report_context"} else
+                "Use after interface indexing" if tool["name"] in {"solidworks_interface_index", "solidworks_assembly_diagnose", "solidworks_assembly_review_pipeline"} else
+                "Use after backup and validation planning" if tool["name"] in {"solidworks_part_feature_execute", "solidworks_component_insert", "solidworks_mate_intent_execute", "solidworks_mate_group_execute", "solidworks_motion_sweep_lite"} else
+                "Use after live change" if tool["name"] in {"solidworks_rebuild", "solidworks_compare_reports", "solidworks_change_verify", "solidworks_interference_check", "solidworks_part_geometry_validate", "solidworks_visual_validate", "solidworks_engineering_lite"} else
+                "Use for resume/handoff" if tool["name"] in {"solidworks_worklog", "solidworks_handoff_bundle", "solidworks_tool_catalog"} else
+                "Use when needed"
+            ),
             "capability": tool.get("description", ""),
         })
 
@@ -122,6 +133,11 @@ def build_map() -> dict[str, Any]:
         "timestamp": datetime.now().isoformat(timespec="seconds"),
         "mission": "AI design reasoning -> engineering interface graph -> guarded SolidWorks execution -> validation evidence.",
         "tool_count": catalog["count"],
+        "read_this_first": [
+            "Start with solidworks_ai_capability_map when the task is broad, ambiguous, or assembly-heavy.",
+            "Use solidworks_workflow_plan to turn intent into a concrete execution order before live mutation.",
+            "Use solidworks_inspect and solidworks_model_understand before choosing mates, repairs, or feature edits.",
+        ],
         "stages": STAGES,
         "direct_native_api_policy": DIRECT_API_RULES,
         "decision_rules": [
@@ -143,9 +159,11 @@ def markdown(data: dict[str, Any]) -> str:
         f"- Tool count: `{data['tool_count']}`",
         f"- Mission: {data['mission']}",
         "",
-        "## Direct Native API Policy",
+        "## Read This First",
         "",
     ]
+    lines.extend(f"- {item}" for item in data["read_this_first"])
+    lines.extend(["", "## Direct Native API Policy", "",])
     lines.extend(f"- {rule}" for rule in data["direct_native_api_policy"])
     lines.extend(["", "## Reasoning Stages", ""])
     lines.append("| Stage | Purpose | Preferred MCP tools | Native API policy | Upper limit |")
@@ -156,12 +174,18 @@ def markdown(data: dict[str, Any]) -> str:
     lines.extend(["", "## Decision Rules", ""])
     lines.extend(f"- {rule}" for rule in data["decision_rules"])
     lines.extend(["", "## Tool Decision Index", ""])
-    lines.append("| Tool | Reasoning role | Required | Optional |")
-    lines.append("| --- | --- | --- | --- |")
+    lines.append("| Tool | Role | Call order | Required | Optional |")
+    lines.append("| --- | --- | --- | --- | --- |")
     for tool in data["tool_decision_index"]:
         required = ", ".join(f"`{item}`" for item in tool["required"]) if tool["required"] else "-"
         optional = ", ".join(f"`{item}`" for item in tool["optional"]) if tool["optional"] else "-"
-        lines.append(f"| `{tool['name']}` | `{tool['reasoning_role']}` | {required} | {optional} |")
+        lines.append(f"| `{tool['name']}` | `{tool['reasoning_role']}` | {tool['call_order_hint']} | {required} | {optional} |")
+    lines.extend(["", "## Tool Parameters", ""])
+    lines.append("| Tool | Parameters |")
+    lines.append("| --- | --- |")
+    for tool in data["tool_decision_index"]:
+        params = ", ".join(f"`{item['name']}`" + (" (required)" if item["required"] else "") for item in tool["parameters"]) if tool["parameters"] else "-"
+        lines.append(f"| `{tool['name']}` | {params} |")
     lines.append("")
     return "\n".join(lines)
 
