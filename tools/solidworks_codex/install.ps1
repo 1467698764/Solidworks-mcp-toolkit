@@ -29,7 +29,7 @@ $result = [ordered]@{
     commands = $checks
     python_candidates = $pythonCandidates
     mcp_server = Join-Path $Workspace "tools\solidworks_codex\mcp\server.cjs"
-    usage = Join-Path $Workspace "docs\solidworks-codex-usage.md"
+    usage = Join-Path $Workspace "docs\mcp-tools.md"
     next = @(
         ".\tools\solidworks_codex\swctl.ps1 preflight",
         ".\tools\solidworks_codex\swctl.ps1 audit",

@@ -86,7 +86,7 @@ def readme(files: list[str]) -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--out-dir", default="docs/demo/offline")
+    parser.add_argument("--out-dir", default="tools/solidworks_codex/reports/offline_demo")
     args = parser.parse_args()
     out_dir = resolve(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)

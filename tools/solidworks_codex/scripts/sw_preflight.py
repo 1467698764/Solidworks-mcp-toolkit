@@ -138,7 +138,9 @@ def main() -> None:
             file_check("tools/solidworks_codex/swctl.ps1"),
             file_check("tools/solidworks_codex/mcp/server.cjs"),
             file_check("tools/solidworks_codex/mcp/smoke-test.cjs"),
-            file_check("docs/solidworks-codex-usage.md"),
+            file_check("README.md"),
+            file_check("docs/mcp-tools.md"),
+            file_check("docs/solidworks-codex-capability-gap-checklist.md"),
         ],
         "runtime": runtime_environment_report(
             generated_roots=[ROOT / item for item in args.generated_root],

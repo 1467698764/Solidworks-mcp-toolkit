@@ -192,7 +192,7 @@ def markdown(report: dict[str, Any]) -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--out", default="docs/solidworks-codex-final-readiness.md")
+    parser.add_argument("--out", default="tools/solidworks_codex/reports/final_readiness.md")
     parser.add_argument("--json-out", default="tools/solidworks_codex/reports/final_readiness.json")
     parser.add_argument("--run-audit", action="store_true")
     args = parser.parse_args()
@@ -218,8 +218,10 @@ def main() -> None:
         "capabilities": CAPABILITIES,
         "next_workflow": NEXT_WORKFLOW,
         "key_files": {
-            "usage": "docs/solidworks-codex-usage.md",
-            "readme": "tools/solidworks_codex/README.md",
+            "readme": "README.md",
+            "mcp_tools": "docs/mcp-tools.md",
+            "plan": "docs/solidworks-automation-plan.md",
+            "checklist": "docs/solidworks-codex-capability-gap-checklist.md",
             "swctl": "tools/solidworks_codex/swctl.ps1",
             "mcp_server": "tools/solidworks_codex/mcp/server.cjs",
             "audit": "tools/solidworks_codex/reports/audit_latest.json",

@@ -546,13 +546,13 @@ class LiveValidationGateSpecTests(unittest.TestCase):
 
     def test_readme_documents_live_gate_native_outputs_and_stale_cleanup(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
-        usage = (ROOT / "docs" / "solidworks-codex-usage.md").read_text(encoding="utf-8")
-        joined = readme + "\n" + usage
-        self.assertIn("live-gate", joined)
+        manual = (ROOT / "docs" / "mcp-tools.md").read_text(encoding="utf-8")
+        joined = readme + "\n" + manual
+        self.assertIn("solidworks_visual_validate", joined)
+        self.assertIn("solidworks_interference_check", joined)
         self.assertIn(".SLDASM/.SLDPRT", joined)
-        self.assertIn("STEP", joined)
-        self.assertIn("--cleanup-stale", joined)
-        self.assertIn("shaper_machine_v5", joined)
+        self.assertIn("Safety Model", joined)
+        self.assertIn("MCP Tool Manual", joined)
 
 
     def test_gate_script_advertises_downstream_pywin32_requirement_to_swctl(self):

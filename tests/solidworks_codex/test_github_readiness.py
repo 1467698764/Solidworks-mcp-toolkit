@@ -37,42 +37,34 @@ class GithubReadinessTests(unittest.TestCase):
                 "install_script",
                 "mcp_config_example",
                 "ci_workflow",
-                "release_checklist",
-                "security",
-                "contributing",
-                "offline_demo",
-                "usage_docs",
+                "mcp_manual",
+                "capability_checklist",
+                "automation_plan",
                 "tool_catalog_mention",
                 "audit_gate",
             ]:
                 self.assertTrue(required[key]["ok"], key)
             readme = (ROOT / "README.md").read_text(encoding="utf-8-sig")
-            self.assertIn("56 MCP tools", readme)
+            self.assertIn("56 tools", readme)
             self.assertNotIn("30 conservative MCP tools", readme)
             self.assertNotIn("29", readme)
             self.assertNotIn("35 conservative MCP tools", readme)
             self.assertNotIn("45 conservative MCP tools", readme)
-            self.assertIn("practical SolidWorks MCP", readme)
+            self.assertIn("SolidWorks Codex MCP", readme)
             self.assertIn("model-understand", readme)
             self.assertIn("report-context", readme)
             self.assertIn("handoff-bundle", readme)
-            self.assertIn("tool-catalog", readme)
+            self.assertIn("docs/mcp-tools.md", readme)
             license_text = (ROOT / "LICENSE").read_text(encoding="utf-8-sig")
             self.assertIn("Non-Commercial License", license_text)
             self.assertIn("non-commercial use only", license_text)
             self.assertIn("sell, rent, sublicense", license_text)
             self.assertNotIn("MIT License", license_text)
-            usage = (ROOT / "docs/solidworks-codex-usage.md").read_text(encoding="utf-8-sig")
-            self.assertIn("56 MCP tools", usage)
-            self.assertNotRegex(usage, r"29 .{1,3} MCP tools")
-            self.assertNotIn("35 MCP tools", usage)
-            self.assertNotIn("36 MCP tools", usage)
-            self.assertNotIn("37 MCP tools", usage)
-            self.assertNotIn("38 MCP tools", usage)
-            self.assertNotIn("39 MCP tools", usage)
-            self.assertNotIn("40 MCP tools", usage)
-            self.assertNotIn("41 MCP tools", usage)
-            self.assertNotIn("42 MCP tools", usage)
+            manual = (ROOT / "docs/mcp-tools.md").read_text(encoding="utf-8-sig")
+            self.assertIn("56 MCP tools", manual)
+            self.assertIn("solidworks_part_feature_execute", manual)
+            self.assertIn("Required parameters", manual)
+            self.assertNotRegex(manual, r"29 .{1,3} MCP tools")
 
 
 if __name__ == "__main__":

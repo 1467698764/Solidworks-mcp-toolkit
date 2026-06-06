@@ -23,7 +23,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools\solidworks_codex\s
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools\solidworks_codex\swctl.ps1 public-copy-guard -Out tools\solidworks_codex\reports\public_copy_guard.json
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools\solidworks_codex\swctl.ps1 release-tree -Out tools\solidworks_codex\reports\release_tree.json
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools\solidworks_codex\swctl.ps1 audit -Out tools\solidworks_codex\reports\audit_latest.json
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools\solidworks_codex\swctl.ps1 finalize -Out docs\solidworks-codex-final-readiness.md -JsonOut tools\solidworks_codex\reports\final_readiness.json
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools\solidworks_codex\swctl.ps1 finalize -Out tools\solidworks_codex\reports\final_readiness.md -JsonOut tools\solidworks_codex\reports\final_readiness.json
 $final = Get-Content -Raw tools\solidworks_codex\reports\final_readiness.json | ConvertFrom-Json
 if (-not $final.audit_ok) { throw 'final readiness audit_ok was false' }
 

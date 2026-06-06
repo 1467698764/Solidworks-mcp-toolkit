@@ -24,10 +24,10 @@ SCRIPTS = ROOT / "tools" / "solidworks_codex" / "scripts"
 REPORTS = ROOT / "tools" / "solidworks_codex" / "reports"
 
 REQUIRED = [
-    "docs/solidworks-codex-usage.md",
-    "docs/architecture.md",
-    "docs/project-principles.md",
-    "docs/github-release-checklist.md",
+    "README.md",
+    "docs/mcp-tools.md",
+    "docs/solidworks-automation-plan.md",
+    "docs/solidworks-codex-capability-gap-checklist.md",
     "tools/solidworks_codex/swctl.ps1",
     "tools/solidworks_codex/mcp/server.cjs",
     "tools/solidworks_codex/mcp/smoke-test.cjs",
@@ -66,7 +66,11 @@ def swctl_commands() -> set[str]:
 
 
 def guide_commands() -> set[str]:
-    text = (ROOT / "docs/solidworks-codex-usage.md").read_text(encoding="utf-8-sig")
+    text = "\n".join(
+        (ROOT / rel).read_text(encoding="utf-8-sig")
+        for rel in ["README.md", "docs/mcp-tools.md"]
+        if (ROOT / rel).exists()
+    )
     return set(re.findall(r"swctl\.ps1\s+([a-zA-Z0-9-]+)", text))
 
 

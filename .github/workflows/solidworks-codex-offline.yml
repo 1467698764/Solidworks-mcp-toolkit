@@ -39,6 +39,6 @@ jobs:
       - name: Final readiness JSON parse
         shell: pwsh
         run: |
-          python tools/solidworks_codex/scripts/sw_finalize.py --out docs/solidworks-codex-final-readiness.md --json-out tools/solidworks_codex/reports/final_readiness.json
+          python tools/solidworks_codex/scripts/sw_finalize.py --out tools/solidworks_codex/reports/final_readiness.md --json-out tools/solidworks_codex/reports/final_readiness.json
           $j = Get-Content -Raw tools/solidworks_codex/reports/final_readiness.json | ConvertFrom-Json
           if (-not $j.audit_ok) { throw "final readiness audit_ok was false" }

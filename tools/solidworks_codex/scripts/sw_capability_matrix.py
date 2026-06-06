@@ -283,8 +283,8 @@ def markdown(data: dict[str, Any]) -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--out", default="docs/capability-matrix.md")
-    parser.add_argument("--json-out", default="docs/capability-matrix.json")
+    parser.add_argument("--out", default="tools/solidworks_codex/reports/capability_matrix.md")
+    parser.add_argument("--json-out", default="tools/solidworks_codex/reports/capability_matrix.json")
     args = parser.parse_args()
     data = build_matrix()
     out = resolve(args.out)
