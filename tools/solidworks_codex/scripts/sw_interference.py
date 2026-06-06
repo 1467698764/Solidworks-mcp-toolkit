@@ -92,6 +92,38 @@ def active_assembly(sw: Any) -> Any:
     return model
 
 
+def open_or_active(sw: Any, model_path: str | None) -> dict[str, Any]:
+    if not model_path:
+        model = active_assembly(sw)
+        return {
+            "model": model,
+            "handoff": {
+                "source": "active_document",
+                "path": read(model, "GetPathName"),
+                "open_errors": None,
+                "open_warnings": None,
+            },
+        }
+    path = str(Path(model_path).resolve())
+    if Path(path).suffix.lower() != ".sldasm":
+        raise ValueError(f"interference check requires a .SLDASM assembly model: {path}")
+    pythoncom_mod, win32_client = require_pywin32()
+    errors = win32_client.VARIANT(pythoncom_mod.VT_BYREF | pythoncom_mod.VT_I4, 0)
+    warnings = win32_client.VARIANT(pythoncom_mod.VT_BYREF | pythoncom_mod.VT_I4, 0)
+    model = sw.OpenDoc6(path, 2, 0, "", errors, warnings)
+    if model is None:
+        raise RuntimeError(f"OpenDoc6 failed: errors={errors.value}, warnings={warnings.value}, path={path}")
+    return {
+        "model": model,
+        "handoff": {
+            "source": "specified_model",
+            "path": path,
+            "open_errors": getattr(errors, "value", errors),
+            "open_warnings": getattr(warnings, "value", warnings),
+        },
+    }
+
+
 def detect(asm: Any) -> dict[str, Any]:
     manager = read(asm, "InterferenceDetectionManager")
     if manager is None or isinstance(manager, dict):
@@ -119,16 +151,19 @@ def detect(asm: Any) -> dict[str, Any]:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--start", action="store_true")
+    parser.add_argument("--model", default=None)
     parser.add_argument("--out", default="tools/solidworks_codex/reports/interference.json")
     args = parser.parse_args()
     pythoncom_mod, _win32_client = require_pywin32()
     pythoncom_mod.CoInitialize()
     sw, started = attach(args.start)
-    asm = active_assembly(sw)
+    opened = open_or_active(sw, args.model)
+    asm = opened["model"]
     result = {
         "timestamp": datetime.now().isoformat(timespec="seconds"),
         "connected": True,
         "started_by_probe": started,
+        "handoff": opened["handoff"],
         "assembly_title": read(asm, "GetTitle"),
         "assembly_path": read(asm, "GetPathName"),
         "interference": detect(asm),

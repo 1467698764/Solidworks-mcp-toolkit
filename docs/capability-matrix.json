@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-06-06T09:11:26",
+  "timestamp": "2026-06-06T09:21:35",
   "count": 74,
   "capabilities": [
     {
@@ -362,9 +362,10 @@
       "solidworks_required": true,
       "required": [],
       "properties": [
+        "model",
         "out"
       ],
-      "description": "Run conservative SolidWorks assembly interference detection and emit JSON."
+      "description": "Run conservative SolidWorks assembly interference detection against the active or specified assembly and emit handoff plus collision evidence."
     },
     {
       "cli": "issue-report",

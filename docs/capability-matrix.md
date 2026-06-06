@@ -1,6 +1,6 @@
 # SolidWorks Codex Capability Matrix
 
-- Timestamp: `2026-06-06T09:11:26`
+- Timestamp: `2026-06-06T09:21:35`
 - Capability count: `74`
 
 ## Coverage

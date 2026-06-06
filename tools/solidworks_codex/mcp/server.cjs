@@ -193,8 +193,8 @@ const toolSchemas = [
   },
   {
     name: 'solidworks_interference_check',
-    description: 'Run conservative SolidWorks assembly interference detection and emit JSON.',
-    inputSchema: { type: 'object', properties: { out: { type: 'string' } }, additionalProperties: false }
+    description: 'Run conservative SolidWorks assembly interference detection against the active or specified assembly and emit handoff plus collision evidence.',
+    inputSchema: { type: 'object', properties: { model: { type: 'string', description: 'Optional .SLDASM model path to open before checking.' }, out: { type: 'string' } }, additionalProperties: false }
   },  {
     name: 'solidworks_template_macro',
     description: 'Generate reviewable VBA macro for common mechanical part templates such as sleeve, spacer, flange, endcap, adapter, and retainer.',
@@ -551,6 +551,7 @@ async function callTool(name, input) {
       break;
     case 'solidworks_interference_check':
       args.push('interference');
+      if (input?.model) args.push('-Model', input.model);
       if (input?.out) args.push('-Out', input.out);
       break;    case 'solidworks_template_macro':
       args.push('template-macro', '-Template', input.template);

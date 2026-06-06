@@ -107,6 +107,7 @@ class ToolCatalogTests(unittest.TestCase):
             self.assertEqual(by_cli["assembly-contract"]["workflow"], "verify_export")
             self.assertEqual(by_cli["assembly-contract"]["safety"], "verification_or_export")
             self.assertFalse(by_cli["assembly-contract"]["solidworks_required"])
+            self.assertIn("model", by_cli["interference"]["properties"])
             self.assertEqual(by_cli["assembly-diagnose"]["workflow"], "analysis")
             self.assertEqual(by_cli["assembly-diagnose"]["safety"], "read_only")
             self.assertEqual(by_cli["assembly-diagnose"]["mcp"], "solidworks_assembly_diagnose")
