@@ -443,6 +443,28 @@ def runtime_budget_plan(intent: str, runtime_budget: str) -> dict[str, Any]:
         ],
         "blocks_full_rebuild_without_reason": True,
         "acceptance_rule": "A full rebuild is allowed only when one allowed reason is selected and local repair options are explicitly rejected with evidence.",
+        "execution_gate": {
+            "tool": "workflow-plan",
+            "decision": "block_full_rebuild_until_authorized",
+            "required_evidence": [
+                "selected_reason",
+                "rejected_local_repairs",
+                "affected_files",
+                "backup_status",
+                "rollback_path",
+                "expected_validation_reports",
+            ],
+            "allowed_next_tools": ["backup", "backup-status", "restore-backup", "assembly-review-pipeline", "live-gate"],
+        },
+        "request_template": {
+            "selected_reason": "",
+            "rejected_local_repairs": [],
+            "affected_files": [],
+            "backup_status": "",
+            "rollback_path": "",
+            "expected_validation_reports": [],
+            "approval_status": "pending",
+        },
     }
     return {
         "artifact": "runtime_budget_plan",
