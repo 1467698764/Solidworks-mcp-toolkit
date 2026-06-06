@@ -233,6 +233,18 @@ class FakeAssembly:
         return self.features.get(name)
 
 
+class FakeFalseAddMateAssembly(FakeAssembly):
+    def AddMate5(self, *args):
+        self.mates.append(args)
+        return False
+
+
+class FakeFalseCreateMateAssembly(FakeAssembly):
+    def CreateMate(self, mate_data):
+        self.mates.append(("CreateMate", mate_data))
+        return False
+
+
 class MateGroupExecuteTests(unittest.TestCase):
     def manifest(self):
         return {
@@ -278,6 +290,17 @@ class MateGroupExecuteTests(unittest.TestCase):
         self.assertEqual(asm.mates[0][0], mod.MATE_TYPES["coincident"])
         self.assertEqual(asm.rebuilds, [False])
         self.assertEqual([call["type"] for call in mate["selection_guard"]["select_by_id_calls"]], ["FACE", "FACE"])
+
+    def test_addmate_false_return_blocks_acceptance(self):
+        asm = FakeFalseAddMateAssembly()
+
+        result = mod.execute_manifest(self.manifest(), asm)
+
+        self.assertFalse(result["ok"], result)
+        self.assertEqual(result["counts"]["executed_mates"], 0)
+        self.assertEqual(result["findings"]["blocking"][0]["kind"], "addmate_failed")
+        self.assertEqual(result["executed_mates"][0]["ok"], False)
+        self.assertEqual(result["executed_mates"][0]["api"], "AddMate5")
 
     def test_selects_native_component_faces_before_addmate5(self):
         bottom_face = FakeFace(
@@ -763,6 +786,34 @@ class MateGroupExecuteTests(unittest.TestCase):
         self.assertEqual(asm.mate_data[0].WidthSelection, [guide_left_face, guide_right_face])
         self.assertEqual(asm.mate_data[0].TabSelection, [slider_left_face, slider_right_face])
         self.assertNotIn("entity", result["executed_mates"][0]["selection_guard"]["selection_reports"][0])
+
+    def test_create_mate_false_return_blocks_width_acceptance(self):
+        manifest = self.manifest()
+        manifest["macros"][0]["mate_type"] = "width"
+        manifest["macros"][0]["expected_mate_name"] = "MG_slider_guide_01_width"
+        manifest["macros"][0]["selection_selectors"] = [
+            {"stable_id": "guide_left-1:plane:y_min", "component": "guide_left-1", "fallback": {"type": "bbox_planar_face", "normal": [0.0, -1.0, 0.0], "origin_m": [0.0, -0.02, 0.0]}},
+            {"stable_id": "guide_right-1:plane:y_max", "component": "guide_right-1", "fallback": {"type": "bbox_planar_face", "normal": [0.0, 1.0, 0.0], "origin_m": [0.0, 0.02, 0.0]}},
+            {"stable_id": "slider-1:plane:y_min", "component": "slider-1", "fallback": {"type": "bbox_planar_face", "normal": [0.0, -1.0, 0.0], "origin_m": [0.0, -0.01, 0.0]}},
+            {"stable_id": "slider-1:plane:y_max", "component": "slider-1", "fallback": {"type": "bbox_planar_face", "normal": [0.0, 1.0, 0.0], "origin_m": [0.0, 0.01, 0.0]}},
+        ]
+        guide_left_face = FakeFace(FakeSurface("plane", [0.0, -0.02, 0.0, 0.0, -1.0, 0.0]), [-0.02, -0.021, -0.01, 0.02, -0.019, 0.01])
+        guide_right_face = FakeFace(FakeSurface("plane", [0.0, 0.02, 0.0, 0.0, 1.0, 0.0]), [-0.02, 0.019, -0.01, 0.02, 0.021, 0.01])
+        slider_left_face = FakeFace(FakeSurface("plane", [0.0, -0.01, 0.0, 0.0, -1.0, 0.0]), [-0.015, -0.011, -0.01, 0.015, -0.009, 0.01])
+        slider_right_face = FakeFace(FakeSurface("plane", [0.0, 0.01, 0.0, 0.0, 1.0, 0.0]), [-0.015, 0.009, -0.01, 0.015, 0.011, 0.01])
+        asm = FakeFalseCreateMateAssembly([
+            FakeComponent("guide_left-1", [guide_left_face]),
+            FakeComponent("guide_right-1", [guide_right_face]),
+            FakeComponent("slider-1", [slider_left_face, slider_right_face]),
+        ])
+
+        result = mod.execute_manifest(manifest, asm)
+
+        self.assertFalse(result["ok"], result)
+        self.assertEqual(result["counts"]["executed_mates"], 0)
+        self.assertEqual(result["findings"]["blocking"][0]["kind"], "addmate_failed")
+        self.assertEqual(result["executed_mates"][0]["ok"], False)
+        self.assertEqual(result["executed_mates"][0]["api"], "CreateMateData/CreateMate")
 
     def test_executes_symmetry_mate_with_two_faces_and_reference_plane(self):
         manifest = self.manifest()

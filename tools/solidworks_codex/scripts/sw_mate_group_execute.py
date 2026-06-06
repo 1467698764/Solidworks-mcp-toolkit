@@ -786,6 +786,10 @@ def optional_angle_rad(item: dict[str, Any], rad_key: str, deg_key: str) -> floa
     return None
 
 
+def mate_feature_created(feature: Any) -> bool:
+    return feature not in (None, False)
+
+
 def add_selected_mate(assembly: Any, item: dict[str, Any]) -> dict[str, Any]:
     mate_type = str(item.get("mate_type", "")).casefold()
     if mate_type not in MATE_TYPES:
@@ -825,13 +829,14 @@ def add_selected_mate(assembly: Any, item: dict[str, Any]) -> dict[str, Any]:
         0,
         mate_error,
     )
-    if feature is not None and item.get("expected_mate_name"):
+    created = mate_feature_created(feature)
+    if created and item.get("expected_mate_name"):
         try:
             feature.Name = str(item["expected_mate_name"])
         except Exception:
             pass
     return {
-        "ok": feature is not None,
+        "ok": created,
         "api": "AddMate5",
         "mate_type": mate_type,
         "orientation_constraint": mate_type in ORIENTATION_MATE_TYPES,
@@ -867,13 +872,14 @@ def add_width_mate(assembly: Any, item: dict[str, Any], select_reports: list[dic
         except (TypeError, ValueError):
             pass
     feature = create_mate(data)
-    if feature is not None and item.get("expected_mate_name"):
+    created = mate_feature_created(feature)
+    if created and item.get("expected_mate_name"):
         try:
             feature.Name = str(item["expected_mate_name"])
         except Exception:
             pass
     return {
-        "ok": feature is not None,
+        "ok": created,
         "api": "CreateMateData/CreateMate",
         "mate_type": "width",
         "constraint_role": CONSTRAINT_ROLE_BY_MATE_TYPE["width"],
@@ -911,13 +917,14 @@ def add_slot_mate(assembly: Any, item: dict[str, Any], select_reports: list[dict
         except (TypeError, ValueError):
             pass
     feature = create_mate(data)
-    if feature is not None and item.get("expected_mate_name"):
+    created = mate_feature_created(feature)
+    if created and item.get("expected_mate_name"):
         try:
             feature.Name = str(item["expected_mate_name"])
         except Exception:
             pass
     return {
-        "ok": feature is not None,
+        "ok": created,
         "api": "CreateMateData/CreateMate",
         "mate_type": "slot",
         "constraint_role": CONSTRAINT_ROLE_BY_MATE_TYPE["slot"],
