@@ -689,16 +689,25 @@ def close_doc(sw: Any, model: Any) -> None:
         pass
 
 
+def com_created(value: Any) -> bool:
+    return value not in (None, False, 0)
+
+
+def require_com_created(value: Any, label: str) -> Any:
+    if not com_created(value):
+        returned = "None" if value is None else repr(value)
+        raise RuntimeError(f"{label} returned {returned}")
+    return value
+
+
 def boss_box(model: Any, width: float, height: float, depth: float, name: str) -> None:
     select_front_plane(model)
     model.SketchManager.InsertSketch(True)
     rect = model.SketchManager.CreateCornerRectangle(-width / 2, -height / 2, 0, width / 2, height / 2, 0)
-    if rect is None:
-        raise RuntimeError(f"CreateCornerRectangle returned None for body {name}")
+    require_com_created(rect, f"CreateCornerRectangle for body {name}")
     model.SketchManager.InsertSketch(True)
     feat = model.FeatureManager.FeatureExtrusion2(True, False, False, 0, 0, depth, 0, False, False, False, False, 0, 0, False, False, False, False, True, True, True, 0, 0, False)
-    if feat is None:
-        raise RuntimeError(f"FeatureExtrusion2 returned None for body {name}")
+    require_com_created(feat, f"FeatureExtrusion2 for body {name}")
     feat.Name = name
 
 
@@ -706,12 +715,10 @@ def boss_cylinder(model: Any, diameter: float, depth: float, name: str) -> None:
     select_front_plane(model)
     model.SketchManager.InsertSketch(True)
     circle = model.SketchManager.CreateCircleByRadius(0, 0, 0, diameter / 2)
-    if circle is None:
-        raise RuntimeError(f"CreateCircleByRadius returned None for body {name}")
+    require_com_created(circle, f"CreateCircleByRadius for body {name}")
     model.SketchManager.InsertSketch(True)
     feat = model.FeatureManager.FeatureExtrusion2(True, False, False, 0, 0, depth, 0, False, False, False, False, 0, 0, False, False, False, False, True, True, True, 0, 0, False)
-    if feat is None:
-        raise RuntimeError(f"FeatureExtrusion2 returned None for body {name}")
+    require_com_created(feat, f"FeatureExtrusion2 for body {name}")
     feat.Name = name
 
 
@@ -723,12 +730,10 @@ def boss_regular_polygon(model: Any, sides: int, radius: float, depth: float, na
     points = [(math.cos(angle_offset + 2 * math.pi * i / sides) * radius, math.sin(angle_offset + 2 * math.pi * i / sides) * radius) for i in range(sides)]
     for (x1, y1), (x2, y2) in zip(points, points[1:] + points[:1]):
         line = model.SketchManager.CreateLine(x1, y1, 0, x2, y2, 0)
-        if line is None:
-            raise RuntimeError(f"CreateLine returned None for polygon body {name}")
+        require_com_created(line, f"CreateLine for polygon body {name}")
     model.SketchManager.InsertSketch(True)
     feat = model.FeatureManager.FeatureExtrusion2(True, False, False, 0, 0, depth, 0, False, False, False, False, 0, 0, False, False, False, False, True, True, True, 0, 0, False)
-    if feat is None:
-        raise RuntimeError(f"FeatureExtrusion2 returned None for polygon body {name}")
+    require_com_created(feat, f"FeatureExtrusion2 for polygon body {name}")
     feat.Name = name
 
 
@@ -755,8 +760,7 @@ def cut_polygon(model: Any, points: list[tuple[float, float]], depth: float, nam
     model.SketchManager.InsertSketch(True)
     for (x1, y1), (x2, y2) in zip(points, points[1:] + points[:1]):
         line = model.SketchManager.CreateLine(x1, y1, 0, x2, y2, 0)
-        if line is None:
-            raise RuntimeError(f"CreateLine returned None for cut {name}")
+        require_com_created(line, f"CreateLine for cut {name}")
     model.SketchManager.InsertSketch(True)
     select_new_cut_sketch(model, before)
     create_cut_from_selected_sketch(model, depth, name)
@@ -766,12 +770,10 @@ def add_rectangular_boss(model: Any, x: float, y: float, width: float, height: f
     select_front_plane(model)
     model.SketchManager.InsertSketch(True)
     rect = model.SketchManager.CreateCornerRectangle(x - width / 2, y - height / 2, 0, x + width / 2, y + height / 2, 0)
-    if rect is None:
-        raise RuntimeError(f"CreateCornerRectangle returned None for boss {name}")
+    require_com_created(rect, f"CreateCornerRectangle for boss {name}")
     model.SketchManager.InsertSketch(True)
     feat = model.FeatureManager.FeatureExtrusion2(True, False, False, 0, 0, depth, 0, False, False, False, False, 0, 0, False, False, False, False, True, True, True, 0, 0, False)
-    if feat is None:
-        raise RuntimeError(f"FeatureExtrusion2 returned None for boss {name}")
+    require_com_created(feat, f"FeatureExtrusion2 for boss {name}")
     feat.Name = name
 
 
@@ -828,8 +830,7 @@ def create_cut_from_selected_sketch(model: Any, depth: float, name: str) -> None
     # explicitly selected. Direction=True cuts through the +Z body extruded from
     # Front Plane; ThroughAll is avoided so this stays stable for thin detail parts.
     feat = model.FeatureManager.FeatureCut3(True, False, True, 0, 0, depth, depth, False, False, False, False, 0, 0, False, False, False, False, False, True, True, True, True, False, 0, 0, False)
-    if feat is None:
-        raise RuntimeError(f"FeatureCut3 returned None for {name}")
+    require_com_created(feat, f"FeatureCut3 for {name}")
     feat.Name = name
 
 
@@ -865,8 +866,7 @@ def cut_rects_once(model: Any, rects: list[tuple[float, float, float, float]], d
         if w <= 0.003 or h <= 0.003:
             raise RuntimeError(f"Rectangle cut {name} is too small to create robustly: {w} x {h} m")
         rect = model.SketchManager.CreateCornerRectangle(x - w / 2, y - h / 2, 0, x + w / 2, y + h / 2, 0)
-        if rect is None:
-            raise RuntimeError(f"CreateCornerRectangle returned None for {name}: {w} x {h} m")
+        require_com_created(rect, f"CreateCornerRectangle for {name}: {w} x {h} m")
     model.SketchManager.InsertSketch(True)
     select_new_cut_sketch(model, before)
     create_cut_from_selected_sketch(model, depth, name)
@@ -1070,14 +1070,13 @@ def add_component(sw: Any, asm: Any, path: Path, xyz: tuple[float, float, float]
     resolved = str(path.resolve())
     activate_assembly(sw, asm)
     comp = asm.AddComponent5(resolved, 0, "", False, "", xyz[0], xyz[1], xyz[2])
-    if comp is not None:
+    if com_created(comp):
         return comp
     opened = open_part_for_insert(sw, path)
     activate_assembly(sw, asm)
     comp = asm.AddComponent5(resolved, 0, "", False, "", xyz[0], xyz[1], xyz[2])
     close_doc(sw, opened)
-    if comp is None:
-        raise RuntimeError(f"AddComponent5 failed for {path}")
+    require_com_created(comp, f"AddComponent5 for {path}")
     return comp
 
 
@@ -1110,9 +1109,9 @@ def face_plane_normal(face: Any) -> tuple[float, float, float] | None:
         if not bool(read_member(surface, "IsPlane")):
             return None
         params = read_member(surface, "PlaneParams")
-        if not params or len(params) < 3:
+        if not params or len(params) < 6:
             return None
-        return (float(params[0]), float(params[1]), float(params[2]))
+        return normalize_vector((float(params[3]), float(params[4]), float(params[5])))
     except Exception:
         return None
 
@@ -1129,7 +1128,7 @@ def face_plane_offset(face: Any, normal: tuple[float, float, float]) -> float | 
         surface = read_member(face, "GetSurface")
         params = read_member(surface, "PlaneParams")
         if params and len(params) >= 6:
-            point = (float(params[3]), float(params[4]), float(params[5]))
+            point = (float(params[0]), float(params[1]), float(params[2]))
             return normal[0] * point[0] + normal[1] * point[1] + normal[2] * point[2]
         box = read_member(face, "GetBox")
         if box and len(box) >= 6:
@@ -1162,10 +1161,11 @@ def add_selected_mate(asm: Any, name: str, mate_type: int, distance: float = 0.0
     mate_error = byref_i4(0)
     try:
         feat = asm.AddMate5(mate_type, -1, False, distance, 0, 0, 0, 0, 0, 0, 0, 0, False, False, mate_error)
-        if feat is not None:
+        if com_created(feat):
             feat.Name = name
             return {"name": name, "ok": True, "api": "AddMate5", "mate_error": getattr(mate_error, "value", None)}
-        return {"name": name, "ok": False, "api": "AddMate5", "mate_error": getattr(mate_error, "value", None), "error": "AddMate5 returned None"}
+        returned = "None" if feat is None else repr(feat)
+        return {"name": name, "ok": False, "api": "AddMate5", "mate_error": getattr(mate_error, "value", None), "error": f"AddMate5 returned {returned}"}
     except Exception as exc:
         return {"name": name, "ok": False, "api": "AddMate5", "mate_error": getattr(mate_error, "value", None), "error": repr(exc)}
 

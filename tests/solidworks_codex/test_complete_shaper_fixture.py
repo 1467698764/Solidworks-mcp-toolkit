@@ -127,10 +127,50 @@ class CompleteShaperSpecTests(unittest.TestCase):
 
     def test_live_builder_fails_fast_for_missing_cut_features(self):
         source = SCRIPT.read_text(encoding="utf-8")
-        self.assertIn("FeatureCut3 returned None", source)
-        self.assertIn("CreateCornerRectangle returned None", source)
-        self.assertIn("FeatureExtrusion2 returned None", source)
+        self.assertIn("require_com_created", source)
+        self.assertIn("FeatureCut3 for", source)
+        self.assertIn("CreateCornerRectangle for", source)
+        self.assertIn("FeatureExtrusion2 for", source)
         self.assertIn("select_new_cut_sketch", source)
+
+    def test_live_builder_treats_false_feature_returns_as_failures(self):
+        class SketchManager:
+            def InsertSketch(self, value):
+                return True
+
+            def CreateCornerRectangle(self, *args):
+                return True
+
+            def CreateCircleByRadius(self, *args):
+                return True
+
+        class FeatureManager:
+            def FeatureExtrusion2(self, *args):
+                return False
+
+            def FeatureCut3(self, *args):
+                return False
+
+        class Extension:
+            def SelectByID2(self, *args):
+                return True
+
+        class Model:
+            def __init__(self):
+                self.SketchManager = SketchManager()
+                self.FeatureManager = FeatureManager()
+                self.Extension = Extension()
+
+        original = self.module.select_front_plane
+        self.module.select_front_plane = lambda model: None
+        try:
+            with self.assertRaisesRegex(RuntimeError, "FeatureExtrusion2.*returned False"):
+                self.module.boss_box(Model(), 0.1, 0.1, 0.01, "FalseExtrude")
+
+            with self.assertRaisesRegex(RuntimeError, "FeatureCut3.*returned False"):
+                self.module.create_cut_from_selected_sketch(Model(), 0.01, "FalseCut")
+        finally:
+            self.module.select_front_plane = original
 
     def test_live_builder_places_visible_attached_detail_instances(self):
         detail_placements = self.module.detail_instance_placements()
@@ -317,6 +357,21 @@ class CompleteShaperSpecTests(unittest.TestCase):
         failed = self.module.validate_semantic_mate_network([mate], contract)
 
         self.assertIn("mate_error:Base_Cover_Distance", failed)
+
+    def test_live_builder_treats_false_addmate_return_as_failure(self):
+        class Asm:
+            def AddMate5(self, *args):
+                return False
+
+        original = self.module.byref_i4
+        self.module.byref_i4 = lambda value=0: type("ByRef", (), {"value": value})()
+        try:
+            result = self.module.add_selected_mate(Asm(), "FalseMate", 3)
+        finally:
+            self.module.byref_i4 = original
+
+        self.assertFalse(result["ok"])
+        self.assertEqual("AddMate5 returned False", result["error"])
 
 
     def test_complete_shaper_uses_real_interface_mates_without_fixing_motion_parts(self):
@@ -671,6 +726,82 @@ class CompleteShaperSpecTests(unittest.TestCase):
         self.assertIn("face_plane_offset", source)
         self.assertIn("abs(actual_distance - distance)", source)
         self.assertNotIn('if result["ok"]:\n                            return result', source)
+
+    def test_plane_params_use_point_then_normal_for_parallel_face_selection(self):
+        class Surface:
+            def __init__(self, params):
+                self.params = params
+
+            def IsPlane(self):
+                return True
+
+            def PlaneParams(self):
+                return self.params
+
+        class Face:
+            def __init__(self, params):
+                self.surface = Surface(params)
+
+            def GetSurface(self):
+                return self.surface
+
+        left_face = Face([0.0, 0.0, 0.010, 0.0, 0.0, 1.0])
+        right_face = Face([0.0, 0.0, 0.035, 0.0, 0.0, -1.0])
+
+        self.assertEqual((0.0, 0.0, 1.0), self.module.face_plane_normal(left_face))
+        self.assertEqual((0.0, 0.0, -1.0), self.module.face_plane_normal(right_face))
+        self.assertAlmostEqual(self.module.face_plane_offset(left_face, (0.0, 0.0, 1.0)), 0.010)
+        self.assertAlmostEqual(self.module.face_plane_offset(right_face, (0.0, 0.0, 1.0)), 0.035)
+
+    def test_best_parallel_planar_face_pair_uses_actual_plane_distance(self):
+        class Surface:
+            def __init__(self, params):
+                self.params = params
+
+            def IsPlane(self):
+                return True
+
+            def PlaneParams(self):
+                return self.params
+
+        class Face:
+            def __init__(self, name, params):
+                self.name = name
+                self.surface = Surface(params)
+                self.next_face = None
+
+            def GetSurface(self):
+                return self.surface
+
+            def GetNextFace(self):
+                return self.next_face
+
+        class Body:
+            def __init__(self, faces):
+                self.faces = faces
+
+            def GetFirstFace(self):
+                for left, right in zip(self.faces, self.faces[1:]):
+                    left.next_face = right
+                return self.faces[0]
+
+        class Component:
+            def __init__(self, faces):
+                self.faces = faces
+
+            def GetBodies2(self, body_type):
+                return [Body(self.faces)]
+
+        left = Component([Face("left_reference", [0.0, 0.0, 0.010, 0.0, 0.0, 1.0])])
+        near = Face("right_025", [0.0, 0.0, 0.035, 0.0, 0.0, -1.0])
+        far = Face("right_080", [0.0, 0.0, 0.090, 0.0, 0.0, -1.0])
+        right = Component([far, near])
+
+        selected_left, selected_right, actual_distance = self.module.best_parallel_planar_face_pair(left, right, 0.025)
+
+        self.assertEqual("left_reference", selected_left.name)
+        self.assertEqual("right_025", selected_right.name)
+        self.assertAlmostEqual(actual_distance, 0.025)
 
 
 
