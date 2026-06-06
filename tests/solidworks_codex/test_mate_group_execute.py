@@ -95,6 +95,23 @@ class FakeFace:
         return self.tracking_id
 
 
+class FakePropertyFace(FakeFace):
+    def __init__(self, surface, box, tracking_id=None):
+        self.GetSurface = surface
+        self.GetBox = box
+        self.tracking_id = tracking_id
+        self.select_calls = []
+
+
+class FakePropertySurface(FakeSurface):
+    def __init__(self, kind, params):
+        super().__init__(kind, params)
+        self.IsPlane = kind == "plane"
+        self.PlaneParams = params
+        self.IsCylinder = kind == "cylinder"
+        self.CylinderParams = params
+
+
 class FakeCurve:
     def __init__(self, params):
         self.params = params
@@ -426,6 +443,31 @@ class MateGroupExecuteTests(unittest.TestCase):
         self.assertTrue(result["ok"], result)
         self.assertEqual(bottom_face.select_calls, [(False, {"mark": 0})])
         self.assertEqual(top_face.select_calls, [(True, {"mark": 0})])
+
+    def test_selects_faces_when_solidworks_exposes_surface_and_box_as_properties(self):
+        bottom_face = FakePropertyFace(
+            FakePropertySurface("plane", [0.0, 0.0, -1.0, 0.0, 0.0, 0.024]),
+            [0.0, 0.0, 0.023, 0.1, 0.1, 0.025],
+        )
+        top_face = FakePropertyFace(
+            FakePropertySurface("plane", [0.0, 0.0, 1.0, 0.0, 0.0, 0.024]),
+            [0.0, 0.0, 0.023, 0.2, 0.1, 0.025],
+        )
+        asm = FakeAssembly([
+            FakeNestedBodiesComponent("bolt_m6-1", [bottom_face]),
+            FakeNestedBodiesComponent("cover_plate-1", [top_face]),
+        ])
+        manifest = self.manifest()
+        manifest["macros"][0]["selection_selectors"][0]["fallback"]["normal"] = [0.0, 0.0, -1.0]
+        manifest["macros"][0]["selection_selectors"][1]["fallback"]["normal"] = [0.0, 0.0, 1.0]
+
+        result = mod.execute_manifest(manifest, asm)
+
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(bottom_face.select_calls, [(False, {"mark": 0})])
+        self.assertEqual(top_face.select_calls, [(True, {"mark": 0})])
+        guard = result["executed_mates"][0]["selection_guard"]
+        self.assertEqual([call["method"] for call in guard["select_by_id_calls"]], ["Face.Select4", "Face.Select4"])
 
     def test_selectbyid_com_type_mismatch_is_reported_not_raised(self):
         asm = FakeSelectByIdTypeMismatchAssembly()

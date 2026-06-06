@@ -112,6 +112,20 @@ def center_from_box(box: Any, fallback: list[float]) -> list[float]:
     return [(nums[i] + nums[i + 3]) / 2.0 for i in range(3)]
 
 
+def read_member(obj: Any, name: str, *args: Any) -> Any:
+    value = getattr(obj, name, None)
+    if callable(value):
+        return value(*args)
+    return value
+
+
+def entity_box(entity: Any) -> list[Any]:
+    try:
+        return as_list(read_member(entity, "GetBox"))
+    except Exception:
+        return []
+
+
 def component_display_name(component: Any) -> str:
     for attr in ("Name2", "Name", "name"):
         value = getattr(component, attr, None)
@@ -255,61 +269,43 @@ def component_vertices(component: Any) -> list[Any]:
 
 
 def surface_for_face(face: Any) -> Any | None:
-    func = getattr(face, "GetSurface", None)
-    if not callable(func):
-        return None
     try:
-        return func()
+        return read_member(face, "GetSurface")
     except Exception:
         return None
 
 
 def surface_bool(surface: Any, method: str) -> bool:
-    func = getattr(surface, method, None)
-    if not callable(func):
-        return False
     try:
-        return bool(func())
+        return bool(read_member(surface, method))
     except Exception:
         return False
 
 
 def surface_params(surface: Any, method: str) -> list[float]:
-    func = getattr(surface, method, None)
-    if not callable(func):
-        return []
     try:
-        return [float(item) for item in as_list(func())]
+        return [float(item) for item in as_list(read_member(surface, method))]
     except Exception:
         return []
 
 
 def curve_for_edge(edge: Any) -> Any | None:
-    func = getattr(edge, "GetCurve", None)
-    if not callable(func):
-        return None
     try:
-        return func()
+        return read_member(edge, "GetCurve")
     except Exception:
         return None
 
 
 def curve_bool(curve: Any, method: str) -> bool:
-    func = getattr(curve, method, None)
-    if not callable(func):
-        return False
     try:
-        return bool(func())
+        return bool(read_member(curve, method))
     except Exception:
         return False
 
 
 def curve_params(curve: Any, method: str) -> list[float]:
-    func = getattr(curve, method, None)
-    if not callable(func):
-        return []
     try:
-        return [float(item) for item in as_list(func())]
+        return [float(item) for item in as_list(read_member(curve, method))]
     except Exception:
         return []
 
@@ -419,7 +415,7 @@ def best_planar_face(component: Any, fallback: dict[str, Any]) -> Any | None:
         normal_score = max((abs(dot(normal, expected_normal)) for normal in normal_candidates), default=1.0) if any(expected_normal) else 1.0
         if normal_score < 0.8:
             continue
-        face_center = center_from_box(getattr(face, "GetBox", lambda: [])(), expected_origin)
+        face_center = center_from_box(entity_box(face), expected_origin)
         score = distance(face_center, expected_origin) - normal_score
         if best is None or score < best[0]:
             best = (score, face)
@@ -478,7 +474,7 @@ def best_linear_edge(component: Any, fallback: dict[str, Any]) -> Any | None:
         axis_score = abs(dot(axis, expected_axis)) if any(expected_axis) else 1.0
         if axis_score < 0.8:
             continue
-        edge_center = center_from_box(getattr(edge, "GetBox", lambda: [])(), origin)
+        edge_center = center_from_box(entity_box(edge), origin)
         score = distance(edge_center, expected_origin) - axis_score
         if best is None or score < best[0]:
             best = (score, edge)
@@ -495,7 +491,7 @@ def vertex_point(vertex: Any, fallback: list[float]) -> list[float]:
         except Exception:
             continue
         return point
-    return center_from_box(getattr(vertex, "GetBox", lambda: [])(), fallback)
+    return center_from_box(entity_box(vertex), fallback)
 
 
 def best_vertex(component: Any, fallback: dict[str, Any]) -> Any | None:
