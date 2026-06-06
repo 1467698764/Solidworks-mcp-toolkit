@@ -36,6 +36,13 @@ class FakeFeature:
         return True
 
 
+class FakeCreatedFeature:
+    _oleobj_ = True
+
+    def __init__(self, name):
+        self.Name = name
+
+
 class FakeFeatureManager:
     _oleobj_ = True
 
@@ -44,39 +51,43 @@ class FakeFeatureManager:
 
     def FeatureFillet3(self, *args):
         self.calls.append(("FeatureFillet3", args))
-        return {"name": "Codex_Fillet"}
+        return FakeCreatedFeature("Codex_Fillet")
+
+    def FeatureChamfer3(self, *args):
+        self.calls.append(("FeatureChamfer3", args))
+        return FakeCreatedFeature("Codex_Chamfer")
 
     def FeatureLinearPattern5(self, *args):
         self.calls.append(("FeatureLinearPattern5", args))
-        return {"name": "Codex_LinearPattern"}
+        return FakeCreatedFeature("Codex_LinearPattern")
 
     def FeatureCircularPattern5(self, *args):
         self.calls.append(("FeatureCircularPattern5", args))
-        return {"name": "Codex_CircularPattern"}
+        return FakeCreatedFeature("Codex_CircularPattern")
 
     def InsertMirrorFeature2(self, *args):
         self.calls.append(("InsertMirrorFeature2", args))
-        return {"name": "Codex_Mirror"}
+        return FakeCreatedFeature("Codex_Mirror")
 
     def FeatureCut3(self, *args):
         self.calls.append(("FeatureCut3", args))
-        return {"name": "Codex_Cut"}
+        return FakeCreatedFeature("Codex_Cut")
 
     def FeatureExtrusion3(self, *args):
         self.calls.append(("FeatureExtrusion3", args))
-        return {"name": "Codex_BossExtrude"}
+        return FakeCreatedFeature("Codex_BossExtrude")
 
     def FeatureRevolve2(self, *args):
         self.calls.append(("FeatureRevolve2", args))
-        return {"name": "Codex_Revolve"}
+        return FakeCreatedFeature("Codex_Revolve")
 
     def FeatureRevolveCut2(self, *args):
         self.calls.append(("FeatureRevolveCut2", args))
-        return {"name": "Codex_RevolvedCut"}
+        return FakeCreatedFeature("Codex_RevolvedCut")
 
     def HoleWizard5(self, *args):
         self.calls.append(("HoleWizard5", args))
-        return {"name": "Codex_HoleWizard"}
+        return FakeCreatedFeature("Codex_HoleWizard")
 
 
 class FakeSketchManager:
@@ -139,6 +150,36 @@ class PartFeatureExecuteTests(unittest.TestCase):
         self.assertEqual(plan["operation"], "chamfer")
         self.assertEqual(plan["operation_role"], "edge_break")
 
+    def test_executes_fillet_and_names_reviewed_feature(self):
+        model = FakeModel()
+        plan = mod.validate_spec({
+            "operation": "fillet",
+            "selectors": [{"kind": "entity", "name": "Edge<1>@Plate", "type": "EDGE", "point": {"x": 0.1}}],
+            "parameters": {"radius_mm": 2.5, "feature_name": "ReviewedEdgeRound"},
+        })
+
+        result = mod.execute(model, plan)
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["operation_result"]["feature_name"], "ReviewedEdgeRound")
+        self.assertEqual(result["operation_result"]["fillet"]["assigned_feature_name"], "ReviewedEdgeRound")
+        self.assertEqual(result["operation_result"]["fillet"]["raw"].Name, "ReviewedEdgeRound")
+
+    def test_executes_chamfer_and_names_reviewed_feature(self):
+        model = FakeModel()
+        plan = mod.validate_spec({
+            "operation": "chamfer",
+            "selectors": [{"kind": "entity", "name": "Edge<2>@Plate", "type": "EDGE", "point": {"x": 0.1}}],
+            "parameters": {"distance_mm": 1.2, "angle_deg": 45, "feature_name": "ReviewedEdgeBreak"},
+        })
+
+        result = mod.execute(model, plan)
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["operation_result"]["feature_name"], "ReviewedEdgeBreak")
+        self.assertEqual(result["operation_result"]["chamfer"]["assigned_feature_name"], "ReviewedEdgeBreak")
+        self.assertEqual(result["operation_result"]["chamfer"]["raw"].Name, "ReviewedEdgeBreak")
+
     def test_rejects_pattern_without_seed_feature(self):
         with self.assertRaisesRegex(ValueError, "seed feature"):
             mod.validate_spec({
@@ -155,7 +196,7 @@ class PartFeatureExecuteTests(unittest.TestCase):
                 {"kind": "feature", "name": "SeedCut"},
                 {"kind": "entity", "name": "Right Plane", "type": "PLANE"},
             ],
-            "parameters": {"count": 3, "spacing_mm": 10},
+            "parameters": {"count": 3, "spacing_mm": 10, "feature_name": "ReviewedLinearPattern"},
         })
 
         result = mod.execute(model, plan)
@@ -172,6 +213,8 @@ class PartFeatureExecuteTests(unittest.TestCase):
         self.assertEqual(result["operation_result"]["pattern_evidence"]["expected_instance_count"], 3)
         self.assertEqual(result["operation_result"]["pattern_evidence"]["spacing_m"], 0.01)
         self.assertEqual(result["operation_result"]["pattern_evidence"]["direction_selector"], "Right Plane")
+        self.assertEqual(result["operation_result"]["feature_name"], "ReviewedLinearPattern")
+        self.assertEqual(result["operation_result"]["call"]["assigned_feature_name"], "ReviewedLinearPattern")
 
     def test_circular_pattern_reports_instance_intent_and_axis_selector(self):
         model = FakeModel()
@@ -181,7 +224,7 @@ class PartFeatureExecuteTests(unittest.TestCase):
                 {"kind": "feature", "name": "SeedCut"},
                 {"kind": "entity", "name": "Axis1", "type": "AXIS"},
             ],
-            "parameters": {"count": 6, "angle_deg": 180},
+            "parameters": {"count": 6, "angle_deg": 180, "feature_name": "ReviewedCircularPattern"},
         })
 
         result = mod.execute(model, plan)
@@ -191,6 +234,8 @@ class PartFeatureExecuteTests(unittest.TestCase):
         self.assertEqual(result["operation_result"]["pattern_evidence"]["expected_instance_count"], 6)
         self.assertEqual(result["operation_result"]["pattern_evidence"]["angle_deg"], 180.0)
         self.assertEqual(result["operation_result"]["pattern_evidence"]["axis_selector"], "Axis1")
+        self.assertEqual(result["operation_result"]["feature_name"], "ReviewedCircularPattern")
+        self.assertEqual(result["operation_result"]["call"]["assigned_feature_name"], "ReviewedCircularPattern")
 
     def test_mirror_reports_mirrored_instance_intent_and_plane_selector(self):
         model = FakeModel()
@@ -200,7 +245,7 @@ class PartFeatureExecuteTests(unittest.TestCase):
                 {"kind": "feature", "name": "SeedCut"},
                 {"kind": "entity", "name": "Front Plane", "type": "PLANE"},
             ],
-            "parameters": {},
+            "parameters": {"feature_name": "ReviewedMirror"},
         })
 
         result = mod.execute(model, plan)
@@ -209,6 +254,8 @@ class PartFeatureExecuteTests(unittest.TestCase):
         self.assertEqual(result["operation_result"]["pattern_evidence"]["pattern_type"], "mirror")
         self.assertEqual(result["operation_result"]["pattern_evidence"]["expected_instance_count"], 2)
         self.assertEqual(result["operation_result"]["pattern_evidence"]["mirror_plane_selector"], "Front Plane")
+        self.assertEqual(result["operation_result"]["feature_name"], "ReviewedMirror")
+        self.assertEqual(result["operation_result"]["call"]["assigned_feature_name"], "ReviewedMirror")
 
     def test_dry_run_writes_reviewable_execution_plan(self):
         with tempfile.TemporaryDirectory() as td:
@@ -243,7 +290,7 @@ class PartFeatureExecuteTests(unittest.TestCase):
         plan = mod.validate_spec({
             "operation": "basic_hole",
             "selectors": [{"kind": "entity", "name": "Front Plane", "type": "PLANE"}],
-            "parameters": {"diameter_mm": 6, "depth_mm": 12, "center": {"x": 0.01, "y": 0.02, "z": 0}},
+            "parameters": {"diameter_mm": 6, "depth_mm": 12, "center": {"x": 0.01, "y": 0.02, "z": 0}, "feature_name": "ReviewedPilotHole"},
         })
 
         result = mod.execute(model, plan)
@@ -252,6 +299,8 @@ class PartFeatureExecuteTests(unittest.TestCase):
         self.assertEqual(result["operation_role"], "cylindrical_hole_cut")
         self.assertIn(("CreateCircleByRadius", (0.01, 0.02, 0.0, 0.003)), model.SketchManager.calls)
         self.assertEqual(model.FeatureManager.calls[-1][0], "FeatureCut3")
+        self.assertEqual(result["operation_result"]["feature_name"], "ReviewedPilotHole")
+        self.assertEqual(result["operation_result"]["cut"]["assigned_feature_name"], "ReviewedPilotHole")
 
     def test_executes_countersink_hole_with_reviewed_hole_wizard_metadata(self):
         model = FakeModel()
@@ -264,6 +313,7 @@ class PartFeatureExecuteTests(unittest.TestCase):
                 "countersink_diameter_mm": 10,
                 "countersink_angle_deg": 82,
                 "center": {"x": 0.01, "y": 0.02, "z": 0},
+                "feature_name": "ReviewedCountersink",
             },
         })
 
@@ -278,6 +328,8 @@ class PartFeatureExecuteTests(unittest.TestCase):
         self.assertEqual(result["operation_result"]["hole_metadata"]["countersink_diameter_m"], 0.01)
         self.assertEqual(result["operation_result"]["hole_metadata"]["countersink_angle_deg"], 82.0)
         self.assertEqual(result["operation_result"]["wizard_call"]["method"], "HoleWizard5")
+        self.assertEqual(result["operation_result"]["feature_name"], "ReviewedCountersink")
+        self.assertEqual(result["operation_result"]["wizard_call"]["assigned_feature_name"], "ReviewedCountersink")
 
     def test_executes_counterbore_hole_with_reviewed_hole_wizard_metadata(self):
         model = FakeModel()
@@ -290,6 +342,7 @@ class PartFeatureExecuteTests(unittest.TestCase):
                 "counterbore_diameter_mm": 12,
                 "counterbore_depth_mm": 4,
                 "center": {"x": 0.01, "y": 0.02, "z": 0},
+                "feature_name": "ReviewedCounterbore",
             },
         })
 
@@ -303,13 +356,15 @@ class PartFeatureExecuteTests(unittest.TestCase):
         self.assertEqual(result["operation_result"]["hole_metadata"]["counterbore_diameter_m"], 0.012)
         self.assertEqual(result["operation_result"]["hole_metadata"]["counterbore_depth_m"], 0.004)
         self.assertEqual(result["operation_result"]["wizard_call"]["method"], "HoleWizard5")
+        self.assertEqual(result["operation_result"]["feature_name"], "ReviewedCounterbore")
+        self.assertEqual(result["operation_result"]["wizard_call"]["assigned_feature_name"], "ReviewedCounterbore")
 
     def test_executes_extrude_cut_from_reviewed_sketch(self):
         model = FakeModel()
         plan = mod.validate_spec({
             "operation": "extrude_cut",
             "selectors": [{"kind": "entity", "name": "CutSketch", "type": "SKETCH"}],
-            "parameters": {"depth_mm": 9},
+            "parameters": {"depth_mm": 9, "feature_name": "ReviewedExtrudeCut"},
         })
 
         result = mod.execute(model, plan)
@@ -319,13 +374,15 @@ class PartFeatureExecuteTests(unittest.TestCase):
         self.assertEqual(model.Extension.calls[0][0], "SelectByID2")
         self.assertEqual(model.FeatureManager.calls[-1][0], "FeatureCut3")
         self.assertEqual(result["operation_result"]["cut"]["method"], "FeatureCut3")
+        self.assertEqual(result["operation_result"]["feature_name"], "ReviewedExtrudeCut")
+        self.assertEqual(result["operation_result"]["cut"]["assigned_feature_name"], "ReviewedExtrudeCut")
 
     def test_executes_slot_cut_from_reviewed_plane(self):
         model = FakeModel()
         plan = mod.validate_spec({
             "operation": "slot_cut",
             "selectors": [{"kind": "entity", "name": "Top Plane", "type": "PLANE"}],
-            "parameters": {"length_mm": 40, "width_mm": 8, "depth_mm": 5, "center": {"x": 0, "y": 0, "z": 0}},
+            "parameters": {"length_mm": 40, "width_mm": 8, "depth_mm": 5, "center": {"x": 0, "y": 0, "z": 0}, "feature_name": "ReviewedSlot"},
         })
 
         result = mod.execute(model, plan)
@@ -334,13 +391,15 @@ class PartFeatureExecuteTests(unittest.TestCase):
         self.assertEqual(result["operation_role"], "slot_profile_cut")
         self.assertTrue(any(call[0] == "CreateStraightSlot" for call in model.SketchManager.calls))
         self.assertEqual(model.FeatureManager.calls[-1][0], "FeatureCut3")
+        self.assertEqual(result["operation_result"]["feature_name"], "ReviewedSlot")
+        self.assertEqual(result["operation_result"]["cut"]["assigned_feature_name"], "ReviewedSlot")
 
     def test_executes_pocket_cut_from_reviewed_plane(self):
         model = FakeModel()
         plan = mod.validate_spec({
             "operation": "pocket_cut",
             "selectors": [{"kind": "entity", "name": "Top Plane", "type": "PLANE"}],
-            "parameters": {"width_mm": 20, "height_mm": 10, "depth_mm": 4, "center": {"x": 0, "y": 0, "z": 0}},
+            "parameters": {"width_mm": 20, "height_mm": 10, "depth_mm": 4, "center": {"x": 0, "y": 0, "z": 0}, "feature_name": "ReviewedPocket"},
         })
 
         result = mod.execute(model, plan)
@@ -349,6 +408,8 @@ class PartFeatureExecuteTests(unittest.TestCase):
         self.assertEqual(result["operation_role"], "rectangular_pocket_cut")
         self.assertTrue(any(call[0] == "CreateCenterRectangle" for call in model.SketchManager.calls))
         self.assertEqual(model.FeatureManager.calls[-1][0], "FeatureCut3")
+        self.assertEqual(result["operation_result"]["feature_name"], "ReviewedPocket")
+        self.assertEqual(result["operation_result"]["cut"]["assigned_feature_name"], "ReviewedPocket")
 
     def test_executes_extrude_boss_from_reviewed_sketch(self):
         model = FakeModel()

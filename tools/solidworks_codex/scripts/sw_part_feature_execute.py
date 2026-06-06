@@ -411,6 +411,10 @@ def point_params(params: dict[str, Any]) -> dict[str, float]:
     }
 
 
+def reviewed_feature_name(params: dict[str, Any]) -> str | None:
+    return str(params.get("feature_name") or params.get("name") or "").strip() or None
+
+
 def apply_hole_center_to_plane_selectors(selectors: list[dict[str, Any]], params: dict[str, Any]) -> list[dict[str, Any]]:
     center = point_params(params)
     result: list[dict[str, Any]] = []
@@ -435,7 +439,7 @@ def start_reviewed_sketch(model: Any) -> dict[str, Any]:
     return {"sketch_manager": sketch_manager, "opened": opened}
 
 
-def finish_cut(model: Any, sketch_context: dict[str, Any], depth_m: float, through_all: bool = False) -> dict[str, Any]:
+def finish_cut(model: Any, sketch_context: dict[str, Any], depth_m: float, through_all: bool = False, feature_name: str | None = None) -> dict[str, Any]:
     sketch_manager = sketch_context["sketch_manager"]
     closed = read(sketch_manager, "InsertSketch", True)
     feature_manager = read(model, "FeatureManager")
@@ -446,6 +450,7 @@ def finish_cut(model: Any, sketch_context: dict[str, Any], depth_m: float, throu
         ("FeatureCut3", (True, False, False, end_condition, 0, depth_m, depth_m, False, False, False, False, 0, 0, False, False, False, False, False, True, True, True, True, False, 0, 0, False)),
         ("FeatureCut2", (True, False, False, end_condition, 0, depth_m, depth_m, False, False, False, False, 0, 0, False, False, False, False, False, True, True, True, True, False, 0, 0)),
     ])
+    cut = apply_feature_name(cut, feature_name)
     return {"closed_sketch": closed, "cut": cut}
 
 
@@ -455,9 +460,10 @@ def execute_basic_hole(model: Any, params: dict[str, Any]) -> dict[str, Any]:
     center = point_params(params)
     diameter_m = float(params.get("diameter_m", mm_to_m(params.get("diameter_mm", 0))))
     depth_m = float(params.get("depth_m", mm_to_m(params.get("depth_mm", 0))))
+    feature_name = reviewed_feature_name(params)
     circle = read(sketch_manager, "CreateCircleByRadius", center["x"], center["y"], center["z"], diameter_m / 2.0)
-    cut = finish_cut(model, sketch_context, depth_m, bool(params.get("through_all")))
-    return {"ok": bool((cut.get("cut") or {}).get("ok")), "sketch": {"opened": sketch_context["opened"], "circle": circle}, **cut}
+    cut = finish_cut(model, sketch_context, depth_m, bool(params.get("through_all")), feature_name)
+    return {"ok": bool((cut.get("cut") or {}).get("ok")), "feature_name": feature_name, "sketch": {"opened": sketch_context["opened"], "circle": circle}, **cut}
 
 
 def hole_metadata(params: dict[str, Any], variant: str) -> dict[str, Any]:
@@ -522,8 +528,11 @@ def execute_hole_wizard(model: Any, params: dict[str, Any], variant: str) -> dic
     wizard_call = invoke_first(feature_manager, [
         ("HoleWizard5", hole_wizard_args(metadata)),
     ])
+    feature_name = reviewed_feature_name(params)
+    wizard_call = apply_feature_name(wizard_call, feature_name)
     return {
         "ok": bool(wizard_call.get("ok")),
+        "feature_name": feature_name,
         "hole_variant": variant,
         "hole_metadata": metadata,
         "wizard_call": wizard_call,
@@ -537,13 +546,14 @@ def execute_slot_cut(model: Any, params: dict[str, Any]) -> dict[str, Any]:
     length_m = float(params.get("length_m", mm_to_m(params.get("length_mm", 0))))
     width_m = float(params.get("width_m", mm_to_m(params.get("width_mm", 0))))
     depth_m = float(params.get("depth_m", mm_to_m(params.get("depth_mm", 0))))
+    feature_name = reviewed_feature_name(params)
     half_line = (length_m - width_m) / 2.0
     slot = invoke_first(sketch_manager, [
         ("CreateStraightSlot", (center["x"] - half_line, center["y"], center["z"], center["x"] + half_line, center["y"], center["z"], width_m / 2.0)),
         ("CreateSketchSlot", (0, 0, center["x"] - half_line, center["y"], center["z"], center["x"] + half_line, center["y"], center["z"], width_m / 2.0, 0, 0, 0, 1, False)),
     ])
-    cut = finish_cut(model, sketch_context, depth_m, bool(params.get("through_all")))
-    return {"ok": bool((cut.get("cut") or {}).get("ok")), "sketch": {"opened": sketch_context["opened"], "slot": slot}, **cut}
+    cut = finish_cut(model, sketch_context, depth_m, bool(params.get("through_all")), feature_name)
+    return {"ok": bool((cut.get("cut") or {}).get("ok")), "feature_name": feature_name, "sketch": {"opened": sketch_context["opened"], "slot": slot}, **cut}
 
 
 def execute_pocket_cut(model: Any, params: dict[str, Any]) -> dict[str, Any]:
@@ -553,12 +563,13 @@ def execute_pocket_cut(model: Any, params: dict[str, Any]) -> dict[str, Any]:
     width_m = float(params.get("width_m", mm_to_m(params.get("width_mm", 0))))
     height_m = float(params.get("height_m", mm_to_m(params.get("height_mm", 0))))
     depth_m = float(params.get("depth_m", mm_to_m(params.get("depth_mm", 0))))
+    feature_name = reviewed_feature_name(params)
     rectangle = invoke_first(sketch_manager, [
         ("CreateCenterRectangle", (center["x"], center["y"], center["z"], center["x"] + width_m / 2.0, center["y"] + height_m / 2.0, center["z"])),
         ("CreateCornerRectangle", (center["x"] - width_m / 2.0, center["y"] - height_m / 2.0, center["z"], center["x"] + width_m / 2.0, center["y"] + height_m / 2.0, center["z"])),
     ])
-    cut = finish_cut(model, sketch_context, depth_m, bool(params.get("through_all")))
-    return {"ok": bool((cut.get("cut") or {}).get("ok")), "sketch": {"opened": sketch_context["opened"], "rectangle": rectangle}, **cut}
+    cut = finish_cut(model, sketch_context, depth_m, bool(params.get("through_all")), feature_name)
+    return {"ok": bool((cut.get("cut") or {}).get("ok")), "feature_name": feature_name, "sketch": {"opened": sketch_context["opened"], "rectangle": rectangle}, **cut}
 
 
 def execute_extrude_cut(model: Any, params: dict[str, Any]) -> dict[str, Any]:
@@ -567,12 +578,14 @@ def execute_extrude_cut(model: Any, params: dict[str, Any]) -> dict[str, Any]:
         raise RuntimeError("Model.FeatureManager is unavailable.")
     depth_m = float(params.get("depth_m", mm_to_m(params.get("depth_mm", 0))))
     through_all = bool(params.get("through_all"))
+    feature_name = reviewed_feature_name(params)
     end_condition = 1 if through_all else 0
     cut = invoke_first(feature_manager, [
         ("FeatureCut3", (True, False, False, end_condition, 0, depth_m, depth_m, False, False, False, False, 0, 0, False, False, False, False, False, True, True, True, True, False, 0, 0, False)),
         ("FeatureCut2", (True, False, False, end_condition, 0, depth_m, depth_m, False, False, False, False, 0, 0, False, False, False, False, False, True, True, True, True, False, 0, 0)),
     ])
-    return {"ok": bool(cut.get("ok")), "cut": cut, "depth_m": depth_m, "through_all": through_all}
+    cut = apply_feature_name(cut, feature_name)
+    return {"ok": bool(cut.get("ok")), "cut": cut, "depth_m": depth_m, "through_all": through_all, "feature_name": feature_name}
 
 
 def apply_feature_name(call_result: dict[str, Any], feature_name: str | None) -> dict[str, Any]:
@@ -593,7 +606,7 @@ def execute_extrude_boss(model: Any, params: dict[str, Any]) -> dict[str, Any]:
     depth_m = float(params.get("depth_m", mm_to_m(params.get("depth_mm", 0))))
     through_all = bool(params.get("through_all"))
     end_condition = 1 if through_all else 0
-    feature_name = str(params.get("feature_name") or params.get("name") or "").strip() or None
+    feature_name = reviewed_feature_name(params)
     boss = invoke_first(feature_manager, [
         ("FeatureExtrusion3", (True, False, False, end_condition, 0, depth_m, depth_m, False, False, False, False, 0, 0, False, False, False, False, True, True, True, 0, 0, False)),
         ("FeatureExtrusion2", (True, False, False, end_condition, 0, depth_m, depth_m, False, False, False, False, 0, 0, False, False, False, False, True, True, True, 0, 0)),
@@ -612,7 +625,7 @@ def execute_revolve(model: Any, plan: dict[str, Any], cut: bool) -> dict[str, An
     angle_rad = angle_deg * 3.141592653589793 / 180.0
     reverse_direction = bool(params.get("reverse_direction"))
     thin_feature = bool(params.get("thin_feature"))
-    feature_name = str(params.get("feature_name") or params.get("name") or "").strip() or None
+    feature_name = reviewed_feature_name(params)
     candidates = [
         ("FeatureRevolveCut2" if cut else "FeatureRevolve2", (True, reverse_direction, False, False, False, False, angle_rad, 0.0, thin_feature, 0.0, 0.0, 0, 0, True, True, True)),
         ("FeatureRevolveCut" if cut else "FeatureRevolve", (True, reverse_direction, angle_rad)),
@@ -645,8 +658,9 @@ def selector_names(plan: dict[str, Any], *, kind: str | None = None, select_type
     return result
 
 
-def pattern_result(call_result: dict[str, Any], evidence: dict[str, Any]) -> dict[str, Any]:
-    return {"ok": bool(call_result.get("ok")), "call": call_result, "pattern_evidence": evidence}
+def pattern_result(call_result: dict[str, Any], evidence: dict[str, Any], feature_name: str | None = None) -> dict[str, Any]:
+    call_result = apply_feature_name(call_result, feature_name)
+    return {"ok": bool(call_result.get("ok")), "call": call_result, "pattern_evidence": evidence, "feature_name": feature_name}
 
 
 def execute_operation(model: Any, plan: dict[str, Any]) -> dict[str, Any]:
@@ -657,19 +671,25 @@ def execute_operation(model: Any, plan: dict[str, Any]) -> dict[str, Any]:
     params = plan["parameters"]
     if operation == "fillet":
         radius_m = float(params.get("radius_m", mm_to_m(params.get("radius_mm", 0))))
-        return invoke_first(feature_manager, [
+        feature_name = reviewed_feature_name(params)
+        fillet = invoke_first(feature_manager, [
             ("FeatureFillet3", (195, radius_m, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, True, True, True)),
             ("FeatureFillet2", (195, radius_m, 0, 0, 0, 0, 0, 0, True, True, True)),
             ("InsertFeatureFillet", (radius_m,)),
         ])
+        fillet = apply_feature_name(fillet, feature_name)
+        return {"ok": bool(fillet.get("ok")), "fillet": fillet, "radius_m": radius_m, "feature_name": feature_name}
     if operation == "chamfer":
         distance_m = float(params.get("distance_m", mm_to_m(params.get("distance_mm", 0))))
         angle_rad = float(params.get("angle_deg", 45.0)) * 3.141592653589793 / 180.0
-        return invoke_first(feature_manager, [
+        feature_name = reviewed_feature_name(params)
+        chamfer = invoke_first(feature_manager, [
             ("FeatureChamfer3", (4, distance_m, angle_rad, 0, 0, 0, True, True)),
             ("FeatureChamfer2", (4, distance_m, angle_rad, 0, 0, True, True)),
             ("InsertFeatureChamfer", (4, distance_m, angle_rad)),
         ])
+        chamfer = apply_feature_name(chamfer, feature_name)
+        return {"ok": bool(chamfer.get("ok")), "chamfer": chamfer, "distance_m": distance_m, "angle_rad": angle_rad, "feature_name": feature_name}
     if operation == "basic_hole":
         return execute_basic_hole(model, params)
     if operation == "countersink_hole":
@@ -691,6 +711,7 @@ def execute_operation(model: Any, plan: dict[str, Any]) -> dict[str, Any]:
     if operation == "linear_pattern":
         count = as_int(params, "count", 2)
         spacing_m = as_float(params, "spacing_m", mm_to_m(params.get("spacing_mm", 0)))
+        feature_name = reviewed_feature_name(params)
         call = invoke_first(feature_manager, [
             ("FeatureLinearPattern5", (count, 1, spacing_m, 0.0, False, False, "", "", False, False, False, False, False, False)),
             ("FeatureLinearPattern4", (count, 1, spacing_m, 0.0, False, False, "", "", False, False, False, False)),
@@ -702,11 +723,12 @@ def execute_operation(model: Any, plan: dict[str, Any]) -> dict[str, Any]:
             "direction_selector": next(iter(selector_names(plan, kind="entity")), None),
             "expected_instance_count": count,
             "spacing_m": spacing_m,
-        })
+        }, feature_name)
     if operation == "circular_pattern":
         count = as_int(params, "count", 2)
         angle_deg = as_float(params, "angle_deg", 360.0)
         angle_rad = angle_deg * 3.141592653589793 / 180.0
+        feature_name = reviewed_feature_name(params)
         call = invoke_first(feature_manager, [
             ("FeatureCircularPattern5", (count, angle_rad, False, "", False, False, False)),
             ("FeatureCircularPattern4", (count, angle_rad, False, "", False, False)),
@@ -719,8 +741,9 @@ def execute_operation(model: Any, plan: dict[str, Any]) -> dict[str, Any]:
             "expected_instance_count": count,
             "angle_deg": angle_deg,
             "angle_rad": angle_rad,
-        })
+        }, feature_name)
     if operation == "mirror":
+        feature_name = reviewed_feature_name(params)
         call = invoke_first(feature_manager, [
             ("InsertMirrorFeature2", (False, False, False, False)),
             ("InsertMirrorFeature", (False, False, False)),
@@ -731,7 +754,7 @@ def execute_operation(model: Any, plan: dict[str, Any]) -> dict[str, Any]:
             "seed_features": selector_names(plan, kind="feature"),
             "mirror_plane_selector": next(iter(selector_names(plan, kind="entity", select_type="PLANE")), None) or next(iter(selector_names(plan, kind="entity")), None),
             "expected_instance_count": 2,
-        })
+        }, feature_name)
     raise ValueError(f"Unsupported operation: {operation}")
 
 
