@@ -1404,12 +1404,58 @@ def component_translation(component: Any) -> tuple[float, float, float]:
     return (0.0, 0.0, 0.0)
 
 
+def component_rotation(component: Any) -> tuple[tuple[float, float, float], tuple[float, float, float], tuple[float, float, float]]:
+    try:
+        transform = read_member(component, "Transform2")
+        data = list(read_member(transform, "ArrayData")) if transform is not None else []
+        if len(data) >= 9:
+            return (
+                (float(data[0]), float(data[1]), float(data[2])),
+                (float(data[3]), float(data[4]), float(data[5])),
+                (float(data[6]), float(data[7]), float(data[8])),
+            )
+    except Exception:
+        pass
+    return ((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0))
+
+
+def transform_vector(component: Any, local_vector: tuple[float, float, float]) -> tuple[float, float, float]:
+    rotation = component_rotation(component)
+    return (
+        rotation[0][0] * local_vector[0] + rotation[0][1] * local_vector[1] + rotation[0][2] * local_vector[2],
+        rotation[1][0] * local_vector[0] + rotation[1][1] * local_vector[1] + rotation[1][2] * local_vector[2],
+        rotation[2][0] * local_vector[0] + rotation[2][1] * local_vector[1] + rotation[2][2] * local_vector[2],
+    )
+
+
+def transform_point(component: Any, local_point: tuple[float, float, float]) -> tuple[float, float, float]:
+    rotation = component_rotation(component)
+    translation = component_translation(component)
+    return (
+        rotation[0][0] * local_point[0] + rotation[0][1] * local_point[1] + rotation[0][2] * local_point[2] + translation[0],
+        rotation[1][0] * local_point[0] + rotation[1][1] * local_point[1] + rotation[1][2] * local_point[2] + translation[1],
+        rotation[2][0] * local_point[0] + rotation[2][1] * local_point[1] + rotation[2][2] * local_point[2] + translation[2],
+    )
+
+
 def component_face_plane_offset(component: Any, face: Any, normal: tuple[float, float, float]) -> float | None:
     offset = face_plane_offset(face, normal)
     if offset is None:
         return None
-    translation = component_translation(component)
-    return offset + normal[0] * translation[0] + normal[1] * translation[1] + normal[2] * translation[2]
+    try:
+        surface = read_member(face, "GetSurface")
+        params = read_member(surface, "PlaneParams")
+        world_normal = transform_vector(component, normal)
+        if params and len(params) >= 6:
+            world_point = transform_point(component, (float(params[3]), float(params[4]), float(params[5])))
+            return world_normal[0] * world_point[0] + world_normal[1] * world_point[1] + world_normal[2] * world_point[2]
+        box = read_member(face, "GetBox")
+        if box and len(box) >= 6:
+            world_center = transform_point(component, ((float(box[0]) + float(box[3])) / 2, (float(box[1]) + float(box[4])) / 2, (float(box[2]) + float(box[5])) / 2))
+            return world_normal[0] * world_center[0] + world_normal[1] * world_center[1] + world_normal[2] * world_center[2]
+    except Exception:
+        return None
+    return None
 
 
 def axis_vector(axis: str) -> tuple[float, float, float]:

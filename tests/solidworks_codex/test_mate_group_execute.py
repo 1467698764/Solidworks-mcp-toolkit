@@ -436,6 +436,27 @@ class MateGroupExecuteTests(unittest.TestCase):
 
         self.assertIs(selected, face)
 
+    def test_best_cylindrical_face_uses_component_rotation_and_translation(self):
+        face = FakeFace(
+            FakeSurface("cylinder", [0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.01]),
+            [-0.01, -0.01, -0.05, 0.01, 0.01, 0.05],
+        )
+        component = FakeComponent("shaft-1", [face])
+        component.Transform2 = FakeTransform([1, 0, 0, 0, 0, 1, 0, 1, 0, 0.25, 0.0, 0.0])
+
+        selected = mod.best_cylindrical_face(component, {"axis": [0.0, 1.0, 0.0], "origin_m": [0.25, 0.0, 0.0], "radius_m": 0.01})
+
+        self.assertIs(selected, face)
+
+    def test_best_linear_edge_uses_component_rotation_and_translation(self):
+        edge = FakeEdge(FakeCurve([0.0, 0.0, 0.0, 1.0, 0.0, 0.0]), [-0.03, -0.001, -0.001, 0.03, 0.001, 0.001])
+        component = FakeComponent("slot_carrier-1", [], [edge])
+        component.Transform2 = FakeTransform([0, 1, 0, -1, 0, 0, 0, 0, 1, 0.1, 0.02, 0.0])
+
+        selected = mod.best_linear_edge(component, {"axis": [0.0, 1.0, 0.0], "centerline_m": {"start": [0.1, -0.01, 0.0], "end": [0.1, 0.05, 0.0]}})
+
+        self.assertIs(selected, edge)
+
     def test_enumerates_faces_from_getfirstface_when_getfaces_is_unavailable(self):
         bottom_face = FakeLinkedFace(
             FakeSurface("plane", [0.0, 0.0, -1.0, 0.0, 0.0, 0.024]),
