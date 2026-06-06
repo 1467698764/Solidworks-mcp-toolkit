@@ -190,6 +190,11 @@ class FakeLinkedBodyComponent(FakeComponent):
         return [FakeLinkedBody(self.faces)]
 
 
+class FakeNestedBodiesComponent(FakeComponent):
+    def GetBodies3(self, body_type, visible_only):
+        return ([FakeBody(self.faces, self.edges, self.vertices)], 0)
+
+
 class FakeSelectionManager:
     def __init__(self, assembly, extension):
         self.assembly = assembly
@@ -398,6 +403,29 @@ class MateGroupExecuteTests(unittest.TestCase):
         self.assertEqual(top_face.select_calls, [(True, {"mark": 0})])
         guard = result["executed_mates"][0]["selection_guard"]
         self.assertEqual([call["method"] for call in guard["select_by_id_calls"]], ["Face.Select4", "Face.Select4"])
+
+    def test_flattens_getbodies3_nested_body_payloads_before_selecting_faces(self):
+        bottom_face = FakeFace(
+            FakeSurface("plane", [0.0, 0.0, -1.0, 0.0, 0.0, 0.024]),
+            [0.0, 0.0, 0.023, 0.1, 0.1, 0.025],
+        )
+        top_face = FakeFace(
+            FakeSurface("plane", [0.0, 0.0, 1.0, 0.0, 0.0, 0.024]),
+            [0.0, 0.0, 0.023, 0.2, 0.1, 0.025],
+        )
+        asm = FakeAssembly([
+            FakeNestedBodiesComponent("bolt_m6-1", [bottom_face]),
+            FakeNestedBodiesComponent("cover_plate-1", [top_face]),
+        ])
+        manifest = self.manifest()
+        manifest["macros"][0]["selection_selectors"][0]["fallback"]["normal"] = [0.0, 0.0, -1.0]
+        manifest["macros"][0]["selection_selectors"][1]["fallback"]["normal"] = [0.0, 0.0, 1.0]
+
+        result = mod.execute_manifest(manifest, asm)
+
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(bottom_face.select_calls, [(False, {"mark": 0})])
+        self.assertEqual(top_face.select_calls, [(True, {"mark": 0})])
 
     def test_selectbyid_com_type_mismatch_is_reported_not_raised(self):
         asm = FakeSelectByIdTypeMismatchAssembly()

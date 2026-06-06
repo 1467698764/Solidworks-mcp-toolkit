@@ -151,13 +151,30 @@ def find_component(assembly: Any, component_name: str) -> Any | None:
     return None
 
 
+def looks_like_body(value: Any) -> bool:
+    return any(callable(getattr(value, method, None)) for method in ("GetFaces", "GetFirstFace", "GetEdges", "GetVertices"))
+
+
+def flatten_body_payload(value: Any) -> list[Any]:
+    if value is None:
+        return []
+    if looks_like_body(value):
+        return [value]
+    if isinstance(value, (str, bytes, bytearray, int, float, bool)):
+        return []
+    bodies: list[Any] = []
+    for item in as_list(value):
+        bodies.extend(flatten_body_payload(item))
+    return bodies
+
+
 def component_bodies(component: Any) -> list[Any]:
     for method, args in (("GetBodies3", (0, None)), ("GetBodies3", (0, True)), ("GetBodies2", (0,)), ("GetBodies", tuple())):
         func = getattr(component, method, None)
         if not callable(func):
             continue
         try:
-            bodies = as_list(func(*args))
+            bodies = flatten_body_payload(func(*args))
         except Exception:
             continue
         if bodies:
