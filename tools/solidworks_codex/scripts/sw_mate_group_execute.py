@@ -992,6 +992,15 @@ def execute_manifest(manifest: dict[str, Any], assembly: Any) -> dict[str, Any]:
         plan = planned_mate(item)
         required_count = required_selector_count(plan["mate_type"])
         if len(plan["selection_actions"]) != required_count:
+            executed.append({
+                "ok": False,
+                "error": "selector_count",
+                "mate_type": plan["mate_type"],
+                "expected_mate_name": item.get("expected_mate_name"),
+                "components": item.get("components", []),
+                "selected_entities": 0,
+                "selection_guard": plan,
+            })
             findings["blocking"].append({
                 "kind": "selector_count",
                 "mate": item.get("expected_mate_name"),
@@ -1014,6 +1023,15 @@ def execute_manifest(manifest: dict[str, Any], assembly: Any) -> dict[str, Any]:
             "selection_reports": [public_select_report(report) for report in select_reports],
         }
         if count != required_count or not all(report.get("ok") for report in select_reports):
+            executed.append({
+                "ok": False,
+                "error": "selection_failed",
+                "mate_type": plan["mate_type"],
+                "expected_mate_name": item.get("expected_mate_name"),
+                "components": item.get("components", []),
+                "selected_entities": count,
+                "selection_guard": guard,
+            })
             findings["blocking"].append({
                 "kind": "selection_failed",
                 "mate": item.get("expected_mate_name"),

@@ -354,6 +354,10 @@ class MateGroupExecuteTests(unittest.TestCase):
 
         self.assertFalse(result["ok"], result)
         self.assertEqual(result["counts"]["executed_mates"], 0)
+        self.assertEqual(len(result["executed_mates"]), 1)
+        self.assertFalse(result["executed_mates"][0]["ok"])
+        self.assertEqual("selection_failed", result["executed_mates"][0]["error"])
+        self.assertEqual("MG_standard_bolt_m6_1_02_coincident", result["executed_mates"][0]["expected_mate_name"])
         blocking = result["findings"]["blocking"][0]
         self.assertEqual("selection_failed", blocking["kind"])
         reports = blocking["detail"]["selection_reports"]
