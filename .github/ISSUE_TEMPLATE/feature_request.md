@@ -13,6 +13,10 @@ What real SolidWorks workflow should this improve?
 
 What should Codex be able to inspect, decide, modify, verify, or hand off?
 
+## Goal fit
+
+Does this fit the current target of making AI faster at understanding, inferring, and executing SolidWorks work?
+
 ## Safety / verification
 
 - Should this be read-only?

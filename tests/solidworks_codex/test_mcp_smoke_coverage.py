@@ -18,6 +18,8 @@ class McpSmokeCoverageTests(unittest.TestCase):
         self.assertIn("solidworks_motion_sweep_lite", text)
         self.assertIn("solidworks_engineering_lite", text)
         self.assertIn("solidworks_part_geometry_validate", text)
+        self.assertIn("solidworks_ai_capability_map", text)
+        self.assertIn("solidworks_workflow_plan", text)
         self.assertIn("componentInsert_is_error", text)
         self.assertIn("partFeatureExecute_is_error", text)
         self.assertIn("metadataExecute_is_error", text)
@@ -28,6 +30,8 @@ class McpSmokeCoverageTests(unittest.TestCase):
         self.assertIn("motionSweepLite_is_error", text)
         self.assertIn("engineeringLite_is_error", text)
         self.assertIn("partGeometryValidate_is_error", text)
+        self.assertIn("aiCapabilityMap_is_error", text)
+        self.assertIn("workflowPlan_is_error", text)
         self.assertIn("mcp_part_geometry_report.json", text)
 
 

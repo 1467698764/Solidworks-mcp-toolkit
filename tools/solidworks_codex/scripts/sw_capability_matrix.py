@@ -84,6 +84,7 @@ WORKFLOW_BY_CLI = {
     "worklog": "handoff",
     "handoff-bundle": "handoff",
     "tool-catalog": "handoff",
+    "ai-capability-map": "handoff",
     "offline-demo": "handoff",
     "template-macro": "macro_generation",
     "mate-macro": "macro_generation",
@@ -106,7 +107,7 @@ SOLIDWORKS_NOT_REQUIRED = {
     "summary", "compare", "issue-report", "design-review", "change-plan", "workflow-plan", "report-search", "report-context", "model-understand", "engineering-lite", "assembly-diagnose", "assembly-repair-plan", "interface-index", "mate-group-plan", "mate-group-validate", "mate-selection-check", "mate-group-live-protocol", "assembly-review-pipeline",
     "worklog", "handoff-bundle", "tool-catalog", "offline-demo", "preflight", "audit", "finalize",
     "github-readiness", "repo-health", "release-tree", "public-copy-guard", "template-macro", "mate-macro", "mate-group-macro",
-    "mcp-tools", "session-snapshot", "capability-matrix", "backup", "backup-status", "restore-backup", "change-verify", "assembly-contract", "part-geometry-validate", "visual-capture", "visual-validate", "mate-group-execution-check", "standard-part-resolve",
+    "mcp-tools", "session-snapshot", "capability-matrix", "ai-capability-map", "backup", "backup-status", "restore-backup", "change-verify", "assembly-contract", "part-geometry-validate", "visual-capture", "visual-validate", "mate-group-execution-check", "standard-part-resolve",
 }
 
 MCP_TO_CLI = {
@@ -142,6 +143,7 @@ MCP_TO_CLI = {
     "solidworks_report_summary": "summary",
     "solidworks_design_review": "design-review",
     "solidworks_change_plan": "change-plan",
+    "solidworks_workflow_plan": "workflow-plan",
     "solidworks_report_search": "report-search",
     "solidworks_report_context": "report-context",
     "solidworks_model_understand": "model-understand",
@@ -162,6 +164,7 @@ MCP_TO_CLI = {
     "solidworks_worklog": "worklog",
     "solidworks_handoff_bundle": "handoff-bundle",
     "solidworks_tool_catalog": "tool-catalog",
+    "solidworks_ai_capability_map": "ai-capability-map",
     "solidworks_offline_demo": "offline-demo",
     "solidworks_preflight": "preflight",
     "solidworks_audit": "audit",

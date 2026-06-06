@@ -17,8 +17,9 @@ class CurrentDocumentationTests(unittest.TestCase):
         )
         for needle in [
             "SolidWorks Codex MCP",
-            "56 tools",
+            "59 tools",
             "MCP Tool Manual",
+            "AI capability map",
             "Capability scope",
             "Limits and notes",
             "Required parameters",

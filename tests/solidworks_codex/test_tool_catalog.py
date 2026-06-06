@@ -40,6 +40,7 @@ class ToolCatalogTests(unittest.TestCase):
             self.assertIn("solidworks_worklog", names)
             self.assertIn("solidworks_report_context", names)
             self.assertIn("solidworks_model_understand", names)
+            self.assertIn("solidworks_workflow_plan", names)
             self.assertIn("solidworks_assembly_diagnose", names)
             self.assertIn("solidworks_assembly_repair_plan", names)
             self.assertIn("solidworks_interface_index", names)
@@ -57,6 +58,7 @@ class ToolCatalogTests(unittest.TestCase):
             self.assertIn("solidworks_engineering_lite", names)
             self.assertIn("solidworks_part_geometry_validate", names)
             self.assertIn("solidworks_standard_part_resolve", names)
+            self.assertIn("solidworks_ai_capability_map", names)
             part_feature_description = by_name["solidworks_part_feature_execute"]["description"]
             self.assertIn("extrude bosses", part_feature_description)
             self.assertIn("revolve bosses", part_feature_description)
@@ -74,6 +76,32 @@ class ToolCatalogTests(unittest.TestCase):
             self.assertIn("handoff", data["groups"])
             self.assertGreaterEqual(data["count"], 52)
             self.assertTrue(any("Do not blindly replay templates" in item for item in data["operator_notes"]))
+
+    def test_ai_capability_map_explains_reasoning_native_api_and_limits(self):
+        with tempfile.TemporaryDirectory() as d:
+            out_md = Path(d) / "ai_capability_map.md"
+            out_json = Path(d) / "ai_capability_map.json"
+            proc = run_py(
+                "tools/solidworks_codex/scripts/sw_ai_capability_map.py",
+                "--out", str(out_md),
+                "--json-out", str(out_json),
+            )
+            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+            text = out_md.read_text(encoding="utf-8-sig")
+            data = json.loads(out_json.read_text(encoding="utf-8-sig"))
+            stage_names = {stage["stage"] for stage in data["stages"]}
+            by_tool = {tool["name"]: tool for tool in data["tool_decision_index"]}
+            self.assertIn("SolidWorks Codex AI Capability Map", text)
+            self.assertIn("Direct Native API Policy", text)
+            self.assertIn("engineering interface graph", data["mission"])
+            self.assertIn("interface_graph", stage_names)
+            self.assertIn("native_execution", stage_names)
+            self.assertIn("validation", stage_names)
+            self.assertIn("solidworks_mate_intent_execute", by_tool)
+            self.assertEqual(by_tool["solidworks_mate_intent_execute"]["reasoning_role"], "native_execution")
+            self.assertIn("intent_spec", by_tool["solidworks_mate_intent_execute"]["required"])
+            self.assertTrue(any("same MCP evidence schema" in rule for rule in data["direct_native_api_policy"]))
+            self.assertTrue(any("declare intended DOF" in rule for rule in data["decision_rules"]))
 
 
     def test_capability_matrix_maps_cli_mcp_safety_and_workflows(self):
@@ -191,13 +219,17 @@ class ToolCatalogTests(unittest.TestCase):
             self.assertEqual(by_cli["mate-group-live-protocol"]["mcp"], "solidworks_mate_group_live_protocol")
             self.assertFalse(by_cli["mate-group-live-protocol"]["solidworks_required"])
             self.assertEqual(by_cli["handoff-bundle"]["workflow"], "handoff")
+            self.assertEqual(by_cli["ai-capability-map"]["workflow"], "handoff")
+            self.assertEqual(by_cli["ai-capability-map"]["mcp"], "solidworks_ai_capability_map")
+            self.assertFalse(by_cli["ai-capability-map"]["solidworks_required"])
             self.assertEqual(by_cli["report-context"]["mcp"], "solidworks_report_context")
             self.assertEqual(by_cli["model-understand"]["mcp"], "solidworks_model_understand")
             self.assertEqual(by_cli["model-understand"]["safety"], "read_only")
             self.assertEqual(by_cli["workflow-plan"]["workflow"], "analysis")
             self.assertEqual(by_cli["workflow-plan"]["safety"], "read_only")
             self.assertFalse(by_cli["workflow-plan"]["solidworks_required"])
-            self.assertEqual(by_cli["workflow-plan"]["required"], ["Target"])
+            self.assertEqual(by_cli["workflow-plan"]["mcp"], "solidworks_workflow_plan")
+            self.assertEqual(by_cli["workflow-plan"]["required"], ["goal"])
             self.assertEqual(by_cli["offline-demo"]["solidworks_required"], False)
             self.assertTrue(data["coverage"]["has_cli_for_every_local_mcp"])
             self.assertTrue(data["coverage"]["has_safety_for_every_capability"])

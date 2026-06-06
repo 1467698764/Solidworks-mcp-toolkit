@@ -2,6 +2,10 @@
 
 What changed?
 
+## Goal fit
+
+How does this move the project toward AI-first SolidWorks understanding, inference, execution, or validation?
+
 ## Safety model
 
 - [ ] Read-only only, or

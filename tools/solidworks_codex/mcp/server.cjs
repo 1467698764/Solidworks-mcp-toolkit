@@ -252,6 +252,11 @@ const toolSchemas = [
     name: 'solidworks_change_plan',
     description: 'Generate a flexible evidence-first mechanical CAD change plan from an inspect JSON report and natural-language goal.',
     inputSchema: { type: 'object', properties: { report: { type: 'string' }, goal: { type: 'string' }, session_name: { type: 'string' }, out: { type: 'string' }, json_out: { type: 'string' } }, required: ['report','goal'], additionalProperties: false }
+  },
+  {
+    name: 'solidworks_workflow_plan',
+    description: 'Generate an intent-scoped CAD workflow plan from a natural-language goal, including design intent, validation profile, runtime budget, assumptions, non-goals, execution gates, and next tool sequence.',
+    inputSchema: { type: 'object', properties: { goal: { type: 'string' }, intent: { type: 'string', enum: ['auto','single_part','part_to_assembly','assembly','mechanism_assembly'] }, runtime_budget: { type: 'string', enum: ['fast','standard','strict'] }, out: { type: 'string' }, json_out: { type: 'string' } }, required: ['goal'], additionalProperties: false }
   },  {
     name: 'solidworks_report_search',
     description: 'Search an inspect JSON report for components, dimensions, and features by text/state when names are messy.',
@@ -373,6 +378,11 @@ const toolSchemas = [
   {
     name: 'solidworks_tool_catalog',
     description: 'Generate a grouped catalog of all SolidWorks Codex MCP tools and when to use them.',
+    inputSchema: { type: 'object', properties: { out: { type: 'string' }, json_out: { type: 'string' } }, additionalProperties: false }
+  },
+  {
+    name: 'solidworks_ai_capability_map',
+    description: 'Generate an AI-facing capability map that explains reasoning stages, preferred MCP tools, direct native API policy, required parameters, optional parameters, and capability limits.',
     inputSchema: { type: 'object', properties: { out: { type: 'string' }, json_out: { type: 'string' } }, additionalProperties: false }
   },
   {
@@ -634,6 +644,13 @@ async function callTool(name, input) {
       if (input?.session_name) args.push('-SessionName', input.session_name);
       if (input?.out) args.push('-Out', input.out);
       if (input?.json_out) args.push('-JsonOut', input.json_out);
+      break;
+    case 'solidworks_workflow_plan':
+      args.push('workflow-plan', '-Target', input.goal);
+      if (input?.intent) args.push('-Action', input.intent);
+      if (input?.runtime_budget) args.push('-View', input.runtime_budget);
+      if (input?.out) args.push('-Out', input.out);
+      if (input?.json_out) args.push('-JsonOut', input.json_out);
       break;    case 'solidworks_report_search':
       args.push('report-search', '-Report', input.report);
       if (input?.query) args.push('-Target', input.query);
@@ -749,6 +766,11 @@ async function callTool(name, input) {
       break;
     case 'solidworks_tool_catalog':
       args.push('tool-catalog');
+      if (input?.out) args.push('-Out', input.out);
+      if (input?.json_out) args.push('-JsonOut', input.json_out);
+      break;
+    case 'solidworks_ai_capability_map':
+      args.push('ai-capability-map');
       if (input?.out) args.push('-Out', input.out);
       if (input?.json_out) args.push('-JsonOut', input.json_out);
       break;

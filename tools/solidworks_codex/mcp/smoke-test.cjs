@@ -217,12 +217,14 @@ child.stderr.on('data', (d) => { stderr += d.toString(); });
   const mateGroupLiveProtocol = await send('tools/call', { name: 'solidworks_mate_group_live_protocol', arguments: { macro_manifest: 'tools/solidworks_codex/sandbox/mcp_mate_group_manifest.json', validation_report: 'tools/solidworks_codex/sandbox/mcp_mate_group_validation.json', model: 'C:/models/mcp_fixture.SLDASM', out: 'tools/solidworks_codex/reports/mcp_mate_group_live_protocol.json', markdown_out: 'tools/solidworks_codex/reports/mcp_mate_group_live_protocol.md' } });
   const designReview = await send('tools/call', { name: 'solidworks_design_review', arguments: { report: 'tools/solidworks_codex/sandbox/report_after.json', intent: 'locating interfaces, floating components, editable dimensions, and manufacturability evidence', out: 'tools/solidworks_codex/reports/mcp_design_review.md', json_out: 'tools/solidworks_codex/reports/mcp_design_review.json' } });
   const changePlan = await send('tools/call', { name: 'solidworks_change_plan', arguments: { report: 'tools/solidworks_codex/sandbox/report_after.json', goal: 'adjust a critical mounting dimension and verify assembly, clearance, and manufacturing evidence', session_name: 'mcp-change', out: 'tools/solidworks_codex/reports/mcp_change_plan.md', json_out: 'tools/solidworks_codex/reports/mcp_change_plan.json' } });
+  const workflowPlan = await send('tools/call', { name: 'solidworks_workflow_plan', arguments: { goal: 'create a small mechanism assembly with semantic features, interface graph, mate intent, motion sweep, and handoff evidence', intent: 'mechanism_assembly', runtime_budget: 'standard', out: 'tools/solidworks_codex/reports/mcp_workflow_plan.md', json_out: 'tools/solidworks_codex/reports/mcp_workflow_plan.json' } });
   const reportSearch = await send('tools/call', { name: 'solidworks_report_search', arguments: { report: 'tools/solidworks_codex/sandbox/report_after.json', query: 'bearing D1 Fillet', out: 'tools/solidworks_codex/reports/mcp_report_search.md', json_out: 'tools/solidworks_codex/reports/mcp_report_search.json' } });
   const reportContext = await send('tools/call', { name: 'solidworks_report_context', arguments: { report: 'tools/solidworks_codex/sandbox/report_after.json', focus: 'current model evidence, constraints, clearance, and manufacturing gaps', out: 'tools/solidworks_codex/reports/mcp_report_context.md', json_out: 'tools/solidworks_codex/reports/mcp_report_context.json' } });
   const modelUnderstand = await send('tools/call', { name: 'solidworks_model_understand', arguments: { report: 'tools/solidworks_codex/sandbox/report_after.json', task: 'understand component constraints, spatial relationships, editable dimensions, and manufacturing evidence', view: 'assembly-constraints', out: 'tools/solidworks_codex/reports/mcp_model_understanding.md', json_out: 'tools/solidworks_codex/reports/mcp_model_understanding.json' } });
   const worklog = await send('tools/call', { name: 'solidworks_worklog', arguments: { session_name: 'mcp-smoke', event: 'verification', message: 'MCP smoke exercised report context and worklog tools', artifact: ['tools/solidworks_codex/sandbox/report_after.json'], next: 'Run audit before handoff', log: 'tools/solidworks_codex/reports/mcp_worklog.jsonl', summary_out: 'tools/solidworks_codex/reports/mcp_worklog.md' } });
   const handoff = await send('tools/call', { name: 'solidworks_handoff_bundle', arguments: { report: 'tools/solidworks_codex/sandbox/report_after.json', worklog: 'tools/solidworks_codex/reports/mcp_worklog.jsonl', focus: 'current model evidence, constraints, clearance, and manufacturing gaps', out_dir: 'tools/solidworks_codex/reports/mcp_handoff' } });
   const toolCatalog = await send('tools/call', { name: 'solidworks_tool_catalog', arguments: { out: 'tools/solidworks_codex/reports/mcp_tool_catalog.md', json_out: 'tools/solidworks_codex/reports/mcp_tool_catalog.json' } });
+  const aiCapabilityMap = await send('tools/call', { name: 'solidworks_ai_capability_map', arguments: { out: 'tools/solidworks_codex/reports/mcp_ai_capability_map.md', json_out: 'tools/solidworks_codex/reports/mcp_ai_capability_map.json' } });
   const offlineDemo = await send('tools/call', { name: 'solidworks_offline_demo', arguments: { out_dir: 'tools/solidworks_codex/reports/mcp_offline_demo' } });
   const preflight = await send('tools/call', { name: 'solidworks_preflight', arguments: { out: 'tools/solidworks_codex/reports/mcp_preflight.json' } });
   const summary = {
@@ -255,12 +257,14 @@ child.stderr.on('data', (d) => { stderr += d.toString(); });
     mateGroupLiveProtocol_is_error: mateGroupLiveProtocol.isError === true,
     designReview_is_error: designReview.isError === true,
     changePlan_is_error: changePlan.isError === true,
+    workflowPlan_is_error: workflowPlan.isError === true,
     reportSearch_is_error: reportSearch.isError === true,
     reportContext_is_error: reportContext.isError === true,
     modelUnderstand_is_error: modelUnderstand.isError === true,
     worklog_is_error: worklog.isError === true,
     handoff_is_error: handoff.isError === true,
     toolCatalog_is_error: toolCatalog.isError === true,
+    aiCapabilityMap_is_error: aiCapabilityMap.isError === true,
     offlineDemo_is_error: offlineDemo.isError === true,
     preflight_is_error: preflight.isError === true,
     backupStatus_text_head: backupStatus.content?.[0]?.text?.slice(0, 500),
@@ -285,12 +289,14 @@ child.stderr.on('data', (d) => { stderr += d.toString(); });
     mateGroupLiveProtocol_text_head: mateGroupLiveProtocol.content?.[0]?.text?.slice(0, 500),
     designReview_text_head: designReview.content?.[0]?.text?.slice(0, 500),
     changePlan_text_head: changePlan.content?.[0]?.text?.slice(0, 500),
+    workflowPlan_text_head: workflowPlan.content?.[0]?.text?.slice(0, 500),
     reportSearch_text_head: reportSearch.content?.[0]?.text?.slice(0, 500),
     reportContext_text_head: reportContext.content?.[0]?.text?.slice(0, 500),
     modelUnderstand_text_head: modelUnderstand.content?.[0]?.text?.slice(0, 500),
     worklog_text_head: worklog.content?.[0]?.text?.slice(0, 500),
     handoff_text_head: handoff.content?.[0]?.text?.slice(0, 500),
     toolCatalog_text_head: toolCatalog.content?.[0]?.text?.slice(0, 500),
+    aiCapabilityMap_text_head: aiCapabilityMap.content?.[0]?.text?.slice(0, 500),
     offlineDemo_text_head: offlineDemo.content?.[0]?.text?.slice(0, 500),
     preflight_text_head: preflight.content?.[0]?.text?.slice(0, 500),
     stderr

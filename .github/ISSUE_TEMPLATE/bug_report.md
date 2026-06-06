@@ -5,13 +5,13 @@ title: "[bug] "
 labels: bug
 ---
 
-## What happened
+## What failed
 
-Describe the problem and the expected behavior.
+Describe the observed failure and the expected outcome.
 
 ## Reproduction
 
-Commands run:
+Commands or workflow steps:
 
 ```powershell
 
@@ -37,3 +37,7 @@ Attach or paste relevant non-sensitive snippets from:
 
 - Did the command use `-Save`?
 - Did you run `backup` first?
+
+## Goal fit
+
+Does this issue block AI understanding, mate inference, execution, or validation?
