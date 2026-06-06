@@ -55,6 +55,7 @@ class ToolCatalogTests(unittest.TestCase):
             self.assertIn("solidworks_motion_sweep_lite", names)
             self.assertIn("solidworks_engineering_lite", names)
             self.assertIn("solidworks_part_geometry_validate", names)
+            self.assertIn("solidworks_standard_part_resolve", names)
             self.assertIn("mate", by_name["solidworks_mate_macro"]["properties"])
             schemas = {tool["name"]: tool for tool in sw_tool_catalog.list_tools_via_node()}
             mate_schema = schemas["solidworks_mate_macro"]["inputSchema"]["properties"]
@@ -161,6 +162,10 @@ class ToolCatalogTests(unittest.TestCase):
             self.assertEqual(by_cli["engineering-lite"]["safety"], "read_only")
             self.assertEqual(by_cli["engineering-lite"]["mcp"], "solidworks_engineering_lite")
             self.assertFalse(by_cli["engineering-lite"]["solidworks_required"])
+            self.assertEqual(by_cli["standard-part-resolve"]["workflow"], "guarded_edit")
+            self.assertEqual(by_cli["standard-part-resolve"]["safety"], "guarded_write")
+            self.assertEqual(by_cli["standard-part-resolve"]["mcp"], "solidworks_standard_part_resolve")
+            self.assertFalse(by_cli["standard-part-resolve"]["solidworks_required"])
             self.assertEqual(by_cli["part-geometry-validate"]["workflow"], "verify_export")
             self.assertEqual(by_cli["part-geometry-validate"]["safety"], "verification_or_export")
             self.assertEqual(by_cli["part-geometry-validate"]["mcp"], "solidworks_part_geometry_validate")

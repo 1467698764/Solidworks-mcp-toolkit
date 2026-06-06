@@ -172,6 +172,11 @@ const toolSchemas = [
     inputSchema: { type: 'object', properties: { spec: { type: 'string', description: 'JSON spec with part_path, origin_m, optional configuration and fixed.' }, model: { type: 'string' }, start: { type: 'boolean' }, save: { type: 'boolean' }, dry_run: { type: 'boolean' }, out: { type: 'string' } }, required: ['spec'], additionalProperties: false }
   },
   {
+    name: 'solidworks_standard_part_resolve',
+    description: 'Resolve a reviewed local standard-part catalog request into a component-insert spec with source policy, supplier/license evidence, host attachment intent, and selector handoff.',
+    inputSchema: { type: 'object', properties: { catalog: { type: 'string', description: 'Reviewed local standard-part catalog JSON.' }, request: { type: 'string', description: 'Standard-part request JSON.' }, out: { type: 'string' }, component_spec_out: { type: 'string', description: 'Optional component-insert spec JSON output path.' } }, required: ['catalog', 'request'], additionalProperties: false }
+  },
+  {
     name: 'solidworks_feature_state',
     description: 'Change part or assembly feature state by feature name: suppress/unsuppress/delete, set a feature-scoped dimension, reorder a feature, or apply reviewed Feature Definition property edits, then rebuild and report before/after evidence.',
     inputSchema: { type: 'object', properties: { feature: { type: 'string' }, action: { type: 'string', enum: ['suppress','unsuppress','delete','set-dimension','reorder','edit-definition'] }, dimension: { type: 'string' }, value_m: { type: 'number' }, target_feature: { type: 'string' }, reorder_position: { type: 'string', enum: ['before','after'] }, definition_spec: { type: 'string', description: 'JSON spec file with reviewed definition edits.' }, model: { type: 'string' }, save: { type: 'boolean' }, out: { type: 'string' } }, required: ['feature','action'], additionalProperties: false }
@@ -513,6 +518,11 @@ async function callTool(name, input) {
       if (input?.save) args.push('-Save');
       if (input?.dry_run) args.push('-ValidateOnly');
       if (input?.out) args.push('-Out', input.out);
+      break;
+    case 'solidworks_standard_part_resolve':
+      args.push('standard-part-resolve', '-Manifest', input.catalog, '-Report', input.request);
+      if (input?.out) args.push('-Out', input.out);
+      if (input?.component_spec_out) args.push('-JsonOut', input.component_spec_out);
       break;
     case 'solidworks_feature_state':
       args.push('feature-state', '-Target', input.feature, '-Action', input.action);

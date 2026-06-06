@@ -1,6 +1,6 @@
 {
-  "timestamp": "2026-06-05T13:41:20",
-  "count": 72,
+  "timestamp": "2026-06-06T09:11:26",
+  "count": 74,
   "capabilities": [
     {
       "cli": "assembly-contract",
@@ -239,9 +239,10 @@
       "properties": [
         "json_out",
         "out",
+        "out_dir",
         "report"
       ],
-      "description": "Generate a read-only engineering-lite BOM, material, DFM, and DFA review from inspect evidence."
+      "description": "Generate a read-only engineering-lite BOM, drawing-BOM CSV, material, DFM, and DFA review from inspect evidence."
     },
     {
       "cli": "export",
@@ -271,14 +272,17 @@
       ],
       "properties": [
         "action",
+        "definition_spec",
         "dimension",
         "feature",
         "model",
         "out",
+        "reorder_position",
         "save",
+        "target_feature",
         "value_m"
       ],
-      "description": "Change part or assembly feature state by feature name: suppress/unsuppress/delete, set a feature-scoped dimension, or reorder a feature before/after a reviewed target, then rebuild and report before/after evidence."
+      "description": "Change part or assembly feature state by feature name: suppress/unsuppress/delete, set a feature-scoped dimension, reorder a feature, or apply reviewed Feature Definition property edits, then rebuild and report before/after evidence."
     },
     {
       "cli": "finalize",
@@ -850,6 +854,24 @@
       "description": "Set one SolidWorks dimension by full parameter name. Value is SystemValue in meters. Use save only after backup."
     },
     {
+      "cli": "standard-part-resolve",
+      "mcp": "solidworks_standard_part_resolve",
+      "workflow": "guarded_edit",
+      "safety": "guarded_write",
+      "solidworks_required": false,
+      "required": [
+        "catalog",
+        "request"
+      ],
+      "properties": [
+        "catalog",
+        "component_spec_out",
+        "out",
+        "request"
+      ],
+      "description": "Resolve a reviewed local standard-part catalog request into a component-insert spec with source policy, supplier/license evidence, host attachment intent, and selector handoff."
+    },
+    {
       "cli": "start-component-insert",
       "mcp": null,
       "workflow": "guarded_edit",
@@ -1033,14 +1055,35 @@
       "description": "Generate a grouped catalog of all SolidWorks Codex MCP tools and when to use them."
     },
     {
-      "cli": "visual-validate",
-      "mcp": null,
+      "cli": "visual-capture",
+      "mcp": "solidworks_visual_capture",
       "workflow": "verify_export",
       "safety": "verification_or_export",
       "solidworks_required": false,
       "required": [],
-      "properties": [],
-      "description": "CLI-only support command."
+      "properties": [
+        "dry_run",
+        "out",
+        "out_dir"
+      ],
+      "description": "Capture SolidWorks window visual evidence into a screenshot manifest; dry_run writes a deterministic placeholder PNG for CI/protocol checks."
+    },
+    {
+      "cli": "visual-validate",
+      "mcp": "solidworks_visual_validate",
+      "workflow": "verify_export",
+      "safety": "verification_or_export",
+      "solidworks_required": false,
+      "required": [
+        "report"
+      ],
+      "properties": [
+        "out",
+        "report",
+        "screenshots",
+        "visual_review"
+      ],
+      "description": "Validate screenshot evidence and reviewed visual findings against an inspect report; missing screenshots or visual contradictions block acceptance."
     },
     {
       "cli": "workflow-plan",
@@ -1076,9 +1119,9 @@
     }
   ],
   "coverage": {
-    "cli_commands": 72,
-    "mcp_tools": 53,
-    "mapped_mcp_tools": 53,
+    "cli_commands": 74,
+    "mcp_tools": 56,
+    "mapped_mcp_tools": 56,
     "has_cli_for_every_local_mcp": true,
     "has_safety_for_every_capability": true,
     "has_workflow_for_every_capability": true,

@@ -1,13 +1,13 @@
 # SolidWorks Codex Capability Matrix
 
-- Timestamp: `2026-06-05T13:41:20`
-- Capability count: `72`
+- Timestamp: `2026-06-06T09:11:26`
+- Capability count: `74`
 
 ## Coverage
 
-- CLI commands: `72`
-- MCP tools: `53`
-- MCP tools mapped to CLI: `53`
+- CLI commands: `74`
+- MCP tools: `56`
+- MCP tools mapped to CLI: `56`
 - CLI for every local MCP tool: `True`
 - Safety label for every capability: `True`
 - Workflow label for every capability: `True`
@@ -76,6 +76,7 @@
 | `selection-report` | `solidworks_selection_report` | `discover` | `read_only` | `True` | `-` |
 | `session-snapshot` | `solidworks_session_snapshot` | `handoff` | `offline_or_read_only` | `False` | `-` |
 | `set-dimension` | `solidworks_set_dimension` | `guarded_edit` | `guarded_write` | `True` | `dimension, value_m` |
+| `standard-part-resolve` | `solidworks_standard_part_resolve` | `guarded_edit` | `guarded_write` | `False` | `catalog, request` |
 | `start-component-insert` | `-` | `guarded_edit` | `guarded_write` | `True` | `-` |
 | `start-component-state` | `-` | `guarded_edit` | `guarded_write` | `True` | `-` |
 | `start-feature-state` | `-` | `guarded_edit` | `guarded_write` | `True` | `-` |
@@ -91,6 +92,7 @@
 | `summary` | `solidworks_report_summary` | `discover` | `read_only` | `False` | `report` |
 | `template-macro` | `solidworks_template_macro` | `macro_generation` | `generated_reviewable_artifact` | `False` | `template` |
 | `tool-catalog` | `solidworks_tool_catalog` | `handoff` | `offline_or_read_only` | `False` | `-` |
-| `visual-validate` | `-` | `verify_export` | `verification_or_export` | `False` | `-` |
+| `visual-capture` | `solidworks_visual_capture` | `verify_export` | `verification_or_export` | `False` | `-` |
+| `visual-validate` | `solidworks_visual_validate` | `verify_export` | `verification_or_export` | `False` | `report` |
 | `workflow-plan` | `-` | `analysis` | `read_only` | `False` | `Target` |
 | `worklog` | `solidworks_worklog` | `handoff` | `offline_or_read_only` | `False` | `message` |

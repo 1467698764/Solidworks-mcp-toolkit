@@ -6,9 +6,9 @@
 
 ## 当前定位
 
-- **55 MCP tools** 由 `tools/solidworks_codex/mcp/server.cjs` 暴露，并落到 `swctl.ps1` 与 Python 控制层。
+- **56 MCP tools** 由 `tools/solidworks_codex/mcp/server.cjs` 暴露，并落到 `swctl.ps1` 与 Python 控制层。
 - 覆盖通用 SolidWorks 对象：零件、装配、尺寸、特征、mate、Transform2/origin、干涉、质量属性、原生 `.SLDASM/.SLDPRT` 文件读回。
-- 执行层覆盖受控组件插入、零件特征执行、元数据写入、组件状态、尺寸修改、mate 组选面、宏生成、执行检查和视觉证据采集。
+- 执行层覆盖标准件来源解析、受控组件插入、零件特征执行、元数据写入、组件状态、尺寸修改、mate 组选面、宏生成、执行检查和视觉证据采集。
 - 证据链由 `inspect`、`model-understand`、`assembly-diagnose`、`interface-index`、`report-context`、`worklog`、`handoff-bundle` 串起来，让后续回合从事实继续。
 - 受控写入后使用 `rebuild`、`compare`、`change-verify`、`assembly-contract`、`interference`、`visual-capture`、`visual-validate` 和 `live-gate` 做验收闭环。
 

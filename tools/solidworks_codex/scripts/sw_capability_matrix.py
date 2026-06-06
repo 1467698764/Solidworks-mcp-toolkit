@@ -30,6 +30,7 @@ WORKFLOW_BY_CLI = {
     "safe-set-dimension": "guarded_edit",
     "component-state": "guarded_edit",
     "component-insert": "guarded_edit",
+    "standard-part-resolve": "guarded_edit",
     "start-component-insert": "guarded_edit",
     "feature-state": "guarded_edit",
     "part-feature-execute": "guarded_edit",
@@ -104,7 +105,7 @@ SOLIDWORKS_NOT_REQUIRED = {
     "summary", "compare", "issue-report", "design-review", "change-plan", "workflow-plan", "report-search", "report-context", "model-understand", "engineering-lite", "assembly-diagnose", "assembly-repair-plan", "interface-index", "mate-group-plan", "mate-group-validate", "mate-selection-check", "mate-group-live-protocol", "assembly-review-pipeline",
     "worklog", "handoff-bundle", "tool-catalog", "offline-demo", "preflight", "audit", "finalize",
     "github-readiness", "repo-health", "release-tree", "public-copy-guard", "template-macro", "mate-macro", "mate-group-macro",
-    "mcp-tools", "session-snapshot", "capability-matrix", "backup", "backup-status", "restore-backup", "change-verify", "assembly-contract", "part-geometry-validate", "visual-capture", "visual-validate", "mate-group-execution-check",
+    "mcp-tools", "session-snapshot", "capability-matrix", "backup", "backup-status", "restore-backup", "change-verify", "assembly-contract", "part-geometry-validate", "visual-capture", "visual-validate", "mate-group-execution-check", "standard-part-resolve",
 }
 
 MCP_TO_CLI = {
@@ -124,6 +125,7 @@ MCP_TO_CLI = {
     "solidworks_change_verify": "change-verify",
     "solidworks_component_state": "component-state",
     "solidworks_component_insert": "component-insert",
+    "solidworks_standard_part_resolve": "standard-part-resolve",
     "solidworks_feature_state": "feature-state",
     "solidworks_part_feature_execute": "part-feature-execute",
     "solidworks_metadata_execute": "metadata-execute",
