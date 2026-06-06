@@ -120,6 +120,28 @@ def rollback_plan(actions: list[dict[str, Any]], diagnosis: dict[str, Any]) -> d
     components = affected_components(actions, diagnosis)
     affected_files = sorted({str(paths[name]) for name in components if paths.get(name)})
     backup_report = "tools/solidworks_codex/reports/repair_plan_backup.json"
+    mutating_kinds = sorted({
+        str(action.get("kind"))
+        for action in actions
+        if action.get("requires_live_solidworks") and action.get("kind")
+    })
+    backup_execution = {
+        "tool": "backup",
+        "files": affected_files,
+        "out": backup_report,
+        "ready": bool(affected_files),
+        "blocker": "" if affected_files else "no affected native file paths found in diagnosis",
+    }
+    backup_status_execution = {
+        "tool": "backup-status",
+        "report": backup_report,
+        "required_status": "ok",
+    }
+    restore_execution = {
+        "tool": "restore-backup",
+        "report": backup_report,
+        "apply": True,
+    }
     return {
         "artifact": "rollback_plan",
         "affected_components": components,
@@ -134,7 +156,36 @@ def rollback_plan(actions: list[dict[str, Any]], diagnosis: dict[str, Any]) -> d
         "restore_command": f"swctl.ps1 restore-backup -Report {backup_report} -Apply",
         "blocks_mutation_without_backup": True,
         "missing_component_paths": sorted(name for name in components if not paths.get(name)),
+        "backup_execution": backup_execution,
+        "backup_status_execution": backup_status_execution,
+        "restore_execution": restore_execution,
+        "guard": {
+            "required_before_action_kinds": mutating_kinds,
+            "backup_status_required": "ok",
+            "missing_paths_block_mutation": True,
+            "mutation_allowed_when": [
+                "affected_files_are_backed_up",
+                "backup_status_reports_ok",
+                "action_affected_subgraph_is_named",
+            ],
+        },
     }
+
+
+def attach_rollback_preconditions(actions: list[dict[str, Any]], rollback: dict[str, Any]) -> list[dict[str, Any]]:
+    guarded_kinds = set(rollback.get("guard", {}).get("required_before_action_kinds", []))
+    result: list[dict[str, Any]] = []
+    for action in actions:
+        updated = dict(action)
+        if action.get("kind") in guarded_kinds:
+            updated["mutation_preconditions"] = {
+                "rollback_backup_report": rollback.get("backup_report"),
+                "backup_status_required": rollback.get("guard", {}).get("backup_status_required", "ok"),
+                "affected_files": sorted((action.get("affected_subgraph") or {}).get("component_paths", {}).values()),
+                "missing_component_paths_block": bool(rollback.get("missing_component_paths")),
+            }
+        result.append(updated)
+    return result
 
 
 def build_plan(diagnosis: dict[str, Any]) -> dict[str, Any]:
@@ -182,6 +233,7 @@ def build_plan(diagnosis: dict[str, Any]) -> dict[str, Any]:
 
     findings = diagnosis.get("findings", {})
     rollback = rollback_plan(actions, diagnosis)
+    actions = attach_rollback_preconditions(actions, rollback)
     return {
         "timestamp": datetime.now().isoformat(timespec="seconds"),
         "mode": "read_only_plan",
