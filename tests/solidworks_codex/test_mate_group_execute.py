@@ -376,19 +376,22 @@ class MateGroupExecuteTests(unittest.TestCase):
 
     def test_enumerates_faces_from_getfirstface_when_getfaces_is_unavailable(self):
         bottom_face = FakeLinkedFace(
-            FakeSurface("plane", [0.0, 0.0, 0.024, 0.0, 0.0, -1.0]),
+            FakeSurface("plane", [0.0, 0.0, -1.0, 0.0, 0.0, 0.024]),
             [0.0, 0.0, 0.023, 0.1, 0.1, 0.025],
         )
         top_face = FakeLinkedFace(
-            FakeSurface("plane", [0.0, 0.0, 0.024, 0.0, 0.0, 1.0]),
+            FakeSurface("plane", [0.0, 0.0, 1.0, 0.0, 0.0, 0.024]),
             [0.0, 0.0, 0.023, 0.2, 0.1, 0.025],
         )
         asm = FakeAssembly([
             FakeLinkedBodyComponent("bolt_m6-1", [bottom_face]),
             FakeLinkedBodyComponent("cover_plate-1", [top_face]),
         ])
+        manifest = self.manifest()
+        manifest["macros"][0]["selection_selectors"][0]["fallback"]["normal"] = [0.0, 0.0, -1.0]
+        manifest["macros"][0]["selection_selectors"][1]["fallback"]["normal"] = [0.0, 0.0, 1.0]
 
-        result = mod.execute_manifest(self.manifest(), asm)
+        result = mod.execute_manifest(manifest, asm)
 
         self.assertTrue(result["ok"], result)
         self.assertEqual(bottom_face.select_calls, [(False, {"mark": 0})])

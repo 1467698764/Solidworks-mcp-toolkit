@@ -398,8 +398,8 @@ def best_planar_face(component: Any, fallback: dict[str, Any]) -> Any | None:
         if surface is None or not surface_bool(surface, "IsPlane"):
             continue
         params = surface_params(surface, "PlaneParams")
-        normal = params[3:6] if len(params) >= 6 else expected_normal
-        normal_score = abs(dot(normal, expected_normal)) if any(expected_normal) else 1.0
+        normal_candidates = [params[:3], params[3:6]] if len(params) >= 6 else [expected_normal]
+        normal_score = max((abs(dot(normal, expected_normal)) for normal in normal_candidates), default=1.0) if any(expected_normal) else 1.0
         if normal_score < 0.8:
             continue
         face_center = center_from_box(getattr(face, "GetBox", lambda: [])(), expected_origin)
