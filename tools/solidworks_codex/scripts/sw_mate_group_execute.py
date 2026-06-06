@@ -337,6 +337,61 @@ def select_entity(entity: Any, assembly: Any, append: bool) -> bool:
     return ok
 
 
+def component_rotation(component: Any) -> list[list[float]]:
+    try:
+        transform = read_member(component, "Transform2")
+        data = list(read_member(transform, "ArrayData")) if transform is not None else []
+        if len(data) >= 9:
+            return [
+                [float(data[0]), float(data[1]), float(data[2])],
+                [float(data[3]), float(data[4]), float(data[5])],
+                [float(data[6]), float(data[7]), float(data[8])],
+            ]
+    except Exception:
+        pass
+    return [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
+
+
+def component_translation(component: Any) -> list[float]:
+    try:
+        transform = read_member(component, "Transform2")
+        data = list(read_member(transform, "ArrayData")) if transform is not None else []
+        if len(data) >= 12:
+            return [float(data[9]), float(data[10]), float(data[11])]
+    except Exception:
+        pass
+    return [0.0, 0.0, 0.0]
+
+
+def transform_vector(component: Any, local_vector: list[float]) -> list[float]:
+    rotation = component_rotation(component)
+    return [
+        rotation[0][0] * local_vector[0] + rotation[0][1] * local_vector[1] + rotation[0][2] * local_vector[2],
+        rotation[1][0] * local_vector[0] + rotation[1][1] * local_vector[1] + rotation[1][2] * local_vector[2],
+        rotation[2][0] * local_vector[0] + rotation[2][1] * local_vector[1] + rotation[2][2] * local_vector[2],
+    ]
+
+
+def transform_point(component: Any, local_point: list[float]) -> list[float]:
+    rotation = component_rotation(component)
+    translation = component_translation(component)
+    rotated = [
+        rotation[0][0] * local_point[0] + rotation[0][1] * local_point[1] + rotation[0][2] * local_point[2],
+        rotation[1][0] * local_point[0] + rotation[1][1] * local_point[1] + rotation[1][2] * local_point[2],
+        rotation[2][0] * local_point[0] + rotation[2][1] * local_point[1] + rotation[2][2] * local_point[2],
+    ]
+    return [rotated[0] + translation[0], rotated[1] + translation[1], rotated[2] + translation[2]]
+
+
+def transform_normal(component: Any, local_normal: list[float]) -> list[float]:
+    rotation = component_rotation(component)
+    return [
+        rotation[0][0] * local_normal[0] + rotation[0][1] * local_normal[1] + rotation[0][2] * local_normal[2],
+        rotation[1][0] * local_normal[0] + rotation[1][1] * local_normal[1] + rotation[1][2] * local_normal[2],
+        rotation[2][0] * local_normal[0] + rotation[2][1] * local_normal[1] + rotation[2][2] * local_normal[2],
+    ]
+
+
 def entity_identity_value(entity: Any, key: str) -> Any:
     for attr in (key, key.lower(), key.upper()):
         value = getattr(entity, attr, None)
@@ -412,10 +467,10 @@ def best_planar_face(component: Any, fallback: dict[str, Any]) -> Any | None:
             continue
         params = surface_params(surface, "PlaneParams")
         normal_candidates = [params[:3], params[3:6]] if len(params) >= 6 else [expected_normal]
-        normal_score = max((abs(dot(normal, expected_normal)) for normal in normal_candidates), default=1.0) if any(expected_normal) else 1.0
+        normal_score = max((abs(dot(transform_normal(component, normal), expected_normal)) for normal in normal_candidates), default=1.0) if any(expected_normal) else 1.0
         if normal_score < 0.8:
             continue
-        face_center = center_from_box(entity_box(face), expected_origin)
+        face_center = transform_point(component, center_from_box(entity_box(face), [0.0, 0.0, 0.0]))
         score = distance(face_center, expected_origin) - normal_score
         if best is None or score < best[0]:
             best = (score, face)
@@ -437,11 +492,11 @@ def best_cylindrical_face(component: Any, fallback: dict[str, Any]) -> Any | Non
         origin = params[:3]
         axis = params[3:6]
         radius = params[6]
-        axis_score = abs(dot(axis, expected_axis)) if any(expected_axis) else 1.0
+        axis_score = abs(dot(transform_normal(component, axis), expected_axis)) if any(expected_axis) else 1.0
         if axis_score < 0.8:
             continue
         radius_penalty = abs(radius - float(expected_radius)) if expected_radius not in (None, "") else 0.0
-        score = distance(origin, expected_origin) + radius_penalty - axis_score
+        score = distance(transform_point(component, origin), expected_origin) + radius_penalty - axis_score
         if best is None or score < best[0]:
             best = (score, face)
     return best[1] if best else None
@@ -471,10 +526,10 @@ def best_linear_edge(component: Any, fallback: dict[str, Any]) -> Any | None:
         params = curve_params(curve, "LineParams")
         origin = params[:3] if len(params) >= 6 else center_from_box(getattr(edge, "GetBox", lambda: [])(), expected_origin)
         axis = params[3:6] if len(params) >= 6 else expected_axis
-        axis_score = abs(dot(axis, expected_axis)) if any(expected_axis) else 1.0
+        axis_score = abs(dot(transform_normal(component, axis), expected_axis)) if any(expected_axis) else 1.0
         if axis_score < 0.8:
             continue
-        edge_center = center_from_box(entity_box(edge), origin)
+        edge_center = transform_point(component, center_from_box(entity_box(edge), origin))
         score = distance(edge_center, expected_origin) - axis_score
         if best is None or score < best[0]:
             best = (score, edge)
@@ -498,7 +553,7 @@ def best_vertex(component: Any, fallback: dict[str, Any]) -> Any | None:
     expected_origin = vector(fallback.get("origin_m"), [0.0, 0.0, 0.0])
     best: tuple[float, Any] | None = None
     for vertex in component_vertices(component):
-        score = distance(vertex_point(vertex, expected_origin), expected_origin)
+        score = distance(transform_point(component, vertex_point(vertex, expected_origin)), expected_origin)
         if best is None or score < best[0]:
             best = (score, vertex)
     return best[1] if best else None

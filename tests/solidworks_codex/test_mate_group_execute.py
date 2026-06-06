@@ -194,9 +194,15 @@ class FakeComponent:
         self.faces = faces
         self.edges = edges or []
         self.vertices = vertices or []
+        self.Transform2 = None
 
     def GetBodies3(self, body_type, visible_only):
         return [FakeBody(self.faces, self.edges, self.vertices)]
+
+
+class FakeTransform:
+    def __init__(self, array_data):
+        self.ArrayData = array_data
 
 
 class FakeLinkedBodyComponent(FakeComponent):
@@ -395,6 +401,40 @@ class MateGroupExecuteTests(unittest.TestCase):
         self.assertEqual(asm.Extension.calls, [])
         guard = result["executed_mates"][0]["selection_guard"]
         self.assertEqual([call["method"] for call in guard["select_by_id_calls"]], ["Face.Select4", "Face.Select4"])
+
+    def test_selects_faces_using_component_transform_into_assembly_coordinates(self):
+        bottom_face = FakeFace(
+            FakeSurface("plane", [0.0, 0.0, 0.024, 0.0, 0.0, -1.0]),
+            [0.0, 0.0, 0.023, 0.1, 0.1, 0.025],
+        )
+        top_face = FakeFace(
+            FakeSurface("plane", [0.0, 0.0, 0.024, 0.0, 0.0, 1.0]),
+            [0.0, 0.0, 0.023, 0.2, 0.1, 0.025],
+        )
+        asm = FakeAssembly([
+            FakeComponent("bolt_m6-1", [bottom_face]),
+            FakeComponent("cover_plate-1", [top_face]),
+        ])
+        asm.components[0].Transform2 = FakeTransform([1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0.0, 0.0])
+        asm.components[1].Transform2 = FakeTransform([1, 0, 0, 0, 1, 0, 0, 0, 1, 0.7, 0.0, 0.0])
+
+        result = mod.execute_manifest(self.manifest(), asm)
+
+        self.assertTrue(result["ok"], result)
+        guard = result["executed_mates"][0]["selection_guard"]
+        self.assertEqual([call["method"] for call in guard["select_by_id_calls"]], ["Face.Select4", "Face.Select4"])
+
+    def test_best_planar_face_prefers_world_position_after_component_transform(self):
+        face = FakeFace(
+            FakeSurface("plane", [0.0, 0.0, 1.0, 0.0, 0.0, 0.024]),
+            [0.0, 0.0, 0.023, 0.1, 0.1, 0.025],
+        )
+        component = FakeComponent("shifted_plate-1", [face])
+        component.Transform2 = FakeTransform([0, 0, 1, 0, 1, 0, -1, 0, 0, 0.5, 0.0, 0.0])
+
+        selected = mod.best_planar_face(component, {"normal": [1.0, 0.0, 0.0], "origin_m": [0.524, 0.05, 0.0]})
+
+        self.assertIs(selected, face)
 
     def test_enumerates_faces_from_getfirstface_when_getfaces_is_unavailable(self):
         bottom_face = FakeLinkedFace(
