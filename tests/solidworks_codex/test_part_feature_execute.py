@@ -90,6 +90,16 @@ class FakeFeatureManager:
         return FakeCreatedFeature("Codex_HoleWizard")
 
 
+class FakeFallbackFeatureManager(FakeFeatureManager):
+    def FeatureFillet3(self, *args):
+        self.calls.append(("FeatureFillet3", args))
+        return False
+
+    def FeatureFillet2(self, *args):
+        self.calls.append(("FeatureFillet2", args))
+        return FakeCreatedFeature("Codex_FilletFallback")
+
+
 class FakeSketchManager:
     _oleobj_ = True
 
@@ -125,6 +135,12 @@ class FakeModel:
 
     def ClearSelection2(self, clear):
         return True
+
+
+class FakeFallbackModel(FakeModel):
+    def __init__(self):
+        super().__init__()
+        self.FeatureManager = FakeFallbackFeatureManager()
 
 
 class PartFeatureExecuteTests(unittest.TestCase):
@@ -164,6 +180,21 @@ class PartFeatureExecuteTests(unittest.TestCase):
         self.assertEqual(result["operation_result"]["feature_name"], "ReviewedEdgeRound")
         self.assertEqual(result["operation_result"]["fillet"]["assigned_feature_name"], "ReviewedEdgeRound")
         self.assertEqual(result["operation_result"]["fillet"]["raw"].Name, "ReviewedEdgeRound")
+
+    def test_feature_manager_false_return_uses_next_candidate(self):
+        model = FakeFallbackModel()
+        plan = mod.validate_spec({
+            "operation": "fillet",
+            "selectors": [{"kind": "entity", "name": "Edge<1>@Plate", "type": "EDGE", "point": {"x": 0.1}}],
+            "parameters": {"radius_mm": 2.5, "feature_name": "FallbackFillet"},
+        })
+
+        result = mod.execute(model, plan)
+
+        self.assertTrue(result["ok"])
+        self.assertEqual([call[0] for call in model.FeatureManager.calls], ["FeatureFillet3", "FeatureFillet2"])
+        self.assertEqual(result["operation_result"]["fillet"]["method"], "FeatureFillet2")
+        self.assertEqual(result["operation_result"]["fillet"]["assigned_feature_name"], "FallbackFillet")
 
     def test_executes_chamfer_and_names_reviewed_feature(self):
         model = FakeModel()

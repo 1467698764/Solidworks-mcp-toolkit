@@ -392,9 +392,9 @@ def invoke_first(target: Any, candidates: list[tuple[str, tuple[Any, ...]]]) -> 
         try:
             member = getattr(target, name)
             result = member(*args)
-            if result is not None:
+            if result not in (None, False):
                 return {"method": name, "ok": True, "raw": value_of(result)}
-            errors.append({"method": name, "error": "returned None"})
+            errors.append({"method": name, "error": "returned None" if result is None else "returned False", "raw": value_of(result)})
         except Exception as exc:
             errors.append({"method": name, "error": f"{type(exc).__name__}: {exc}"})
     return {"ok": False, "errors": errors}
