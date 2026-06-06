@@ -136,24 +136,45 @@ def expected_shaper_mate_contract() -> dict[str, dict[str, Any]]:
     """
     pairs = {
         "Bed_Column_Parallel": ("parallel", ["cast_bed_with_t_slots", "column_frame_with_window"], "structure"),
+        "Bed_Column_Contact": ("coincident", ["cast_bed_with_t_slots", "column_frame_with_window"], "structure"),
+        "Column_Bed_Setback": ("distance", ["column_frame_with_window", "cast_bed_with_t_slots"], "structure"),
         "Left_Way_Column_Parallel": ("parallel", ["left_dovetail_way", "column_frame_with_window"], "ram_guidance"),
+        "Left_Way_Column_Contact": ("distance", ["left_dovetail_way", "column_frame_with_window"], "ram_guidance"),
         "Right_Way_Column_Parallel": ("parallel", ["right_dovetail_way", "column_frame_with_window"], "ram_guidance"),
+        "Right_Way_Column_Contact": ("distance", ["right_dovetail_way", "column_frame_with_window"], "ram_guidance"),
+        "Way_Spacing_Distance": ("parallel", ["left_dovetail_way", "right_dovetail_way"], "ram_guidance"),
         "Ram_Left_Way_Parallel": ("parallel", ["ram_with_dovetail_and_tool_mount", "left_dovetail_way"], "ram_guidance"),
+        "Ram_LeftWay_Guidance_Distance_Mate": ("distance", ["ram_with_dovetail_and_tool_mount", "left_dovetail_way"], "ram_guidance"),
         "Ram_Right_Way_Parallel": ("parallel", ["ram_with_dovetail_and_tool_mount", "right_dovetail_way"], "ram_guidance"),
+        "Ram_RightWay_Guidance_Distance_Mate": ("parallel", ["ram_with_dovetail_and_tool_mount", "right_dovetail_way"], "ram_guidance"),
         "Front_Gib_Ram_Parallel": ("parallel", ["front_gib_plate", "ram_with_dovetail_and_tool_mount"], "ram_guidance"),
+        "Front_Gib_Ram_Clearance": ("distance", ["front_gib_plate", "ram_with_dovetail_and_tool_mount"], "ram_guidance"),
         "Rear_Gib_Ram_Parallel": ("parallel", ["rear_gib_plate", "ram_with_dovetail_and_tool_mount"], "ram_guidance"),
+        "Rear_Gib_Ram_Clearance": ("distance", ["rear_gib_plate", "ram_with_dovetail_and_tool_mount"], "ram_guidance"),
         "Tool_Head_Ram_Parallel": ("parallel", ["clapper_tool_head", "ram_with_dovetail_and_tool_mount"], "tool_head"),
+        "Tool_Head_Ram_Contact": ("coincident", ["clapper_tool_head", "ram_with_dovetail_and_tool_mount"], "tool_head"),
         "Tool_Tool_Head_Parallel": ("parallel", ["single_point_cutting_tool", "clapper_tool_head"], "tool_head"),
+        "Tool_Tool_Head_Contact": ("distance", ["single_point_cutting_tool", "clapper_tool_head"], "tool_head"),
         "Table_Slide_Parallel": ("parallel", ["work_table_with_t_slots", "table_cross_slide"], "workholding"),
+        "Table_Slide_Contact": ("coincident", ["work_table_with_t_slots", "table_cross_slide"], "workholding"),
         "Slide_Bed_Parallel": ("parallel", ["table_cross_slide", "cast_bed_with_t_slots"], "workholding"),
+        "Slide_Bed_Contact": ("distance", ["table_cross_slide", "cast_bed_with_t_slots"], "workholding"),
         "Fixed_Jaw_Table_Parallel": ("parallel", ["vise_jaw_fixed", "work_table_with_t_slots"], "workholding"),
+        "Fixed_Jaw_Table_Contact": ("coincident", ["vise_jaw_fixed", "work_table_with_t_slots"], "workholding"),
         "Movable_Jaw_Table_Parallel": ("parallel", ["vise_jaw_movable", "work_table_with_t_slots"], "workholding"),
+        "Movable_Jaw_Table_Clearance": ("distance", ["vise_jaw_movable", "work_table_with_t_slots"], "workholding"),
         "Bull_Gear_Crank_Shaft_Concentric": ("concentric", ["bull_gear_crank_disk", "crank_center_shaft"], "quick_return_drive"),
+        "Crank_Shaft_Axial_Locator": ("distance", ["bull_gear_crank_disk", "crank_center_shaft"], "quick_return_drive"),
         "Eccentric_Pin_Bull_Gear_Concentric": ("concentric", ["eccentric_crank_pin", "bull_gear_crank_disk"], "quick_return_drive"),
+        "Eccentric_Pin_Axial_Locator": ("distance", ["eccentric_crank_pin", "bull_gear_crank_disk"], "quick_return_drive"),
         "Rocker_Pivot_Shaft_Bracket_Concentric": ("concentric", ["rocker_pivot_shaft", "rocker_pivot_bracket"], "quick_return_drive"),
+        "Rocker_Pivot_Shaft_Axial_Locator": ("distance", ["rocker_pivot_shaft", "rocker_pivot_bracket"], "quick_return_drive"),
         "Rocker_Arm_Pivot_Shaft_Concentric": ("concentric", ["slotted_rocker_arm", "rocker_pivot_shaft"], "quick_return_drive"),
+        "Rocker_Arm_Axial_Locator": ("distance", ["slotted_rocker_arm", "rocker_pivot_shaft"], "quick_return_drive"),
         "Sliding_Die_Rocker_Concentric": ("concentric", ["bronze_sliding_die_block", "slotted_rocker_arm"], "quick_return_drive"),
+        "Sliding_Die_Rocker_Slot_Clearance": ("distance", ["bronze_sliding_die_block", "slotted_rocker_arm"], "quick_return_drive"),
         "Ram_Link_Ram_Concentric": ("concentric", ["ram_drive_link", "ram_with_dovetail_and_tool_mount"], "quick_return_drive"),
+        "Ram_Link_Ram_Axial_Locator": ("distance", ["ram_drive_link", "ram_with_dovetail_and_tool_mount"], "quick_return_drive"),
     }
     return {
         name: {"type": kind, "semantic_pair": pair, "functional_group": group}
@@ -1117,7 +1138,7 @@ def face_plane_normal(face: Any) -> tuple[float, float, float] | None:
         params = read_member(surface, "PlaneParams")
         if not params or len(params) < 6:
             return None
-        return normalize_vector((float(params[3]), float(params[4]), float(params[5])))
+        return normalize_vector((float(params[0]), float(params[1]), float(params[2])))
     except Exception:
         return None
 
@@ -1134,7 +1155,7 @@ def face_plane_offset(face: Any, normal: tuple[float, float, float]) -> float | 
         surface = read_member(face, "GetSurface")
         params = read_member(surface, "PlaneParams")
         if params and len(params) >= 6:
-            point = (float(params[0]), float(params[1]), float(params[2]))
+            point = (float(params[3]), float(params[4]), float(params[5]))
             return normal[0] * point[0] + normal[1] * point[1] + normal[2] * point[2]
         box = read_member(face, "GetBox")
         if box and len(box) >= 6:
@@ -1145,8 +1166,77 @@ def face_plane_offset(face: Any, normal: tuple[float, float, float]) -> float | 
     return None
 
 
+def component_translation(component: Any) -> tuple[float, float, float]:
+    try:
+        transform = read_member(component, "Transform2")
+        data = list(read_member(transform, "ArrayData")) if transform is not None else []
+        if len(data) >= 12:
+            return (float(data[9]), float(data[10]), float(data[11]))
+    except Exception:
+        pass
+    return (0.0, 0.0, 0.0)
+
+
+def component_face_plane_offset(component: Any, face: Any, normal: tuple[float, float, float]) -> float | None:
+    offset = face_plane_offset(face, normal)
+    if offset is None:
+        return None
+    translation = component_translation(component)
+    return offset + normal[0] * translation[0] + normal[1] * translation[1] + normal[2] * translation[2]
+
+
 def normals_parallel(a: tuple[float, float, float], b: tuple[float, float, float]) -> bool:
     return abs(a[0] * b[0] + a[1] * b[1] + a[2] * b[2]) > 0.99
+
+
+def normal_matches_hint(normal: tuple[float, float, float], hint: tuple[float, float, float] | None) -> bool:
+    if hint is None:
+        return True
+    return abs(normal[0] * hint[0] + normal[1] * hint[1] + normal[2] * hint[2]) > 0.97
+
+
+def planar_mate_normal_hint(name: str) -> tuple[float, float, float] | None:
+    """Declared interface axis for each planar mate in the shaper contract."""
+    x_axis = (1.0, 0.0, 0.0)
+    y_axis = (0.0, 1.0, 0.0)
+    z_axis = (0.0, 0.0, 1.0)
+    hints = {
+        "Bed_Column_Parallel": z_axis,
+        "Bed_Column_Contact": z_axis,
+        "Column_Bed_Setback": x_axis,
+        "Left_Way_Column_Parallel": z_axis,
+        "Left_Way_Column_Contact": z_axis,
+        "Right_Way_Column_Parallel": z_axis,
+        "Right_Way_Column_Contact": z_axis,
+        "Way_Spacing_Distance": y_axis,
+        "Ram_Left_Way_Parallel": z_axis,
+        "Ram_LeftWay_Guidance_Distance_Mate": z_axis,
+        "Ram_Right_Way_Parallel": y_axis,
+        "Ram_RightWay_Guidance_Distance_Mate": y_axis,
+        "Front_Gib_Ram_Parallel": z_axis,
+        "Front_Gib_Ram_Clearance": z_axis,
+        "Rear_Gib_Ram_Parallel": z_axis,
+        "Rear_Gib_Ram_Clearance": z_axis,
+        "Tool_Head_Ram_Parallel": x_axis,
+        "Tool_Head_Ram_Contact": x_axis,
+        "Tool_Tool_Head_Parallel": z_axis,
+        "Tool_Tool_Head_Contact": z_axis,
+        "Table_Slide_Parallel": y_axis,
+        "Table_Slide_Contact": y_axis,
+        "Slide_Bed_Parallel": z_axis,
+        "Slide_Bed_Contact": z_axis,
+        "Fixed_Jaw_Table_Parallel": y_axis,
+        "Fixed_Jaw_Table_Contact": y_axis,
+        "Movable_Jaw_Table_Parallel": y_axis,
+        "Movable_Jaw_Table_Clearance": x_axis,
+        "Crank_Shaft_Axial_Locator": z_axis,
+        "Eccentric_Pin_Axial_Locator": z_axis,
+        "Rocker_Pivot_Shaft_Axial_Locator": z_axis,
+        "Rocker_Arm_Axial_Locator": z_axis,
+        "Sliding_Die_Rocker_Slot_Clearance": z_axis,
+        "Ram_Link_Ram_Axial_Locator": z_axis,
+    }
+    return hints.get(name)
 
 
 def select_faces(asm: Any, first: Any, second: Any, component_pair: list[str] | None = None) -> dict[str, Any]:
@@ -1178,20 +1268,27 @@ def add_selected_mate(asm: Any, name: str, mate_type: int, distance: float = 0.0
         return {"name": name, "ok": False, "api": "AddMate5", "mate_error": getattr(mate_error, "value", None), "error": repr(exc)}
 
 
-def best_parallel_planar_face_pair(left: Any, right: Any, distance: float) -> tuple[Any, Any, float] | None:
+def best_parallel_planar_face_pair(
+    left: Any,
+    right: Any,
+    distance: float,
+    normal_hint: tuple[float, float, float] | None = None,
+) -> tuple[Any, Any, float] | None:
     candidates: list[tuple[float, Any, Any, float]] = []
     left_faces = [(face, face_plane_normal(face)) for face in component_faces(left)]
     left_faces = [(face, normal) for face, normal in left_faces if normal is not None]
     right_faces = [(face, face_plane_normal(face)) for face in component_faces(right)]
     right_faces = [(face, normal) for face, normal in right_faces if normal is not None]
     for left_face, left_normal in left_faces:
-        left_offset = face_plane_offset(left_face, left_normal)
+        if not normal_matches_hint(left_normal, normal_hint):
+            continue
+        left_offset = component_face_plane_offset(left, left_face, left_normal)
         if left_offset is None:
             continue
         for right_face, right_normal in right_faces:
             if not normals_parallel(left_normal, right_normal):
                 continue
-            right_offset = face_plane_offset(right_face, left_normal)
+            right_offset = component_face_plane_offset(right, right_face, left_normal)
             if right_offset is None:
                 continue
             actual_distance = abs(left_offset - right_offset)
@@ -1205,7 +1302,7 @@ def best_parallel_planar_face_pair(left: Any, right: Any, distance: float) -> tu
 def add_distance_mate_between_planar_faces(asm: Any, components: list[Any], distance: float, name: str = "Shaper_Distance_Mate") -> dict[str, Any]:
     for i, left in enumerate(components):
         for right in components[i + 1:]:
-            best = best_parallel_planar_face_pair(left, right, distance)
+            best = best_parallel_planar_face_pair(left, right, distance, normal_hint=planar_mate_normal_hint(name))
             if best is None:
                 continue
             left_face, right_face, actual_distance = best
@@ -1252,7 +1349,7 @@ def add_semantic_coincident_mate(asm: Any, components: list[Any], name: str, sem
     right = component_by_part_name(components, semantic_pair[1])
     if left is None or right is None:
         return {"name": name, "ok": False, "kind": "coincident", "semantic_pair": semantic_pair, "error": "component missing"}
-    best = best_parallel_planar_face_pair(left, right, 0.0)
+    best = best_parallel_planar_face_pair(left, right, 0.0, normal_hint=planar_mate_normal_hint(name))
     if best is None:
         return {"name": name, "ok": False, "kind": "coincident", "semantic_pair": semantic_pair, "error": "parallel planar face missing"}
     left_face, right_face, actual_distance = best
@@ -1285,7 +1382,7 @@ def add_semantic_parallel_mate(asm: Any, components: list[Any], name: str, seman
     right = component_by_part_name(components, semantic_pair[1])
     if left is None or right is None:
         return {"name": name, "ok": False, "kind": "parallel", "semantic_pair": semantic_pair, "error": "component missing"}
-    best = best_parallel_planar_face_pair(left, right, 0.0)
+    best = best_parallel_planar_face_pair(left, right, 0.0, normal_hint=planar_mate_normal_hint(name))
     if best is None:
         return {"name": name, "ok": False, "kind": "parallel", "semantic_pair": semantic_pair, "error": "parallel planar face missing"}
     left_face, right_face, actual_distance = best
@@ -1481,10 +1578,27 @@ def add_semantic_lock_mate(asm: Any, components: list[Any], name: str, semantic_
 
 
 def shaper_distance_mate_clearance(name: str) -> float:
-    # Keep the ram visually guided by the left way while avoiding hard body
-    # overlap in SolidWorks interference detection. Other distance mates keep the
-    # original 10 mm display clearance that already validates cleanly.
-    return {"Ram_LeftWay_Guidance_Distance_Mate": 0.040}.get(name, 0.010)
+    clearances = {
+        "Column_Bed_Setback": 0.142,
+        "Left_Way_Column_Contact": 0.012,
+        "Right_Way_Column_Contact": 0.052,
+        "Way_Spacing_Distance": 0.008,
+        "Ram_LeftWay_Guidance_Distance_Mate": 0.048,
+        "Ram_RightWay_Guidance_Distance_Mate": 0.008,
+        "Front_Gib_Ram_Clearance": 0.021,
+        "Rear_Gib_Ram_Clearance": 0.021,
+        "Tool_Head_Ram_Contact": 0.015,
+        "Tool_Tool_Head_Contact": 0.017,
+        "Slide_Bed_Contact": 0.0395,
+        "Movable_Jaw_Table_Clearance": 0.025,
+        "Crank_Shaft_Axial_Locator": 0.018,
+        "Eccentric_Pin_Axial_Locator": 0.017,
+        "Rocker_Pivot_Shaft_Axial_Locator": 0.018,
+        "Rocker_Arm_Axial_Locator": 0.018,
+        "Sliding_Die_Rocker_Slot_Clearance": 0.014,
+        "Ram_Link_Ram_Axial_Locator": 0.018,
+    }
+    return clearances.get(name, 0.010)
 
 
 def restore_component_origin(sw: Any, component: Any, origin: tuple[float, float, float]) -> dict[str, Any]:
@@ -1584,7 +1698,7 @@ def validate_design_layout_fixed_components(evidence: Any) -> list[str]:
 
 def restore_primary_design_layout_components(sw: Any, components: list[Any]) -> list[dict[str, Any]]:
     """Restore all primary shaper components to the authored design layout."""
-    primary_origins = desired_primary_origins_for_shaper()
+    primary_origins = authored_primary_origins_for_shaper()
     restored: list[dict[str, Any]] = []
     for component in components:
         name = str(getattr(component, "Name2", ""))
@@ -1605,7 +1719,7 @@ def fix_primary_design_layout_components(sw: Any, asm: Any, components: list[Any
     to keep a picture together. If the mate network cannot keep those parts in a
     coherent machine layout, validation should fail and expose the defect.
     """
-    primary_origins = desired_primary_origins_for_shaper()
+    primary_origins = authored_primary_origins_for_shaper()
     fixed_names = structural_reference_parts_for_shaper()
     fixed: list[dict[str, Any]] = []
     empty = empty_dispatch_variant()
@@ -1875,12 +1989,13 @@ def component_prefixes_from_inspect(inspect: dict[str, Any]) -> set[str]:
     return prefixes
 
 
-def desired_primary_origins_for_shaper() -> dict[str, tuple[float, float, float]]:
-    """Accepted Transform2 origins for the retained fixture pose.
+def authored_primary_origins_for_shaper() -> dict[str, tuple[float, float, float]]:
+    """Stable pre-mate Transform2 origins for authored shaper layout.
 
-    Values are measured from live SolidWorks readback after the real interface
-    mate network solves. They intentionally track the solved mechanism pose, not
-    the pre-mate insertion pose.
+    These values are the insertion/restoration pose that lets the execution
+    layer select the intended interfaces before SolidWorks solves the mate
+    network. They are deliberately separate from post-solve inspect readback so
+    a successful solve cannot feed back into the next run and create drift.
     """
     return {
         "cast_bed_with_t_slots": (0.0, 0.0, -0.0275),
@@ -1907,9 +2022,36 @@ def desired_primary_origins_for_shaper() -> dict[str, tuple[float, float, float]
     }
 
 
+def desired_primary_origins_for_shaper() -> dict[str, tuple[float, float, float]]:
+    """Backward-compatible alias for the authored pre-mate layout contract."""
+    return authored_primary_origins_for_shaper()
+
+
 def solved_primary_origins_for_shaper() -> dict[str, tuple[float, float, float]]:
     """Expected primary origins for strict inspect placement validation."""
-    return desired_primary_origins_for_shaper()
+    return {
+        "cast_bed_with_t_slots": (0.0, 0.0, -0.0275),
+        "column_frame_with_window": (-0.22, 0.095, 0.035),
+        "left_dovetail_way": (0.03, 0.245, 0.0965),
+        "right_dovetail_way": (0.03, 0.245, 0.1365),
+        "ram_with_dovetail_and_tool_mount": (0.10, 0.285, 0.1765),
+        "front_gib_plate": (0.10, 0.222, 0.2025),
+        "rear_gib_plate": (0.10, 0.222, 0.2505),
+        "clapper_tool_head": (0.30, 0.255, 0.255),
+        "single_point_cutting_tool": (0.350, 0.160, 0.310),
+        "bull_gear_crank_disk": (-0.245, 0.115, 0.091),
+        "crank_center_shaft": (-0.245, 0.115, 0.0675),
+        "eccentric_crank_pin": (-0.20935, 0.115, 0.190),
+        "bronze_sliding_die_block": (-0.1735, 0.1487, 0.310),
+        "slotted_rocker_arm": (-0.1735, 0.0347, 0.274),
+        "rocker_pivot_bracket": (-0.205, 0.105, 0.378),
+        "rocker_pivot_shaft": (-0.1735, 0.1487, 0.4525),
+        "ram_drive_link": (0.100, 0.28012, 0.3605),
+        "table_cross_slide": (0.08, 0.090, 0.067),
+        "work_table_with_t_slots": (0.10, 0.125, 0.1195),
+        "vise_jaw_fixed": (0.045, 0.1635, 0.372),
+        "vise_jaw_movable": (0.22745, 0.170, 0.395),
+    }
 
 
 def expected_shaper_placement_contract(tolerance_m: float = 0.003) -> dict[str, dict[str, Any]]:
@@ -2149,29 +2291,41 @@ def construct_live_fixture(spec: CompleteShaperSpec, out_dir: Path, reports_dir:
     layout = validate_nominal_layout(spec)
     if not layout["ok"]:
         raise RuntimeError(f"Nominal shaper layout has unapproved bbox intersections: {layout['intersections'][:8]}")
-    runtime_preflight = preflight_solidworks_runtime(out_dir=out_dir)
-    if not runtime_preflight["ok"]:
-        reports_dir.mkdir(parents=True, exist_ok=True)
-        result = {
-            "ok": False,
-            "error": "SolidWorks runtime preflight failed; restart SolidWorks before live fixture generation",
-            "runtime_preflight": runtime_preflight,
-            "layout": layout,
-            "validation": {"ok": False, "failed": list(runtime_preflight.get("failed", []))},
-            "post_cleanup": probe_unlocked_generated_files(out_dir),
-        }
-        (reports_dir / "complete_shaper_build.json").write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
-        return result
     stage = "attach_solidworks"
     sw = None
     started_by_fixture = False
     result: dict[str, Any] | None = None
+    skipped: list[str] = []
     try:
-        sw, started_by_fixture = attach_solidworks()
-        stage = "close_existing_fixture_documents"
-        close_fixture_documents(sw, spec, out_dir)
-        stage = "cleanup_output_dir"
-        skipped = cleanup_dir(out_dir, force)
+        if force:
+            sw, started_by_fixture = attach_solidworks()
+            stage = "close_existing_fixture_documents"
+            close_fixture_documents(sw, spec, out_dir)
+            stage = "cleanup_output_dir"
+            skipped = cleanup_dir(out_dir, force)
+        runtime_preflight = preflight_solidworks_runtime(
+            out_dir=out_dir,
+            com_attach_probe=(lambda sw=sw: sw) if sw is not None else None,
+        )
+        if not runtime_preflight["ok"]:
+            reports_dir.mkdir(parents=True, exist_ok=True)
+            result = {
+                "ok": False,
+                "error": "SolidWorks runtime preflight failed; restart SolidWorks before live fixture generation",
+                "runtime_preflight": runtime_preflight,
+                "layout": layout,
+                "validation": {"ok": False, "failed": list(runtime_preflight.get("failed", []))},
+                "post_cleanup": probe_unlocked_generated_files(out_dir),
+            }
+            (reports_dir / "complete_shaper_build.json").write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
+            return result
+        if sw is None:
+            sw, started_by_fixture = attach_solidworks()
+        if not force:
+            stage = "close_existing_fixture_documents"
+            close_fixture_documents(sw, spec, out_dir)
+            stage = "cleanup_output_dir"
+            skipped = cleanup_dir(out_dir, force)
         out_dir.mkdir(parents=True, exist_ok=True)
         reports_dir.mkdir(parents=True, exist_ok=True)
         part_paths: dict[str, Path] = {}

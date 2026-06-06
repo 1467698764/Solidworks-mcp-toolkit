@@ -476,7 +476,7 @@ class CompleteShaperSpecTests(unittest.TestCase):
 
     def test_eccentric_pin_contract_matches_solved_readback_origin(self):
         expected = self.module.expected_shaper_placement_contract()
-        self.assertEqual(expected["eccentric_crank_pin"]["expected_origin_m"], (-0.2093, 0.115, 0.190))
+        self.assertEqual(expected["eccentric_crank_pin"]["expected_origin_m"], (-0.20935, 0.115, 0.190))
 
     def test_shaft_washers_clear_eccentric_crank_pin_envelope(self):
         washers = self.module.detail_instance_placements()["washer_set"]
@@ -720,12 +720,19 @@ class CompleteShaperSpecTests(unittest.TestCase):
 
     def test_complete_shaper_uses_real_interface_mates_without_fixing_motion_parts(self):
         expected = self.module.expected_shaper_mate_contract()
-        real_mates = {name: mate for name, mate in expected.items() if mate.get("type") in {"parallel", "concentric"}}
+        real_mates = {name: mate for name, mate in expected.items() if mate.get("type") in {"coincident", "parallel", "distance", "concentric"}}
+        kinds = {mate["type"] for mate in expected.values()}
 
-        self.assertGreaterEqual(len(real_mates), 14)
+        self.assertGreaterEqual(len(real_mates), 30)
+        self.assertIn("coincident", kinds)
+        self.assertIn("distance", kinds)
         self.assertIn("Ram_Left_Way_Parallel", real_mates)
         self.assertIn("Bull_Gear_Crank_Shaft_Concentric", real_mates)
+        self.assertIn("Bed_Column_Contact", real_mates)
+        self.assertIn("Crank_Shaft_Axial_Locator", real_mates)
         self.assertEqual("MateParallel", self.module.expected_inspect_mate_type("parallel"))
+        self.assertEqual("MateCoincident", self.module.expected_inspect_mate_type("coincident"))
+        self.assertEqual("MateDistanceDim", self.module.expected_inspect_mate_type("distance"))
         self.assertEqual("MateConcentric", self.module.expected_inspect_mate_type("concentric"))
         source = SCRIPT.read_text(encoding="utf-8")
         self.assertIn("GetSelectedObjectCount2(-1)", source)
@@ -756,14 +763,24 @@ class CompleteShaperSpecTests(unittest.TestCase):
 
     def test_complete_shaper_requires_semantic_mate_network_not_single_distance_mate(self):
         expected = self.module.expected_shaper_mate_contract()
-        self.assertGreaterEqual(len(expected), 18)
+        self.assertGreaterEqual(len(expected), 30)
         mate_types = {mate["type"] for mate in expected.values()}
+        groups = {}
+        for mate in expected.values():
+            groups.setdefault(mate["functional_group"], set()).add(mate["type"])
+        self.assertIn("coincident", mate_types)
         self.assertIn("parallel", mate_types)
+        self.assertIn("distance", mate_types)
         self.assertIn("concentric", mate_types)
-        self.assertNotIn("distance", mate_types)
         self.assertFalse(all(mate["type"] == "lock" for mate in expected.values()))
+        self.assertIn("coincident", groups["structure"])
+        self.assertIn("distance", groups["ram_guidance"])
+        self.assertIn("distance", groups["quick_return_drive"])
+        self.assertIn("coincident", groups["tool_head"])
+        self.assertIn("coincident", groups["workholding"])
         for required_mate in (
             "Bed_Column_Parallel",
+            "Bed_Column_Contact",
             "Left_Way_Column_Parallel",
             "Right_Way_Column_Parallel",
             "Ram_Left_Way_Parallel",
@@ -772,7 +789,9 @@ class CompleteShaperSpecTests(unittest.TestCase):
             "Table_Slide_Parallel",
             "Fixed_Jaw_Table_Parallel",
             "Bull_Gear_Crank_Shaft_Concentric",
+            "Crank_Shaft_Axial_Locator",
             "Eccentric_Pin_Bull_Gear_Concentric",
+            "Eccentric_Pin_Axial_Locator",
             "Rocker_Pivot_Shaft_Bracket_Concentric",
             "Rocker_Arm_Pivot_Shaft_Concentric",
             "Sliding_Die_Rocker_Concentric",
@@ -1058,11 +1077,36 @@ class CompleteShaperSpecTests(unittest.TestCase):
             construct.index("inspect_live_assembly_model(asm, sw, reports_dir)"),
         )
 
-    def test_placement_contract_targets_restored_design_layout_not_bad_solver_positions(self):
-        origins = self.module.solved_primary_origins_for_shaper()
+    def test_authored_layout_contract_keeps_stable_pre_mate_origins(self):
+        origins = self.module.authored_primary_origins_for_shaper()
         self.assertEqual((-0.22, 0.095, 0.035), origins["column_frame_with_window"])
         self.assertEqual((0.03, 0.245, 0.089), origins["left_dovetail_way"])
         self.assertEqual((0.10, 0.125, 0.1195), origins["work_table_with_t_slots"])
+
+    def test_placement_contract_targets_post_mate_solved_origins(self):
+        authored = self.module.authored_primary_origins_for_shaper()
+        solved = self.module.solved_primary_origins_for_shaper()
+        contract = self.module.expected_shaper_placement_contract()
+
+        self.assertNotEqual(authored["left_dovetail_way"], solved["left_dovetail_way"])
+        self.assertEqual(solved["left_dovetail_way"], contract["left_dovetail_way"]["expected_origin_m"])
+        self.assertEqual((0.03, 0.245, 0.0965), solved["left_dovetail_way"])
+
+    def test_restore_and_fix_layout_use_authored_origins_not_solved_readback(self):
+        source = SCRIPT.read_text(encoding="utf-8")
+        restore_body = source[
+            source.index("def restore_primary_design_layout_components"):
+            source.index("def fix_primary_design_layout_components")
+        ]
+        fix_body = source[
+            source.index("def fix_primary_design_layout_components"):
+            source.index("def add_shaper_mate_network")
+        ]
+
+        self.assertIn("authored_primary_origins_for_shaper", restore_body)
+        self.assertIn("authored_primary_origins_for_shaper", fix_body)
+        self.assertNotIn("solved_primary_origins_for_shaper", restore_body)
+        self.assertNotIn("solved_primary_origins_for_shaper", fix_body)
 
     def test_distance_mate_uses_closest_parallel_face_pair_not_first_arbitrary_faces(self):
         source = SCRIPT.read_text(encoding="utf-8")
@@ -1071,7 +1115,7 @@ class CompleteShaperSpecTests(unittest.TestCase):
         self.assertIn("abs(actual_distance - distance)", source)
         self.assertNotIn('if result["ok"]:\n                            return result', source)
 
-    def test_plane_params_use_point_then_normal_for_parallel_face_selection(self):
+    def test_plane_params_use_normal_then_point_for_parallel_face_selection(self):
         class Surface:
             def __init__(self, params):
                 self.params = params
@@ -1089,8 +1133,8 @@ class CompleteShaperSpecTests(unittest.TestCase):
             def GetSurface(self):
                 return self.surface
 
-        left_face = Face([0.0, 0.0, 0.010, 0.0, 0.0, 1.0])
-        right_face = Face([0.0, 0.0, 0.035, 0.0, 0.0, -1.0])
+        left_face = Face([0.0, 0.0, 1.0, 0.0, 0.0, 0.010])
+        right_face = Face([0.0, 0.0, -1.0, 0.0, 0.0, 0.035])
 
         self.assertEqual((0.0, 0.0, 1.0), self.module.face_plane_normal(left_face))
         self.assertEqual((0.0, 0.0, -1.0), self.module.face_plane_normal(right_face))
@@ -1136,9 +1180,9 @@ class CompleteShaperSpecTests(unittest.TestCase):
             def GetBodies2(self, body_type):
                 return [Body(self.faces)]
 
-        left = Component([Face("left_reference", [0.0, 0.0, 0.010, 0.0, 0.0, 1.0])])
-        near = Face("right_025", [0.0, 0.0, 0.035, 0.0, 0.0, -1.0])
-        far = Face("right_080", [0.0, 0.0, 0.090, 0.0, 0.0, -1.0])
+        left = Component([Face("left_reference", [0.0, 0.0, 1.0, 0.0, 0.0, 0.010])])
+        near = Face("right_025", [0.0, 0.0, -1.0, 0.0, 0.0, 0.035])
+        far = Face("right_080", [0.0, 0.0, -1.0, 0.0, 0.0, 0.090])
         right = Component([far, near])
 
         selected_left, selected_right, actual_distance = self.module.best_parallel_planar_face_pair(left, right, 0.025)
@@ -1146,6 +1190,116 @@ class CompleteShaperSpecTests(unittest.TestCase):
         self.assertEqual("left_reference", selected_left.name)
         self.assertEqual("right_025", selected_right.name)
         self.assertAlmostEqual(actual_distance, 0.025)
+
+    def test_planar_face_pair_distance_includes_component_transform_translation(self):
+        class Surface:
+            def __init__(self, params):
+                self.params = params
+
+            def IsPlane(self):
+                return True
+
+            def PlaneParams(self):
+                return self.params
+
+        class Face:
+            def __init__(self, name, params):
+                self.name = name
+                self.surface = Surface(params)
+                self.next_face = None
+
+            def GetSurface(self):
+                return self.surface
+
+            def GetNextFace(self):
+                return self.next_face
+
+        class Body:
+            def __init__(self, faces):
+                self.faces = faces
+
+            def GetFirstFace(self):
+                for left, right in zip(self.faces, self.faces[1:]):
+                    left.next_face = right
+                return self.faces[0]
+
+        class Transform:
+            def __init__(self, z):
+                self.ArrayData = [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, z, 1, 0, 0, 0]
+
+        class Component:
+            def __init__(self, faces, z):
+                self.faces = faces
+                self.Transform2 = Transform(z)
+
+            def GetBodies2(self, body_type):
+                return [Body(self.faces)]
+
+        left = Component([Face("left_top", [0.0, 0.0, 1.0, 0.0, 0.0, 0.010])], 0.100)
+        right = Component([Face("right_top", [0.0, 0.0, 1.0, 0.0, 0.0, 0.010])], 0.125)
+
+        _left_face, _right_face, actual_distance = self.module.best_parallel_planar_face_pair(left, right, 0.025)
+
+        self.assertAlmostEqual(actual_distance, 0.025)
+
+    def test_named_planar_mates_select_faces_on_declared_interface_axis(self):
+        class Surface:
+            def __init__(self, params):
+                self.params = params
+
+            def IsPlane(self):
+                return True
+
+            def PlaneParams(self):
+                return self.params
+
+        class Face:
+            def __init__(self, name, params):
+                self.name = name
+                self.surface = Surface(params)
+                self.next_face = None
+
+            def GetSurface(self):
+                return self.surface
+
+            def GetNextFace(self):
+                return self.next_face
+
+        class Body:
+            def __init__(self, faces):
+                self.faces = faces
+
+            def GetFirstFace(self):
+                for left, right in zip(self.faces, self.faces[1:]):
+                    left.next_face = right
+                return self.faces[0]
+
+        class Component:
+            def __init__(self, faces):
+                self.faces = faces
+
+            def GetBodies2(self, body_type):
+                return [Body(self.faces)]
+
+        wrong_axis = Face("wrong_x_axis", [1.0, 0.0, 0.0, 0.010, 0.0, 0.0])
+        intended_left = Face("left_z_interface", [0.0, 0.0, 1.0, 0.0, 0.0, 0.050])
+        intended_right = Face("right_z_interface", [0.0, 0.0, -1.0, 0.0, 0.0, 0.060])
+
+        selected_left, selected_right, actual_distance = self.module.best_parallel_planar_face_pair(
+            Component([wrong_axis, intended_left]),
+            Component([Face("wrong_x_axis_peer", [-1.0, 0.0, 0.0, 0.020, 0.0, 0.0]), intended_right]),
+            0.010,
+            normal_hint=self.module.planar_mate_normal_hint("Bed_Column_Contact"),
+        )
+
+        self.assertEqual("left_z_interface", selected_left.name)
+        self.assertEqual("right_z_interface", selected_right.name)
+        self.assertAlmostEqual(actual_distance, 0.010)
+
+    def test_complete_shaper_declares_interface_axes_for_planar_mates(self):
+        for mate_name, expected in self.module.expected_shaper_mate_contract().items():
+            if expected["type"] in {"coincident", "parallel", "distance"}:
+                self.assertIsNotNone(self.module.planar_mate_normal_hint(mate_name), mate_name)
 
 
 
@@ -1262,6 +1416,37 @@ class CompleteShaperSpecTests(unittest.TestCase):
             self.module.preflight_solidworks_runtime = original
         self.assertFalse(result["ok"])
         self.assertEqual(Path("tools/solidworks_codex/live_fixture/custom_shaper"), calls[0]["out_dir"])
+
+    def test_force_live_builder_closes_existing_fixture_before_lock_preflight(self):
+        events = []
+        preflight_calls = []
+        attached = []
+
+        class Sw:
+            pass
+
+        original_attach = self.module.attach_solidworks
+        original_close = self.module.close_fixture_documents
+        original_preflight = self.module.preflight_solidworks_runtime
+        try:
+            self.module.attach_solidworks = lambda: (events.append("attach") or attached.append(Sw()) or (attached[0], False))
+            self.module.close_fixture_documents = lambda sw, spec, out_dir: events.append("close_existing")
+            self.module.preflight_solidworks_runtime = lambda **kwargs: (preflight_calls.append(kwargs) or events.append("preflight") or {"ok": False, "failed": ["solidworks_stale_lock_files"]})
+            result = self.module.construct_live_fixture(
+                self.module.build_complete_shaper_spec(),
+                Path("tools/solidworks_codex/live_fixture/custom_shaper"),
+                Path("tools/solidworks_codex/reports/custom_shaper"),
+                force=True,
+            )
+        finally:
+            self.module.attach_solidworks = original_attach
+            self.module.close_fixture_documents = original_close
+            self.module.preflight_solidworks_runtime = original_preflight
+
+        self.assertFalse(result["ok"])
+        self.assertLess(events.index("close_existing"), events.index("preflight"))
+        self.assertIn("com_attach_probe", preflight_calls[0])
+        self.assertIs(preflight_calls[0]["com_attach_probe"](), attached[0])
 
     def test_runtime_health_guard_raises_before_next_heavy_step_when_solidworks_is_unhealthy(self):
         high = [{"name": "SLDWORKS", "id": 77, "private_memory_bytes": 2_600_000_000, "responding": False}]
