@@ -323,6 +323,14 @@ class FakeFalseCreateMateAssembly(FakeAssembly):
 
 
 class MateGroupExecuteTests(unittest.TestCase):
+    def test_transform_vector_treats_arraydata_axes_as_basis_vectors(self):
+        component = FakeComponent("fixture-1", [])
+        component.Transform2 = FakeTransform([0, 1, 0, 0, 0, 1, 1, 0, 0, 4.0, 5.0, 6.0])
+
+        self.assertEqual([0.0, 1.0, 0.0], mod.transform_vector(component, [1.0, 0.0, 0.0]))
+        self.assertEqual([0.0, 0.0, 1.0], mod.transform_vector(component, [0.0, 1.0, 0.0]))
+        self.assertEqual([1.0, 0.0, 0.0], mod.transform_vector(component, [0.0, 0.0, 1.0]))
+
     def manifest(self):
         return {
             "mode": "reviewable_mate_group_macros",

@@ -343,9 +343,9 @@ def component_rotation(component: Any) -> list[list[float]]:
         data = list(read_member(transform, "ArrayData")) if transform is not None else []
         if len(data) >= 9:
             return [
-                [float(data[0]), float(data[1]), float(data[2])],
-                [float(data[3]), float(data[4]), float(data[5])],
-                [float(data[6]), float(data[7]), float(data[8])],
+                [float(data[0]), float(data[3]), float(data[6])],
+                [float(data[1]), float(data[4]), float(data[7])],
+                [float(data[2]), float(data[5]), float(data[8])],
             ]
     except Exception:
         pass
@@ -461,11 +461,15 @@ def best_planar_face(component: Any, fallback: dict[str, Any]) -> Any | None:
     expected_normal = vector(fallback.get("normal"), [0.0, 0.0, 0.0])
     expected_origin = vector(fallback.get("origin_m"), [0.0, 0.0, 0.0])
     best: tuple[float, Any] | None = None
+    nearest: tuple[float, Any] | None = None
     for face in component_faces(component):
         face_center = transform_point(component, center_from_box(entity_box(face), [0.0, 0.0, 0.0]))
+        center_score = distance(face_center, expected_origin)
+        if nearest is None or center_score < nearest[0]:
+            nearest = (center_score, face)
         surface = surface_for_face(face)
         if surface is None or not surface_bool(surface, "IsPlane"):
-            score = distance(face_center, expected_origin)
+            score = center_score
         else:
             params = surface_params(surface, "PlaneParams")
             normal_candidates = [params[:3], params[3:6]] if len(params) >= 6 else [expected_normal]
@@ -475,7 +479,9 @@ def best_planar_face(component: Any, fallback: dict[str, Any]) -> Any | None:
             score = distance(face_center, expected_origin) - normal_score
         if best is None or score < best[0]:
             best = (score, face)
-    return best[1] if best else None
+    if best is not None:
+        return best[1]
+    return nearest[1] if nearest else None
 
 
 def best_cylindrical_face(component: Any, fallback: dict[str, Any]) -> Any | None:
@@ -483,24 +489,32 @@ def best_cylindrical_face(component: Any, fallback: dict[str, Any]) -> Any | Non
     expected_origin = vector(fallback.get("origin_m"), [0.0, 0.0, 0.0])
     expected_radius = fallback.get("radius_m")
     best: tuple[float, Any] | None = None
+    nearest: tuple[float, Any] | None = None
     for face in component_faces(component):
         surface = surface_for_face(face)
+        face_center = transform_point(component, center_from_box(entity_box(face), expected_origin))
+        center_score = distance(face_center, expected_origin)
+        if nearest is None or center_score < nearest[0]:
+            nearest = (center_score, face)
         if surface is None or not surface_bool(surface, "IsCylinder"):
-            continue
-        params = surface_params(surface, "CylinderParams")
-        if len(params) < 7:
-            continue
-        origin = params[:3]
-        axis = params[3:6]
-        radius = params[6]
-        axis_score = abs(dot(transform_normal(component, axis), expected_axis)) if any(expected_axis) else 1.0
-        if axis_score < 0.8:
-            continue
-        radius_penalty = abs(radius - float(expected_radius)) if expected_radius not in (None, "") else 0.0
-        score = distance(transform_point(component, origin), expected_origin) + radius_penalty - axis_score
+            score = center_score
+        else:
+            params = surface_params(surface, "CylinderParams")
+            if len(params) < 7:
+                continue
+            origin = params[:3]
+            axis = params[3:6]
+            radius = params[6]
+            axis_score = abs(dot(transform_normal(component, axis), expected_axis)) if any(expected_axis) else 1.0
+            if axis_score < 0.8:
+                continue
+            radius_penalty = abs(radius - float(expected_radius)) if expected_radius not in (None, "") else 0.0
+            score = distance(transform_point(component, origin), expected_origin) + radius_penalty - axis_score
         if best is None or score < best[0]:
             best = (score, face)
-    return best[1] if best else None
+    if best is not None:
+        return best[1]
+    return nearest[1] if nearest else None
 
 
 def slot_axis_and_origin(fallback: dict[str, Any]) -> tuple[list[float], list[float]]:
@@ -520,21 +534,29 @@ def slot_axis_and_origin(fallback: dict[str, Any]) -> tuple[list[float], list[fl
 def best_linear_edge(component: Any, fallback: dict[str, Any]) -> Any | None:
     expected_axis, expected_origin = slot_axis_and_origin(fallback)
     best: tuple[float, Any] | None = None
+    nearest: tuple[float, Any] | None = None
     for edge in component_edges(component):
         curve = curve_for_edge(edge)
+        edge_center = transform_point(component, center_from_box(entity_box(edge), expected_origin))
+        center_score = distance(edge_center, expected_origin)
+        if nearest is None or center_score < nearest[0]:
+            nearest = (center_score, edge)
         if curve is None or not curve_bool(curve, "IsLine"):
-            continue
-        params = curve_params(curve, "LineParams")
-        origin = params[:3] if len(params) >= 6 else center_from_box(getattr(edge, "GetBox", lambda: [])(), expected_origin)
-        axis = params[3:6] if len(params) >= 6 else expected_axis
-        axis_score = abs(dot(transform_normal(component, axis), expected_axis)) if any(expected_axis) else 1.0
-        if axis_score < 0.8:
-            continue
-        edge_center = transform_point(component, center_from_box(entity_box(edge), origin))
-        score = distance(edge_center, expected_origin) - axis_score
+            score = center_score
+        else:
+            params = curve_params(curve, "LineParams")
+            origin = params[:3] if len(params) >= 6 else center_from_box(getattr(edge, "GetBox", lambda: [])(), expected_origin)
+            axis = params[3:6] if len(params) >= 6 else expected_axis
+            axis_score = abs(dot(transform_normal(component, axis), expected_axis)) if any(expected_axis) else 1.0
+            if axis_score < 0.8:
+                continue
+            edge_center = transform_point(component, center_from_box(entity_box(edge), origin))
+            score = distance(edge_center, expected_origin) - axis_score
         if best is None or score < best[0]:
             best = (score, edge)
-    return best[1] if best else None
+    if best is not None:
+        return best[1]
+    return nearest[1] if nearest else None
 
 
 def vertex_point(vertex: Any, fallback: list[float]) -> list[float]:
