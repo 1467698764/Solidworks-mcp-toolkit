@@ -10,6 +10,7 @@ fs.mkdirSync(path.dirname(sample), { recursive: true });
 fs.writeFileSync(sample, 'mcp smoke sample\n');
 const partGeometryReport = path.join(workspace, 'tools', 'solidworks_codex', 'sandbox', 'mcp_part_geometry_report.json');
 const mateGroupManifest = path.join(workspace, 'tools', 'solidworks_codex', 'sandbox', 'mcp_mate_group_manifest.json');
+const mateIntentSpec = path.join(workspace, 'tools', 'solidworks_codex', 'sandbox', 'mcp_mate_intent_spec.json');
 const mateSelectionReport = path.join(workspace, 'tools', 'solidworks_codex', 'sandbox', 'mcp_mate_selection_report.json');
 const mateGroupValidation = path.join(workspace, 'tools', 'solidworks_codex', 'sandbox', 'mcp_mate_group_validation.json');
 const motionSweepSpec = path.join(workspace, 'tools', 'solidworks_codex', 'sandbox', 'mcp_motion_sweep_lite.json');
@@ -50,6 +51,24 @@ fs.writeFileSync(mateGroupManifest, JSON.stringify({
       { stable_id: 'bearing-1:cylinder:bore', component: 'bearing-1', strategy: 'stable_id_then_feature_dimension_bbox_fallback', fallback: { type: 'cylindrical_axis', origin_m: [0, 0, 0] } }
     ],
     verification: ['rebuild', 'mate_errors']
+  }]
+}, null, 2));
+fs.writeFileSync(mateIntentSpec, JSON.stringify({
+  mode: 'engineering_mate_intent',
+  design_intent: { goal: 'mount a shaft in a bearing using a revolute joint plus axial locator evidence' },
+  mate_intents: [{
+    id: 'mcp_revolute_joint',
+    kind: 'revolute',
+    components: ['shaft-1', 'bearing-1'],
+    axial_clearance_m: 0.001,
+    axial_min_m: 0,
+    axial_max_m: 0.002,
+    interfaces: {
+      shaft_axis: { stable_id: 'shaft-1:cylinder:axis', component: 'shaft-1', fallback: { type: 'cylindrical_axis', axis: [0, 0, 1], origin_m: [0, 0, 0], radius_m: 0.01 } },
+      bore_axis: { stable_id: 'bearing-1:cylinder:bore', component: 'bearing-1', fallback: { type: 'cylindrical_axis', axis: [0, 0, 1], origin_m: [0, 0, 0], radius_m: 0.01 } },
+      shaft_axial_face: { stable_id: 'shaft-1:plane:z_max', component: 'shaft-1', fallback: { type: 'bbox_planar_face', normal: [0, 0, 1], origin_m: [0, 0, 0.05] } },
+      housing_axial_face: { stable_id: 'bearing-1:plane:z_min', component: 'bearing-1', fallback: { type: 'bbox_planar_face', normal: [0, 0, -1], origin_m: [0, 0, 0.049] } }
+    }
   }]
 }, null, 2));
 fs.writeFileSync(mateSelectionReport, JSON.stringify({
@@ -188,6 +207,7 @@ child.stderr.on('data', (d) => { stderr += d.toString(); });
   const mate = await send('tools/call', { name: 'solidworks_mate_macro', arguments: { mate: 'concentric', out: 'tools/solidworks_codex/macros/mcp_mate_concentric.swp.vba', manifest: 'tools/solidworks_codex/reports/mcp_mate_concentric_manifest.json' } });
   const mateSelectionCheck = await send('tools/call', { name: 'solidworks_mate_selection_check', arguments: { macro_manifest: 'tools/solidworks_codex/sandbox/mcp_mate_group_manifest.json', selection_report: 'tools/solidworks_codex/sandbox/mcp_mate_selection_report.json', expected_mate_name: 'MG_mcp_fixture_joint_01_concentric', out: 'tools/solidworks_codex/reports/mcp_mate_selection_check.json' } });
   const mateGroupExecute = await send('tools/call', { name: 'solidworks_mate_group_execute', arguments: { macro_manifest: 'tools/solidworks_codex/sandbox/mcp_mate_group_manifest.json', dry_run: true, out: 'tools/solidworks_codex/reports/mcp_mate_group_execute.json' } });
+  const mateIntentExecute = await send('tools/call', { name: 'solidworks_mate_intent_execute', arguments: { intent_spec: 'tools/solidworks_codex/sandbox/mcp_mate_intent_spec.json', dry_run: true, out: 'tools/solidworks_codex/reports/mcp_mate_intent_execute.json' } });
   const motionSweepLite = await send('tools/call', { name: 'solidworks_motion_sweep_lite', arguments: { spec: 'tools/solidworks_codex/sandbox/mcp_motion_sweep_lite.json', macro_manifest: 'tools/solidworks_codex/sandbox/mcp_mate_group_manifest.json', dry_run: true, out: 'tools/solidworks_codex/reports/mcp_motion_sweep_lite.json' } });
   const engineeringLite = await send('tools/call', { name: 'solidworks_engineering_lite', arguments: { report: 'tools/solidworks_codex/sandbox/report_after.json', out: 'tools/solidworks_codex/reports/mcp_engineering_lite.md', json_out: 'tools/solidworks_codex/reports/mcp_engineering_lite.json' } });
   const partGeometryValidate = await send('tools/call', { name: 'solidworks_part_geometry_validate', arguments: { report: 'tools/solidworks_codex/sandbox/mcp_part_geometry_report.json', contract: 'tools/solidworks_codex/sandbox/mcp_part_geometry_contract.json', out: 'tools/solidworks_codex/reports/mcp_part_geometry_validate.json' } });
@@ -226,6 +246,7 @@ child.stderr.on('data', (d) => { stderr += d.toString(); });
     mate_is_error: mate.isError === true,
     mateSelectionCheck_is_error: mateSelectionCheck.isError === true,
     mateGroupExecute_is_error: mateGroupExecute.isError === true,
+    mateIntentExecute_is_error: mateIntentExecute.isError === true,
     motionSweepLite_is_error: motionSweepLite.isError === true,
     engineeringLite_is_error: engineeringLite.isError === true,
     partGeometryValidate_is_error: partGeometryValidate.isError === true,
@@ -256,6 +277,7 @@ child.stderr.on('data', (d) => { stderr += d.toString(); });
     mate_text_head: mate.content?.[0]?.text?.slice(0, 500),
     mateSelectionCheck_text_head: mateSelectionCheck.content?.[0]?.text?.slice(0, 500),
     mateGroupExecute_text_head: mateGroupExecute.content?.[0]?.text?.slice(0, 500),
+    mateIntentExecute_text_head: mateIntentExecute.content?.[0]?.text?.slice(0, 500),
     motionSweepLite_text_head: motionSweepLite.content?.[0]?.text?.slice(0, 500),
     engineeringLite_text_head: engineeringLite.content?.[0]?.text?.slice(0, 500),
     visualCapture_text_head: visualCapture.content?.[0]?.text?.slice(0, 500),

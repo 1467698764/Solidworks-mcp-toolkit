@@ -14,7 +14,7 @@ SERVER = ROOT / "tools" / "solidworks_codex" / "mcp" / "server.cjs"
 
 GROUP_RULES = {
     "read_only": ["probe", "inspect", "summary", "selection", "mass"],
-    "write_guarded": ["backup", "set_dimension", "component_state", "component_insert", "standard_part_resolve", "feature_state", "metadata_execute", "rebuild", "mate_group_execute", "motion_sweep"],
+    "write_guarded": ["backup", "set_dimension", "component_state", "component_insert", "standard_part_resolve", "feature_state", "metadata_execute", "rebuild", "mate_group_execute", "mate_intent_execute", "motion_sweep"],
     "export_verify": ["export", "interference", "compare", "part_geometry_validate", "visual_capture", "visual_validate", "preflight", "audit", "finalize"],
     "analysis": ["issue", "design_review", "change_plan", "report_search", "report_context", "model_understand", "engineering_lite", "diagnose", "mate_selection_check"],
     "handoff": ["worklog", "handoff"],

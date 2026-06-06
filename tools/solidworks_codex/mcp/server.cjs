@@ -218,6 +218,11 @@ const toolSchemas = [
     name: 'solidworks_mate_group_execute',
     description: 'Execute reviewed mate group selector evidence in the active SolidWorks assembly using SelectByID2, AddMate5, and immediate rebuild. dry_run only plans selector actions.',
     inputSchema: { type: 'object', properties: { macro_manifest: { type: 'string' }, dry_run: { type: 'boolean' }, out: { type: 'string' } }, required: ['macro_manifest'], additionalProperties: false }
+  },
+  {
+    name: 'solidworks_mate_intent_execute',
+    description: 'Execute engineering-level assembly mate intent such as revolute joints, rigid mounts, prismatic guides, slot-pin joints, and gear pairs by expanding intent into reviewed native selector actions and SolidWorks mate API calls with evidence.',
+    inputSchema: { type: 'object', properties: { intent_spec: { type: 'string', description: 'JSON spec with mate_intents/joints, engineering interfaces, components, limits, and optional design intent.' }, dry_run: { type: 'boolean' }, out: { type: 'string' } }, required: ['intent_spec'], additionalProperties: false }
   },  {
     name: 'solidworks_selection_report',
     description: 'Report current SolidWorks selection set for safe preselected-entity mate workflows.',
@@ -600,6 +605,11 @@ async function callTool(name, input) {
       break;
     case 'solidworks_mate_group_execute':
       args.push('mate-group-execute', '-Report', input.macro_manifest);
+      if (input?.dry_run) args.push('-ValidateOnly');
+      if (input?.out) args.push('-Out', input.out);
+      break;
+    case 'solidworks_mate_intent_execute':
+      args.push('mate-intent-execute', '-Report', input.intent_spec);
       if (input?.dry_run) args.push('-ValidateOnly');
       if (input?.out) args.push('-Out', input.out);
       break;    case 'solidworks_selection_report':
