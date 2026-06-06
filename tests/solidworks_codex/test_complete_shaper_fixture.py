@@ -252,6 +252,66 @@ class CompleteShaperSpecTests(unittest.TestCase):
             self.module.require_pywin32 = original_require
             self.module.empty_dispatch_variant = original_empty
 
+    def test_open_part_for_insert_rejects_false_open_doc_result(self):
+        class VariantFactory:
+            def VARIANT(self, *args):
+                return type("Variant", (), {"value": 0})()
+
+        class PythonCom:
+            VT_BYREF = 0
+            VT_I4 = 0
+
+        class Sw:
+            def OpenDoc6(self, *args):
+                return False
+
+        original_require = self.module.require_pywin32
+        self.module.require_pywin32 = lambda: (PythonCom(), VariantFactory())
+        try:
+            with self.assertRaisesRegex(RuntimeError, "OpenDoc6 failed"):
+                self.module.open_part_for_insert(Sw(), Path("part.SLDPRT"))
+        finally:
+            self.module.require_pywin32 = original_require
+
+    def test_fix_primary_layout_rejects_false_fixcomponent_result(self):
+        class Asm:
+            def ClearSelection2(self, value):
+                return True
+
+            def FixComponent(self):
+                return False
+
+        class Component:
+            Name2 = "cast_bed_with_t_slots-1"
+
+            def Select4(self, *args):
+                return True
+
+        original_empty = self.module.empty_dispatch_variant
+        original_restore = self.module.restore_component_origin
+        self.module.empty_dispatch_variant = lambda: object()
+        self.module.restore_component_origin = lambda sw, component, origin: {
+            "component": component.Name2,
+            "restored": True,
+            "restored_origin_m": list(origin),
+        }
+        try:
+            fixed = self.module.fix_primary_design_layout_components(object(), Asm(), [Component()])
+        finally:
+            self.module.empty_dispatch_variant = original_empty
+            self.module.restore_component_origin = original_restore
+
+        self.assertFalse(fixed[0]["ok"])
+        self.assertEqual("FixComponent returned False", fixed[0]["error"])
+
+    def test_live_builder_treats_false_rebuild_return_as_failure(self):
+        class Model:
+            def ForceRebuild3(self, top_only):
+                return False
+
+        with self.assertRaisesRegex(RuntimeError, "ForceRebuild3.*returned False"):
+            self.module.require_rebuild_success(Model(), "part rebuild")
+
     def test_live_builder_places_visible_attached_detail_instances(self):
         detail_placements = self.module.detail_instance_placements()
         self.assertGreaterEqual(len(detail_placements["fastener_set_m6"]), 18)
@@ -831,7 +891,7 @@ class CompleteShaperSpecTests(unittest.TestCase):
         self.assertIn("restore_primary_design_layout_components", source)
         self.assertIn("design_layout_restored_components", source)
         self.assertLess(
-            construct.index("asm.ForceRebuild3(False)"),
+            construct.index('require_rebuild_success(asm, "complete shaper assembly")'),
             construct.index("design_layout_restored_components = restore_primary_design_layout_components(sw, component_objs)"),
         )
         self.assertLess(

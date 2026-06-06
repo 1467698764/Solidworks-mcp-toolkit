@@ -698,6 +698,11 @@ def require_com_created(value: Any, label: str) -> Any:
     return value
 
 
+def require_rebuild_success(model: Any, label: str) -> Any:
+    result = model.ForceRebuild3(False)
+    return require_com_created(result, f"ForceRebuild3 for {label}")
+
+
 def boss_box(model: Any, width: float, height: float, depth: float, name: str) -> None:
     select_front_plane(model)
     model.SketchManager.InsertSketch(True)
@@ -966,7 +971,7 @@ def create_part_with_feature_evidence(sw: Any, out_dir: Path, part: PartSpec) ->
             cut_circles(model, [(0, 0, max(w, h)*.22)], depth, "Washer_Center_Hole")
         elif name == "oil_cups":
             cut_circles(model, [(0, 0, max(w, h)*.18)], depth, "Oil_Cup_Bore")
-        model.ForceRebuild3(False)
+        require_rebuild_success(model, f"part {part.name}")
         evidence = {"ok": True, "part": part.name, "features": feature_tree_evidence(model)}
         save_as(model, path)
         return path, evidence
@@ -1048,7 +1053,8 @@ def open_part_for_insert(sw: Any, path: Path) -> Any:
     errors = win32_client.VARIANT(pythoncom.VT_BYREF | pythoncom.VT_I4, 0)
     warnings = win32_client.VARIANT(pythoncom.VT_BYREF | pythoncom.VT_I4, 0)
     model = sw.OpenDoc6(str(path.resolve()), 1, 1, "", errors, warnings)
-    if model is None:
+    if not com_created(model):
+        returned = "None" if model is None else repr(model)
         raise RuntimeError(f"OpenDoc6 failed for {path}; errors={getattr(errors, 'value', errors)} warnings={getattr(warnings, 'value', warnings)}")
     return model
 
@@ -1600,7 +1606,17 @@ def fix_primary_design_layout_components(sw: Any, asm: Any, components: list[Any
             asm.ClearSelection2(True)
             selected = bool(component.Select4(False, empty, False))
             result = read_member(asm, "FixComponent") if selected else None
-            fixed.append({"component": name, "ok": bool(selected) and bool(restore.get("restored")), "api_result": result, **restore})
+            fixed_ok = bool(selected) and bool(restore.get("restored")) and com_created(result)
+            error = None
+            if not selected:
+                error = "component selection returned False"
+            elif not com_created(result):
+                returned = "None" if result is None else repr(result)
+                error = f"FixComponent returned {returned}"
+            row = {"component": name, "ok": fixed_ok, "selected": selected, "api_result": result, **restore}
+            if error is not None:
+                row["error"] = error
+            fixed.append(row)
         except Exception as exc:
             fixed.append({"component": name, "ok": False, "error": repr(exc)})
     return fixed
@@ -2170,7 +2186,7 @@ def construct_live_fixture(spec: CompleteShaperSpec, out_dir: Path, reports_dir:
             asm_path = out_dir / "bullhead_shaper_complete.SLDASM"
             stage = "assembly_rebuild"
             assert_solidworks_runtime_healthy(stage)
-            asm.ForceRebuild3(False)
+            require_rebuild_success(asm, "complete shaper assembly")
             stage = "restore_primary_design_layout_components"
             assert_solidworks_runtime_healthy(stage)
             design_layout_restored_components = restore_primary_design_layout_components(sw, component_objs)
