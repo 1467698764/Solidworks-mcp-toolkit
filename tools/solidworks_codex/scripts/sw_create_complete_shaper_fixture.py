@@ -138,6 +138,7 @@ def expected_shaper_mate_contract() -> dict[str, dict[str, Any]]:
         "Bed_Column_Parallel": ("parallel", ["cast_bed_with_t_slots", "column_frame_with_window"], "structure"),
         "Bed_Column_Contact": ("coincident", ["cast_bed_with_t_slots", "column_frame_with_window"], "structure"),
         "Column_Bed_Setback": ("distance", ["column_frame_with_window", "cast_bed_with_t_slots"], "structure"),
+        "Column_Bed_Perpendicular": ("perpendicular", ["column_frame_with_window", "cast_bed_with_t_slots"], "structure"),
         "Left_Way_Column_Parallel": ("parallel", ["left_dovetail_way", "column_frame_with_window"], "ram_guidance"),
         "Left_Way_Column_Contact": ("distance", ["left_dovetail_way", "column_frame_with_window"], "ram_guidance"),
         "Right_Way_Column_Parallel": ("parallel", ["right_dovetail_way", "column_frame_with_window"], "ram_guidance"),
@@ -146,11 +147,12 @@ def expected_shaper_mate_contract() -> dict[str, dict[str, Any]]:
         "Ram_Left_Way_Parallel": ("parallel", ["ram_with_dovetail_and_tool_mount", "left_dovetail_way"], "ram_guidance"),
         "Ram_LeftWay_Guidance_Distance_Mate": ("distance", ["ram_with_dovetail_and_tool_mount", "left_dovetail_way"], "ram_guidance"),
         "Ram_Right_Way_Parallel": ("parallel", ["ram_with_dovetail_and_tool_mount", "right_dovetail_way"], "ram_guidance"),
-        "Ram_RightWay_Guidance_Distance_Mate": ("parallel", ["ram_with_dovetail_and_tool_mount", "right_dovetail_way"], "ram_guidance"),
+        "Ram_Centered_Between_Ways": ("width", ["ram_with_dovetail_and_tool_mount", "left_dovetail_way", "right_dovetail_way"], "ram_guidance"),
+        "Ram_Stroke_Limit": ("limit_distance", ["ram_with_dovetail_and_tool_mount", "column_frame_with_window"], "ram_guidance"),
         "Front_Gib_Ram_Parallel": ("parallel", ["front_gib_plate", "ram_with_dovetail_and_tool_mount"], "ram_guidance"),
-        "Front_Gib_Ram_Clearance": ("distance", ["front_gib_plate", "ram_with_dovetail_and_tool_mount"], "ram_guidance"),
+        "Front_Gib_Ram_Clearance": ("limit_distance", ["front_gib_plate", "ram_with_dovetail_and_tool_mount"], "ram_guidance"),
         "Rear_Gib_Ram_Parallel": ("parallel", ["rear_gib_plate", "ram_with_dovetail_and_tool_mount"], "ram_guidance"),
-        "Rear_Gib_Ram_Clearance": ("distance", ["rear_gib_plate", "ram_with_dovetail_and_tool_mount"], "ram_guidance"),
+        "Rear_Gib_Ram_Clearance": ("limit_distance", ["rear_gib_plate", "ram_with_dovetail_and_tool_mount"], "ram_guidance"),
         "Tool_Head_Ram_Parallel": ("parallel", ["clapper_tool_head", "ram_with_dovetail_and_tool_mount"], "tool_head"),
         "Tool_Head_Ram_Contact": ("coincident", ["clapper_tool_head", "ram_with_dovetail_and_tool_mount"], "tool_head"),
         "Tool_Tool_Head_Parallel": ("parallel", ["single_point_cutting_tool", "clapper_tool_head"], "tool_head"),
@@ -162,19 +164,20 @@ def expected_shaper_mate_contract() -> dict[str, dict[str, Any]]:
         "Fixed_Jaw_Table_Parallel": ("parallel", ["vise_jaw_fixed", "work_table_with_t_slots"], "workholding"),
         "Fixed_Jaw_Table_Contact": ("coincident", ["vise_jaw_fixed", "work_table_with_t_slots"], "workholding"),
         "Movable_Jaw_Table_Parallel": ("parallel", ["vise_jaw_movable", "work_table_with_t_slots"], "workholding"),
-        "Movable_Jaw_Table_Clearance": ("distance", ["vise_jaw_movable", "work_table_with_t_slots"], "workholding"),
+        "Movable_Jaw_Table_Clearance": ("limit_distance", ["vise_jaw_movable", "work_table_with_t_slots"], "workholding"),
         "Bull_Gear_Crank_Shaft_Concentric": ("concentric", ["bull_gear_crank_disk", "crank_center_shaft"], "quick_return_drive"),
-        "Crank_Shaft_Axial_Locator": ("distance", ["bull_gear_crank_disk", "crank_center_shaft"], "quick_return_drive"),
+        "Crank_Shaft_Axial_Locator": ("limit_distance", ["bull_gear_crank_disk", "crank_center_shaft"], "quick_return_drive"),
+        "Crank_Reference_Angle": ("limit_angle", ["bull_gear_crank_disk", "column_frame_with_window"], "quick_return_drive"),
         "Eccentric_Pin_Bull_Gear_Concentric": ("concentric", ["eccentric_crank_pin", "bull_gear_crank_disk"], "quick_return_drive"),
-        "Eccentric_Pin_Axial_Locator": ("distance", ["eccentric_crank_pin", "bull_gear_crank_disk"], "quick_return_drive"),
+        "Eccentric_Pin_Axial_Locator": ("limit_distance", ["eccentric_crank_pin", "bull_gear_crank_disk"], "quick_return_drive"),
         "Rocker_Pivot_Shaft_Bracket_Concentric": ("concentric", ["rocker_pivot_shaft", "rocker_pivot_bracket"], "quick_return_drive"),
-        "Rocker_Pivot_Shaft_Axial_Locator": ("distance", ["rocker_pivot_shaft", "rocker_pivot_bracket"], "quick_return_drive"),
+        "Rocker_Pivot_Shaft_Axial_Locator": ("limit_distance", ["rocker_pivot_shaft", "rocker_pivot_bracket"], "quick_return_drive"),
         "Rocker_Arm_Pivot_Shaft_Concentric": ("concentric", ["slotted_rocker_arm", "rocker_pivot_shaft"], "quick_return_drive"),
-        "Rocker_Arm_Axial_Locator": ("distance", ["slotted_rocker_arm", "rocker_pivot_shaft"], "quick_return_drive"),
+        "Rocker_Arm_Axial_Locator": ("limit_distance", ["slotted_rocker_arm", "rocker_pivot_shaft"], "quick_return_drive"),
         "Sliding_Die_Rocker_Concentric": ("concentric", ["bronze_sliding_die_block", "slotted_rocker_arm"], "quick_return_drive"),
-        "Sliding_Die_Rocker_Slot_Clearance": ("distance", ["bronze_sliding_die_block", "slotted_rocker_arm"], "quick_return_drive"),
+        "Sliding_Die_Rocker_Slot_Clearance": ("limit_distance", ["bronze_sliding_die_block", "slotted_rocker_arm"], "quick_return_drive"),
         "Ram_Link_Ram_Concentric": ("concentric", ["ram_drive_link", "ram_with_dovetail_and_tool_mount"], "quick_return_drive"),
-        "Ram_Link_Ram_Axial_Locator": ("distance", ["ram_drive_link", "ram_with_dovetail_and_tool_mount"], "quick_return_drive"),
+        "Ram_Link_Ram_Axial_Locator": ("limit_distance", ["ram_drive_link", "ram_with_dovetail_and_tool_mount"], "quick_return_drive"),
     }
     return {
         name: {"type": kind, "semantic_pair": pair, "functional_group": group}
@@ -189,11 +192,29 @@ def expected_shaper_functional_connection_contract() -> list[tuple[str, str]]:
     assembly is not a cloud of parts. Every pair must be present in spatial
     near/overlap evidence from model-understand, independent of group inventory.
     """
-    return [tuple(v["semantic_pair"]) for v in expected_shaper_mate_contract().values()]
+    pairs: list[tuple[str, str]] = []
+    for item in expected_shaper_mate_contract().values():
+        semantic_pair = list(item["semantic_pair"])
+        if len(semantic_pair) < 2:
+            continue
+        anchor = semantic_pair[0]
+        pairs.extend((anchor, other) for other in semantic_pair[1:])
+    return pairs
 
 
 def expected_inspect_mate_type(kind: str) -> str:
-    return {"coincident": "MateCoincident", "parallel": "MateParallel", "distance": "MateDistanceDim", "concentric": "MateConcentric", "lock": "MateLock"}.get(kind, f"Mate:{kind}")
+    return {
+        "coincident": "MateCoincident",
+        "parallel": "MateParallel",
+        "perpendicular": "MatePerpendicular",
+        "distance": "MateDistanceDim",
+        "limit_distance": "MateLimitDistanceDim",
+        "angle": "MateAngleDim",
+        "limit_angle": "MateLimitPlanarAngleDim",
+        "width": "MateWidth",
+        "concentric": "MateConcentric",
+        "lock": "MateLock",
+    }.get(kind, f"Mate:{kind}")
 
 
 def component_pair_matches_semantic_pair(component_names: Any, semantic_pair: list[str]) -> bool:
@@ -210,14 +231,220 @@ def int_equals(value: Any, expected: int) -> bool:
         return False
 
 
+def part_size_m_by_name() -> dict[str, tuple[float, float, float]]:
+    return {part.name: tuple(value / 1000.0 for value in part.size_mm) for part in build_complete_shaper_spec().parts}
+
+
+def authored_component_origin(part_name: str) -> tuple[float, float, float]:
+    return authored_primary_origins_for_shaper().get(part_name, (0.0, 0.0, 0.0))
+
+
+def interface_origin_m(part_name: str, axis: str, side: str) -> list[float]:
+    origin = list(authored_component_origin(part_name))
+    size = part_size_m_by_name().get(part_name, (0.0, 0.0, 0.0))
+    axis_index = {"x": 0, "y": 1, "z": 2}[axis]
+    offset = size[axis_index] / 2.0
+    origin[axis_index] += offset if side == "max" else -offset
+    return [float(value) for value in origin]
+
+
+def planar_intent_selector(part_name: str, axis: str, side: str, role: str = "interface") -> dict[str, Any]:
+    return {
+        "stable_id": f"{part_name}-1:face:{axis}_{side}:{role}",
+        "component": f"{part_name}-1",
+        "fallback": {
+            "type": "bbox_planar_face",
+            "normal": list(axis_vector(axis)),
+            "origin_m": interface_origin_m(part_name, axis, side),
+            "interface_axis": axis,
+            "interface_side": side,
+        },
+    }
+
+
+def cylindrical_intent_selector(part_name: str, role: str = "axis") -> dict[str, Any]:
+    origin = list(authored_component_origin(part_name))
+    size = part_size_m_by_name().get(part_name, (0.0, 0.0, 0.0))
+    return {
+        "stable_id": f"{part_name}-1:cylindrical_axis:{role}",
+        "component": f"{part_name}-1",
+        "fallback": {
+            "type": "cylindrical_axis",
+            "axis": [0.0, 0.0, 1.0],
+            "origin_m": [float(value) for value in origin],
+            "radius_m": max(size[0], size[1]) / 2.0 if size else 0.01,
+        },
+    }
+
+
+def planar_intent_selectors_for_mate(name: str, semantic_pair: list[str]) -> list[dict[str, Any]]:
+    left_selector, right_selector = shaper_planar_interface_selector(name, semantic_pair)
+    return [
+        planar_intent_selector(semantic_pair[0], left_selector[0], left_selector[1], name),
+        planar_intent_selector(semantic_pair[1], right_selector[0], right_selector[1], name),
+    ]
+
+
+def direct_shaper_mate_intent(name: str, expected: dict[str, Any]) -> dict[str, Any]:
+    semantic_pair = list(expected["semantic_pair"])
+    kind = str(expected["type"])
+    intent: dict[str, Any] = {
+        "id": name,
+        "kind": "direct_mate",
+        "mate_type": kind,
+        "expected_mate_name": name,
+        "components": [f"{part_name}-1" for part_name in semantic_pair],
+    }
+    if kind == "concentric":
+        intent["selection_selectors"] = [cylindrical_intent_selector(part, name) for part in semantic_pair[:2]]
+    else:
+        intent["selection_selectors"] = planar_intent_selectors_for_mate(name, semantic_pair)
+    if kind in {"distance", "limit_distance"}:
+        nominal = shaper_distance_mate_clearance(name)
+        intent["distance_m"] = nominal
+        if kind == "limit_distance":
+            limit_min, limit_max = shaper_limit_distance_bounds(name)
+            intent["distance_min_m"] = limit_min
+            intent["distance_max_m"] = limit_max
+    if kind in {"angle", "limit_angle"}:
+        intent["angle_rad"] = math.radians(90.0)
+        if kind == "limit_angle":
+            intent["angle_min_rad"] = 0.0
+            intent["angle_max_rad"] = math.pi
+    return intent
+
+
+def build_shaper_mate_intent_spec() -> dict[str, Any]:
+    contract = expected_shaper_mate_contract()
+    consumed: set[str] = set()
+    intents: list[dict[str, Any]] = []
+
+    def add_rigid_mount(intent_id: str, contact_name: str, orientation_name: str | None = None) -> None:
+        contact = contract[contact_name]
+        pair = list(contact["semantic_pair"])
+        contact_selectors = planar_intent_selectors_for_mate(contact_name, pair)
+        interfaces = {"mount_face": contact_selectors[0], "host_face": contact_selectors[1]}
+        expected_names = {"contact": contact_name}
+        if orientation_name is not None:
+            orientation = contract[orientation_name]
+            orientation_selectors = planar_intent_selectors_for_mate(orientation_name, list(orientation["semantic_pair"]))
+            interfaces["orientation_face"] = orientation_selectors[0]
+            interfaces["host_orientation_face"] = orientation_selectors[1]
+            expected_names["orientation"] = orientation_name
+            consumed.add(orientation_name)
+        intents.append({
+            "id": intent_id,
+            "kind": "rigid_mount",
+            "components": [f"{part_name}-1" for part_name in pair],
+            "expected_mate_names": expected_names,
+            "interfaces": interfaces,
+        })
+        consumed.add(contact_name)
+
+    def add_revolute(intent_id: str, concentric_name: str, axial_name: str | None = None) -> None:
+        concentric = contract[concentric_name]
+        pair = list(concentric["semantic_pair"])
+        interfaces = {
+            "shaft_axis": cylindrical_intent_selector(pair[0], concentric_name),
+            "bore_axis": cylindrical_intent_selector(pair[1], concentric_name),
+        }
+        expected_names = {"concentric": concentric_name}
+        intent: dict[str, Any] = {
+            "id": intent_id,
+            "kind": "revolute",
+            "components": [f"{part_name}-1" for part_name in pair],
+            "expected_mate_names": expected_names,
+            "interfaces": interfaces,
+        }
+        if axial_name is not None:
+            axial = contract[axial_name]
+            axial_pair = list(axial["semantic_pair"])
+            axial_selectors = planar_intent_selectors_for_mate(axial_name, axial_pair)
+            interfaces["shaft_axial_face"] = axial_selectors[0]
+            interfaces["housing_axial_face"] = axial_selectors[1]
+            expected_names["axial_locator"] = axial_name
+            nominal = shaper_distance_mate_clearance(axial_name)
+            limit_min, limit_max = shaper_limit_distance_bounds(axial_name)
+            intent["axial_clearance_m"] = nominal
+            intent["axial_min_m"] = limit_min
+            intent["axial_max_m"] = limit_max
+            consumed.add(axial_name)
+        intents.append(intent)
+        consumed.add(concentric_name)
+
+    add_rigid_mount("bed_column_primary_mount", "Bed_Column_Contact", "Bed_Column_Parallel")
+    add_rigid_mount("tool_head_to_ram_mount", "Tool_Head_Ram_Contact", "Tool_Head_Ram_Parallel")
+    add_rigid_mount("tool_bit_to_clapper_mount", "Tool_Tool_Head_Contact", "Tool_Tool_Head_Parallel")
+    add_rigid_mount("table_to_cross_slide_mount", "Table_Slide_Contact", "Table_Slide_Parallel")
+    add_rigid_mount("fixed_jaw_to_table_mount", "Fixed_Jaw_Table_Contact", "Fixed_Jaw_Table_Parallel")
+
+    width_selectors = shaper_width_interface_selector("Ram_Centered_Between_Ways")
+    travel_min, travel_max = shaper_limit_distance_bounds("Ram_Stroke_Limit")
+    travel_selectors = planar_intent_selectors_for_mate("Ram_Stroke_Limit", list(contract["Ram_Stroke_Limit"]["semantic_pair"]))
+    intents.append({
+        "id": "ram_guided_between_dovetail_ways",
+        "kind": "prismatic",
+        "components": ["ram_with_dovetail_and_tool_mount-1", "left_dovetail_way-1", "right_dovetail_way-1"],
+        "distance_m": shaper_distance_mate_clearance("Ram_Stroke_Limit"),
+        "distance_min_m": travel_min,
+        "distance_max_m": travel_max,
+        "expected_mate_names": {"width": "Ram_Centered_Between_Ways", "travel_limit": "Ram_Stroke_Limit"},
+        "interfaces": {
+            "guide_left_face": planar_intent_selector("left_dovetail_way", *width_selectors["left_way"], "Ram_Centered_Between_Ways"),
+            "guide_right_face": planar_intent_selector("right_dovetail_way", *width_selectors["right_way"], "Ram_Centered_Between_Ways"),
+            "slider_left_face": planar_intent_selector("ram_with_dovetail_and_tool_mount", *width_selectors["ram_left"], "Ram_Centered_Between_Ways"),
+            "slider_right_face": planar_intent_selector("ram_with_dovetail_and_tool_mount", *width_selectors["ram_right"], "Ram_Centered_Between_Ways"),
+            "travel_stop_face": travel_selectors[0],
+            "travel_reference_face": travel_selectors[1],
+        },
+    })
+    consumed.update({"Ram_Centered_Between_Ways", "Ram_Stroke_Limit"})
+
+    add_revolute("bull_gear_on_crank_shaft", "Bull_Gear_Crank_Shaft_Concentric", "Crank_Shaft_Axial_Locator")
+    add_revolute("eccentric_pin_in_bull_gear", "Eccentric_Pin_Bull_Gear_Concentric", "Eccentric_Pin_Axial_Locator")
+    add_revolute("rocker_pivot_shaft_in_bracket", "Rocker_Pivot_Shaft_Bracket_Concentric", "Rocker_Pivot_Shaft_Axial_Locator")
+    add_revolute("rocker_arm_on_pivot_shaft", "Rocker_Arm_Pivot_Shaft_Concentric", "Rocker_Arm_Axial_Locator")
+    add_revolute("sliding_die_pin_in_rocker_slot", "Sliding_Die_Rocker_Concentric", "Sliding_Die_Rocker_Slot_Clearance")
+    add_revolute("ram_drive_link_to_ram_pin", "Ram_Link_Ram_Concentric", "Ram_Link_Ram_Axial_Locator")
+
+    for name, expected in contract.items():
+        if name not in consumed:
+            intents.append(direct_shaper_mate_intent(name, expected))
+
+    return {
+        "mode": "engineering_mate_intent",
+        "document": {"kind": "solidworks_assembly", "name": "bullhead_shaper_complete"},
+        "design_intent": {
+            "fixture": "complete_bullhead_shaper",
+            "assembly_strategy": "human-readable engineering joints expanded by the MCP mate intent executor",
+        },
+        "mate_intents": intents,
+    }
+
+
+def normalize_intent_executed_mate(row: dict[str, Any], contract: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    name = str(row.get("expected_mate_name") or row.get("name") or "")
+    expected = contract.get(name, {})
+    kind = str(row.get("mate_type") or row.get("kind") or expected.get("type") or "")
+    semantic_pair = list(expected.get("semantic_pair", []))
+    result = dict(row)
+    result["name"] = name
+    result["kind"] = kind
+    result["semantic_pair"] = semantic_pair
+    if "components" not in result or not result["components"]:
+        result["components"] = [f"{part_name}-1" for part_name in semantic_pair]
+    return result
+
+
 def mate_selection_evidence_ok(mate: dict[str, Any]) -> bool:
     guard = mate.get("selection_guard", {}) if isinstance(mate, dict) else {}
+    expected_count = 4 if mate.get("kind") == "width" else 2
     return (
-        int_equals(mate.get("selected_entities"), 2)
+        int_equals(mate.get("selected_entities"), expected_count)
         and int_equals(guard.get("cleared_selection_count"), 0)
         and guard.get("left_selected") is True
         and guard.get("right_selected") is True
-        and int_equals(guard.get("selection_count_before_mate"), 2)
+        and int_equals(guard.get("selection_count_before_mate"), expected_count)
     )
 
 
@@ -225,9 +452,9 @@ def mate_component_evidence_ok(mate: dict[str, Any], semantic_pair: list[str]) -
     components = mate.get("components") if isinstance(mate, dict) else None
     guard = mate.get("selection_guard", {}) if isinstance(mate, dict) else {}
     component_pair = guard.get("component_pair")
-    if not isinstance(components, list) or len(components) != 2:
+    if not isinstance(components, list) or len(components) < 2:
         return False
-    if not isinstance(component_pair, list) or len(component_pair) != 2:
+    if not isinstance(component_pair, list) or len(component_pair) != len(components):
         return False
     if [str(item) for item in component_pair] != [str(item) for item in components]:
         return False
@@ -1185,6 +1412,115 @@ def component_face_plane_offset(component: Any, face: Any, normal: tuple[float, 
     return offset + normal[0] * translation[0] + normal[1] * translation[1] + normal[2] * translation[2]
 
 
+def axis_vector(axis: str) -> tuple[float, float, float]:
+    return {
+        "x": (1.0, 0.0, 0.0),
+        "y": (0.0, 1.0, 0.0),
+        "z": (0.0, 0.0, 1.0),
+    }[axis]
+
+
+def explicit_planar_interface_face(component: Any, axis: str, side: str) -> Any | None:
+    """Select a designed interface face by component axis and side.
+
+    This is the fixture equivalent of a human engineer selecting the known
+    mounting face / datum side / guide face. It deliberately does not rank
+    arbitrary nearby faces between components.
+    """
+    normal_hint = axis_vector(axis)
+    candidates: list[tuple[float, Any]] = []
+    for face in component_faces(component):
+        normal = face_plane_normal(face)
+        if normal is None or not normal_matches_hint(normal, normal_hint):
+            continue
+        offset = component_face_plane_offset(component, face, normal_hint)
+        if offset is None:
+            continue
+        candidates.append((offset, face))
+    if not candidates:
+        return None
+    return (max if side == "max" else min)(candidates, key=lambda item: item[0])[1]
+
+
+def shaper_planar_interface_selector(name: str, semantic_pair: list[str]) -> tuple[tuple[str, str], tuple[str, str]]:
+    """Explicit engineering interface map for each planar shaper mate.
+
+    Values are (axis, side) selectors in each component's authored coordinate
+    system. This keeps assembly intent reviewable: bed top to column bottom,
+    ram underside to way tops, table bottom to slide top, etc.
+    """
+    selectors = {
+        "Bed_Column_Parallel": (("z", "max"), ("z", "min")),
+        "Bed_Column_Contact": (("z", "max"), ("z", "min")),
+        "Column_Bed_Setback": (("x", "min"), ("x", "max")),
+        "Column_Bed_Perpendicular": (("x", "max"), ("z", "max")),
+        "Left_Way_Column_Parallel": (("z", "min"), ("z", "max")),
+        "Left_Way_Column_Contact": (("z", "min"), ("z", "max")),
+        "Right_Way_Column_Parallel": (("z", "min"), ("z", "max")),
+        "Right_Way_Column_Contact": (("z", "min"), ("z", "max")),
+        "Way_Spacing_Distance": (("z", "max"), ("z", "min")),
+        "Ram_Left_Way_Parallel": (("z", "min"), ("z", "max")),
+        "Ram_LeftWay_Guidance_Distance_Mate": (("z", "min"), ("z", "max")),
+        "Ram_Right_Way_Parallel": (("z", "min"), ("z", "max")),
+        "Ram_Stroke_Limit": (("x", "min"), ("x", "max")),
+        "Front_Gib_Ram_Parallel": (("z", "min"), ("z", "max")),
+        "Front_Gib_Ram_Clearance": (("z", "min"), ("z", "max")),
+        "Rear_Gib_Ram_Parallel": (("z", "min"), ("z", "max")),
+        "Rear_Gib_Ram_Clearance": (("z", "min"), ("z", "max")),
+        "Tool_Head_Ram_Parallel": (("x", "min"), ("x", "max")),
+        "Tool_Head_Ram_Contact": (("x", "min"), ("x", "max")),
+        "Tool_Tool_Head_Parallel": (("z", "min"), ("z", "max")),
+        "Tool_Tool_Head_Contact": (("z", "min"), ("z", "max")),
+        "Table_Slide_Parallel": (("y", "min"), ("y", "max")),
+        "Table_Slide_Contact": (("y", "min"), ("y", "max")),
+        "Slide_Bed_Parallel": (("z", "min"), ("z", "max")),
+        "Slide_Bed_Contact": (("z", "min"), ("z", "max")),
+        "Fixed_Jaw_Table_Parallel": (("y", "min"), ("y", "max")),
+        "Fixed_Jaw_Table_Contact": (("y", "min"), ("y", "max")),
+        "Movable_Jaw_Table_Parallel": (("y", "min"), ("y", "max")),
+        "Movable_Jaw_Table_Clearance": (("x", "min"), ("x", "max")),
+        "Crank_Shaft_Axial_Locator": (("z", "min"), ("z", "max")),
+        "Crank_Reference_Angle": (("x", "max"), ("x", "min")),
+        "Eccentric_Pin_Axial_Locator": (("z", "min"), ("z", "max")),
+        "Rocker_Pivot_Shaft_Axial_Locator": (("z", "min"), ("z", "max")),
+        "Rocker_Arm_Axial_Locator": (("z", "min"), ("z", "max")),
+        "Sliding_Die_Rocker_Slot_Clearance": (("z", "min"), ("z", "max")),
+        "Ram_Link_Ram_Axial_Locator": (("z", "min"), ("z", "max")),
+    }
+    return selectors.get(name, (("z", "max"), ("z", "min")))
+
+
+def shaper_width_interface_selector(name: str) -> dict[str, tuple[str, str]]:
+    """Explicit four-face interface map for centered width mates.
+
+    A width mate is not a cosmetic spacing mate. For the ram guide it represents
+    the human-selected opposing guideway cheeks and the two ram side cheeks that
+    center the sliding member laterally between the ways.
+    """
+    selectors = {
+        "Ram_Centered_Between_Ways": {
+            "left_way": ("z", "max"),
+            "right_way": ("z", "min"),
+            "ram_left": ("z", "min"),
+            "ram_right": ("z", "max"),
+        }
+    }
+    return selectors[name]
+
+
+def explicit_planar_face_pair(left: Any, right: Any, name: str, semantic_pair: list[str]) -> tuple[Any, Any, float] | None:
+    left_selector, right_selector = shaper_planar_interface_selector(name, semantic_pair)
+    left_face = explicit_planar_interface_face(left, left_selector[0], left_selector[1])
+    right_face = explicit_planar_interface_face(right, right_selector[0], right_selector[1])
+    if left_face is None or right_face is None:
+        return None
+    normal = axis_vector(left_selector[0])
+    left_offset = component_face_plane_offset(left, left_face, normal)
+    right_offset = component_face_plane_offset(right, right_face, normal)
+    actual_distance = abs((left_offset or 0.0) - (right_offset or 0.0))
+    return left_face, right_face, actual_distance
+
+
 def normals_parallel(a: tuple[float, float, float], b: tuple[float, float, float]) -> bool:
     return abs(a[0] * b[0] + a[1] * b[1] + a[2] * b[2]) > 0.99
 
@@ -1204,15 +1540,16 @@ def planar_mate_normal_hint(name: str) -> tuple[float, float, float] | None:
         "Bed_Column_Parallel": z_axis,
         "Bed_Column_Contact": z_axis,
         "Column_Bed_Setback": x_axis,
+        "Column_Bed_Perpendicular": x_axis,
         "Left_Way_Column_Parallel": z_axis,
         "Left_Way_Column_Contact": z_axis,
         "Right_Way_Column_Parallel": z_axis,
         "Right_Way_Column_Contact": z_axis,
-        "Way_Spacing_Distance": y_axis,
+        "Way_Spacing_Distance": z_axis,
         "Ram_Left_Way_Parallel": z_axis,
         "Ram_LeftWay_Guidance_Distance_Mate": z_axis,
-        "Ram_Right_Way_Parallel": y_axis,
-        "Ram_RightWay_Guidance_Distance_Mate": y_axis,
+        "Ram_Right_Way_Parallel": z_axis,
+        "Ram_Stroke_Limit": x_axis,
         "Front_Gib_Ram_Parallel": z_axis,
         "Front_Gib_Ram_Clearance": z_axis,
         "Rear_Gib_Ram_Parallel": z_axis,
@@ -1230,6 +1567,7 @@ def planar_mate_normal_hint(name: str) -> tuple[float, float, float] | None:
         "Movable_Jaw_Table_Parallel": y_axis,
         "Movable_Jaw_Table_Clearance": x_axis,
         "Crank_Shaft_Axial_Locator": z_axis,
+        "Crank_Reference_Angle": x_axis,
         "Eccentric_Pin_Axial_Locator": z_axis,
         "Rocker_Pivot_Shaft_Axial_Locator": z_axis,
         "Rocker_Arm_Axial_Locator": z_axis,
@@ -1255,10 +1593,60 @@ def select_faces(asm: Any, first: Any, second: Any, component_pair: list[str] | 
     }
 
 
-def add_selected_mate(asm: Any, name: str, mate_type: int, distance: float = 0.0) -> dict[str, Any]:
+def select_data_with_mark(asm: Any, mark: int) -> Any:
+    try:
+        manager = read_member(asm, "SelectionManager")
+        create_select_data = getattr(manager, "CreateSelectData", None)
+        if callable(create_select_data):
+            data = create_select_data()
+            try:
+                data.Mark = int(mark)
+            except Exception:
+                pass
+            return data
+    except Exception:
+        pass
+    return empty_dispatch_variant()
+
+
+def select_face_with_mark(face: Any, append: bool, asm: Any, mark: int) -> bool:
+    select_data = select_data_with_mark(asm, mark)
+    try:
+        return bool(face.Select4(bool(append), select_data))
+    except TypeError:
+        return bool(face.Select4(bool(append), select_data, mark))
+
+
+def add_selected_mate(
+    asm: Any,
+    name: str,
+    mate_type: int,
+    distance: float = 0.0,
+    distance_min: float | None = None,
+    distance_max: float | None = None,
+    angle: float = 0.0,
+    angle_min: float | None = None,
+    angle_max: float | None = None,
+) -> dict[str, Any]:
     mate_error = byref_i4(0)
     try:
-        feat = asm.AddMate5(mate_type, -1, False, distance, 0, 0, 0, 0, 0, 0, 0, 0, False, False, mate_error)
+        feat = asm.AddMate5(
+            mate_type,
+            -1,
+            False,
+            distance,
+            distance_max if distance_max is not None else distance,
+            distance_min if distance_min is not None else distance,
+            0,
+            0,
+            angle,
+            angle_max if angle_max is not None else angle,
+            angle_min if angle_min is not None else angle,
+            0,
+            False,
+            False,
+            mate_error,
+        )
         if com_created(feat):
             feat.Name = name
             return {"name": name, "ok": True, "api": "AddMate5", "mate_error": getattr(mate_error, "value", None)}
@@ -1302,7 +1690,8 @@ def best_parallel_planar_face_pair(
 def add_distance_mate_between_planar_faces(asm: Any, components: list[Any], distance: float, name: str = "Shaper_Distance_Mate") -> dict[str, Any]:
     for i, left in enumerate(components):
         for right in components[i + 1:]:
-            best = best_parallel_planar_face_pair(left, right, distance, normal_hint=planar_mate_normal_hint(name))
+            semantic_pair = [str(getattr(left, "Name2", "")).split("-")[0], str(getattr(right, "Name2", "")).split("-")[0]]
+            best = explicit_planar_face_pair(left, right, name, semantic_pair)
             if best is None:
                 continue
             left_face, right_face, actual_distance = best
@@ -1344,12 +1733,47 @@ def add_semantic_distance_mate(asm: Any, components: list[Any], name: str, seman
     return result
 
 
+def add_semantic_limit_distance_mate(asm: Any, components: list[Any], name: str, semantic_pair: list[str]) -> dict[str, Any]:
+    left = component_by_part_name(components, semantic_pair[0])
+    right = component_by_part_name(components, semantic_pair[1])
+    if left is None or right is None:
+        return {"name": name, "ok": False, "kind": "limit_distance", "semantic_pair": semantic_pair, "error": "component missing"}
+    nominal = shaper_distance_mate_clearance(name)
+    best = explicit_planar_face_pair(left, right, name, semantic_pair)
+    if best is None:
+        return {"name": name, "ok": False, "kind": "limit_distance", "semantic_pair": semantic_pair, "error": "parallel planar face missing"}
+    left_face, right_face, actual_distance = best
+    component_pair = [left.Name2, right.Name2]
+    selection_guard = select_faces(asm, left_face, right_face, component_pair)
+    selected = selection_guard["selection_count_before_mate"]
+    if selected < 2:
+        return {"name": name, "ok": False, "kind": "limit_distance", "semantic_pair": semantic_pair, "selected_entities": selected, "selection_guard": selection_guard, "components": component_pair, "error": "planar faces not selected"}
+    limit_min, limit_max = shaper_limit_distance_bounds(name)
+    result = add_selected_mate(
+        asm,
+        name,
+        5,
+        nominal,
+        distance_min=limit_min,
+        distance_max=limit_max,
+    )
+    result["selected_entities"] = selected
+    result["selection_guard"] = selection_guard
+    result["components"] = component_pair
+    result["requested_selector_distance_m"] = nominal
+    result["face_pair_actual_distance_m"] = actual_distance
+    result["limit_distance_range_m"] = [limit_min, limit_max]
+    result["kind"] = "limit_distance"
+    result["semantic_pair"] = semantic_pair
+    return result
+
+
 def add_semantic_coincident_mate(asm: Any, components: list[Any], name: str, semantic_pair: list[str]) -> dict[str, Any]:
     left = component_by_part_name(components, semantic_pair[0])
     right = component_by_part_name(components, semantic_pair[1])
     if left is None or right is None:
         return {"name": name, "ok": False, "kind": "coincident", "semantic_pair": semantic_pair, "error": "component missing"}
-    best = best_parallel_planar_face_pair(left, right, 0.0, normal_hint=planar_mate_normal_hint(name))
+    best = explicit_planar_face_pair(left, right, name, semantic_pair)
     if best is None:
         return {"name": name, "ok": False, "kind": "coincident", "semantic_pair": semantic_pair, "error": "parallel planar face missing"}
     left_face, right_face, actual_distance = best
@@ -1377,12 +1801,47 @@ def add_semantic_coincident_mate(asm: Any, components: list[Any], name: str, sem
     return result
 
 
+def add_semantic_perpendicular_mate(asm: Any, components: list[Any], name: str, semantic_pair: list[str]) -> dict[str, Any]:
+    left = component_by_part_name(components, semantic_pair[0])
+    right = component_by_part_name(components, semantic_pair[1])
+    if left is None or right is None:
+        return {"name": name, "ok": False, "kind": "perpendicular", "semantic_pair": semantic_pair, "error": "component missing"}
+    left_hint = planar_mate_normal_hint(name)
+    right_hint = (0.0, 0.0, 1.0) if left_hint == (1.0, 0.0, 0.0) else (1.0, 0.0, 0.0)
+    left_faces = [(face, face_plane_normal(face)) for face in component_faces(left)]
+    right_faces = [(face, face_plane_normal(face)) for face in component_faces(right)]
+    candidates: list[tuple[float, Any, Any]] = []
+    for left_face, left_normal in left_faces:
+        if left_normal is None or not normal_matches_hint(left_normal, left_hint):
+            continue
+        for right_face, right_normal in right_faces:
+            if right_normal is None or not normal_matches_hint(right_normal, right_hint):
+                continue
+            dot = abs(left_normal[0] * right_normal[0] + left_normal[1] * right_normal[1] + left_normal[2] * right_normal[2])
+            candidates.append((dot, left_face, right_face))
+    if not candidates:
+        return {"name": name, "ok": False, "kind": "perpendicular", "semantic_pair": semantic_pair, "error": "perpendicular planar face pair missing"}
+    _dot, left_face, right_face = min(candidates, key=lambda item: item[0])
+    component_pair = [left.Name2, right.Name2]
+    selection_guard = select_faces(asm, left_face, right_face, component_pair)
+    selected = selection_guard["selection_count_before_mate"]
+    if selected < 2:
+        return {"name": name, "ok": False, "kind": "perpendicular", "semantic_pair": semantic_pair, "selected_entities": selected, "selection_guard": selection_guard, "components": component_pair, "error": "planar faces not selected"}
+    result = add_selected_mate(asm, name, 2, 0.0)
+    result["selected_entities"] = selected
+    result["selection_guard"] = selection_guard
+    result["components"] = component_pair
+    result["kind"] = "perpendicular"
+    result["semantic_pair"] = semantic_pair
+    return result
+
+
 def add_semantic_parallel_mate(asm: Any, components: list[Any], name: str, semantic_pair: list[str]) -> dict[str, Any]:
     left = component_by_part_name(components, semantic_pair[0])
     right = component_by_part_name(components, semantic_pair[1])
     if left is None or right is None:
         return {"name": name, "ok": False, "kind": "parallel", "semantic_pair": semantic_pair, "error": "component missing"}
-    best = best_parallel_planar_face_pair(left, right, 0.0, normal_hint=planar_mate_normal_hint(name))
+    best = explicit_planar_face_pair(left, right, name, semantic_pair)
     if best is None:
         return {"name": name, "ok": False, "kind": "parallel", "semantic_pair": semantic_pair, "error": "parallel planar face missing"}
     left_face, right_face, actual_distance = best
@@ -1540,6 +1999,164 @@ def add_semantic_concentric_mate(asm: Any, components: list[Any], name: str, sem
     return result
 
 
+def add_semantic_angle_mate(asm: Any, components: list[Any], name: str, semantic_pair: list[str], kind: str = "angle") -> dict[str, Any]:
+    left = component_by_part_name(components, semantic_pair[0])
+    right = component_by_part_name(components, semantic_pair[1])
+    if left is None or right is None:
+        return {"name": name, "ok": False, "kind": kind, "semantic_pair": semantic_pair, "error": "component missing"}
+    best = explicit_planar_face_pair(left, right, name, semantic_pair)
+    if best is None:
+        return {"name": name, "ok": False, "kind": kind, "semantic_pair": semantic_pair, "error": "planar face pair missing"}
+    left_face, right_face, actual_distance = best
+    component_pair = [left.Name2, right.Name2]
+    selection_guard = select_faces(asm, left_face, right_face, component_pair)
+    selected = selection_guard["selection_count_before_mate"]
+    if selected < 2:
+        return {"name": name, "ok": False, "kind": kind, "semantic_pair": semantic_pair, "selected_entities": selected, "selection_guard": selection_guard, "components": component_pair, "error": "planar faces not selected"}
+    angle = math.radians(90.0)
+    result = add_selected_mate(asm, name, 6, 0.0, angle=angle, angle_min=math.radians(0.0), angle_max=math.radians(180.0))
+    result["selected_entities"] = selected
+    result["selection_guard"] = selection_guard
+    result["components"] = component_pair
+    result["face_pair_actual_distance_m"] = actual_distance
+    result["angle_rad"] = angle
+    result["angle_range_rad"] = [0.0, math.pi]
+    result["kind"] = kind
+    result["semantic_pair"] = semantic_pair
+    return result
+
+
+def select_width_faces(asm: Any, width_faces: list[Any], tab_faces: list[Any], component_pair: list[str]) -> dict[str, Any]:
+    asm.ClearSelection2(True)
+    cleared_count = int(asm.SelectionManager.GetSelectedObjectCount2(-1))
+    selections: list[bool] = []
+    marked: list[int] = []
+    for index, face in enumerate(width_faces):
+        selections.append(select_face_with_mark(face, index > 0, asm, 1))
+        marked.append(1)
+    for index, face in enumerate(tab_faces, start=len(width_faces)):
+        selections.append(select_face_with_mark(face, index > 0, asm, 16))
+        marked.append(16)
+    selected_count = int(asm.SelectionManager.GetSelectedObjectCount2(-1))
+    return {
+        "cleared_selection_count": cleared_count,
+        "left_selected": all(selections[:2]),
+        "right_selected": all(selections[2:]),
+        "selection_count_before_mate": selected_count,
+        "component_pair": component_pair,
+        "width_selected": selections[:2],
+        "tab_selected": selections[2:],
+        "selection_marks": marked,
+    }
+
+
+def width_selection_variants(width_faces: list[Any], tab_faces: list[Any]) -> list[dict[str, Any]]:
+    pythoncom, win32_client = require_pywin32()
+    variants: list[dict[str, Any]] = [
+        {
+            "selection_variant": "variant_dispatch_array",
+            "width_value": win32_client.VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_DISPATCH, tuple(width_faces)),
+            "tab_value": win32_client.VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_DISPATCH, tuple(tab_faces)),
+        },
+        {
+            "selection_variant": "plain_dispatch_list",
+            "width_value": width_faces,
+            "tab_value": tab_faces,
+        },
+        {
+            "selection_variant": "plain_dispatch_tuple",
+            "width_value": tuple(width_faces),
+            "tab_value": tuple(tab_faces),
+        },
+    ]
+    return variants
+
+
+def create_width_mate(asm: Any, name: str, width_faces: list[Any], tab_faces: list[Any], component_pair: list[str]) -> dict[str, Any]:
+    selection_guard = select_width_faces(asm, width_faces, tab_faces, component_pair)
+    if int(selection_guard["selection_count_before_mate"]) < 4:
+        return {"name": name, "ok": False, "kind": "width", "components": component_pair, "selected_entities": selection_guard["selection_count_before_mate"], "selection_guard": selection_guard, "error": "width mate requires four selected faces"}
+    addmate_result = add_selected_mate(asm, name, 11, 0.0)
+    addmate_result["kind"] = "width"
+    addmate_result["components"] = component_pair
+    addmate_result["selected_entities"] = selection_guard["selection_count_before_mate"]
+    addmate_result["selection_guard"] = selection_guard
+    if addmate_result.get("ok"):
+        return addmate_result
+    try:
+        create_data = getattr(asm, "CreateMateData", None)
+        create_mate = getattr(asm, "CreateMate", None)
+        if not callable(create_data) or not callable(create_mate):
+            addmate_result["error"] = f"{addmate_result.get('error', 'AddMate5 failed')}; CreateMateData/CreateMate unavailable"
+            return addmate_result
+        create_attempts: list[dict[str, Any]] = []
+        for variant in width_selection_variants(width_faces, tab_faces):
+            try:
+                data = create_data(11)
+                data.WidthSelection = variant["width_value"]
+                data.TabSelection = variant["tab_value"]
+                data.ConstraintType = 0
+                feat = create_mate(data)
+                attempt = {
+                    "selection_variant": variant["selection_variant"],
+                    "ok": com_created(feat),
+                    "returned": "None" if feat is None else repr(feat),
+                }
+                create_attempts.append(attempt)
+                if com_created(feat):
+                    feat.Name = name
+                    return {
+                        "name": name,
+                        "ok": True,
+                        "api": "CreateMateData/CreateMate",
+                        "mate_error": 1,
+                        "kind": "width",
+                        "components": component_pair,
+                        "selected_entities": selection_guard["selection_count_before_mate"],
+                        "selection_guard": selection_guard,
+                        "create_mate_attempts": create_attempts,
+                    }
+            except Exception as exc:
+                create_attempts.append({
+                    "selection_variant": variant["selection_variant"],
+                    "ok": False,
+                    "error": repr(exc),
+                })
+        addmate_result["api_fallback"] = "CreateMateData/CreateMate"
+        addmate_result["create_mate_attempts"] = create_attempts
+        addmate_result["error"] = f"{addmate_result.get('error', 'AddMate5 failed')}; CreateMate returned None"
+        return addmate_result
+    except Exception as exc:
+        addmate_result["api_fallback"] = "CreateMateData/CreateMate"
+        addmate_result["error"] = f"{addmate_result.get('error', 'AddMate5 failed')}; {repr(exc)}"
+        return addmate_result
+
+
+def add_semantic_width_mate(asm: Any, components: list[Any], name: str, semantic_pair: list[str]) -> dict[str, Any]:
+    ram = component_by_part_name(components, semantic_pair[0])
+    left_way = component_by_part_name(components, semantic_pair[1])
+    right_way = component_by_part_name(components, semantic_pair[2]) if len(semantic_pair) > 2 else None
+    if ram is None or left_way is None or right_way is None:
+        return {"name": name, "ok": False, "kind": "width", "semantic_pair": semantic_pair, "error": "component missing"}
+    selectors = shaper_width_interface_selector(name)
+    left_way_face = explicit_planar_interface_face(left_way, *selectors["left_way"])
+    right_way_face = explicit_planar_interface_face(right_way, *selectors["right_way"])
+    ram_left_face = explicit_planar_interface_face(ram, *selectors["ram_left"])
+    ram_right_face = explicit_planar_interface_face(ram, *selectors["ram_right"])
+    if left_way_face is None or right_way_face is None or ram_left_face is None or ram_right_face is None:
+        return {"name": name, "ok": False, "kind": "width", "semantic_pair": semantic_pair, "error": "width/tab planar faces missing"}
+    component_pair = [left_way.Name2, right_way.Name2, ram.Name2]
+    result = create_width_mate(asm, name, [left_way_face, right_way_face], [ram_left_face, ram_right_face], component_pair)
+    result["semantic_pair"] = semantic_pair
+    result["engineered_interfaces"] = [
+        f"left_way:{selectors['left_way'][0]}_{selectors['left_way'][1]}",
+        f"right_way:{selectors['right_way'][0]}_{selectors['right_way'][1]}",
+        f"ram:{selectors['ram_left'][0]}_{selectors['ram_left'][1]}",
+        f"ram:{selectors['ram_right'][0]}_{selectors['ram_right'][1]}",
+    ]
+    return result
+
+
 def select_components(asm: Any, left: Any, right: Any, component_pair: list[str] | None = None) -> dict[str, Any]:
     asm.ClearSelection2(True)
     empty = empty_dispatch_variant()
@@ -1599,6 +2216,12 @@ def shaper_distance_mate_clearance(name: str) -> float:
         "Ram_Link_Ram_Axial_Locator": 0.018,
     }
     return clearances.get(name, 0.010)
+
+
+def shaper_limit_distance_bounds(name: str) -> tuple[float, float]:
+    nominal = shaper_distance_mate_clearance(name)
+    tolerance = max(0.002, min(0.004, nominal * 0.1))
+    return max(0.0, nominal - tolerance), nominal + tolerance
 
 
 def restore_component_origin(sw: Any, component: Any, origin: tuple[float, float, float]) -> dict[str, Any]:
@@ -1758,19 +2381,27 @@ def fix_primary_design_layout_components(sw: Any, asm: Any, components: list[Any
 
 
 def add_shaper_mate_network(asm: Any, components: list[Any]) -> list[dict[str, Any]]:
-    mates: list[dict[str, Any]] = []
     contract = expected_shaper_mate_contract()
+    intent_executor = load_sibling_module("sw_mate_intent_execute")
+    result = intent_executor.execute_intent(build_shaper_mate_intent_spec(), asm)
+    executed = result.get("executed_mates", []) if isinstance(result, dict) else []
+    mates = [
+        normalize_intent_executed_mate(row, contract)
+        for row in executed
+        if isinstance(row, dict)
+    ]
+    seen = {mate.get("name") for mate in mates}
     for name, expected in contract.items():
-        if expected["type"] == "coincident":
-            mates.append(add_semantic_coincident_mate(asm, components, name, list(expected["semantic_pair"])))
-        elif expected["type"] == "parallel":
-            mates.append(add_semantic_parallel_mate(asm, components, name, list(expected["semantic_pair"])))
-        elif expected["type"] == "distance":
-            mates.append(add_semantic_distance_mate(asm, components, name, list(expected["semantic_pair"]), shaper_distance_mate_clearance(name)))
-        elif expected["type"] == "concentric":
-            mates.append(add_semantic_concentric_mate(asm, components, name, list(expected["semantic_pair"])))
-        else:
-            mates.append({"name": name, "ok": False, "kind": expected["type"], "semantic_pair": expected["semantic_pair"], "error": "unknown mate type"})
+        if name not in seen:
+            mates.append({
+                "name": name,
+                "ok": False,
+                "kind": expected["type"],
+                "semantic_pair": list(expected["semantic_pair"]),
+                "components": [f"{part_name}-1" for part_name in expected["semantic_pair"]],
+                "error": "mate intent executor did not return this expected mate",
+                "executor_ok": result.get("ok") if isinstance(result, dict) else False,
+            })
     return mates
 
 
@@ -1780,11 +2411,14 @@ def add_bed_column_distance_mate(asm: Any, components: list[Any], distance: floa
 
 
 def load_sibling_module(module_name: str) -> Any:
+    import sys
+
     path = Path(__file__).resolve().parent / f"{module_name}.py"
     spec = importlib.util.spec_from_file_location(module_name, path)
     if spec is None or spec.loader is None:
         raise RuntimeError(f"could not load {path}")
     module = importlib.util.module_from_spec(spec)
+    sys.path.insert(0, str(path.parent))
     spec.loader.exec_module(module)
     return module
 
@@ -1950,7 +2584,7 @@ def sample_expected_shaper_inspect_evidence() -> dict[str, Any]:
                 {
                     "name": name,
                     "type": expected_inspect_mate_type(expected["type"]),
-                    "components": [f"{expected['semantic_pair'][0]}-1", f"{expected['semantic_pair'][1]}-1"],
+                    "components": [f"{part_name}-1" for part_name in expected["semantic_pair"]],
                     "suppressed": False,
                 }
                 for name, expected in expected_shaper_mate_contract().items()
@@ -2333,7 +2967,6 @@ def construct_live_fixture(spec: CompleteShaperSpec, out_dir: Path, reports_dir:
         for part in spec.parts:
             stage = f"create_part:{part.name}"
             assert_solidworks_runtime_healthy(stage)
-            print(f"[complete-shaper] creating {part.name}", flush=True)
             part_path, feature_evidence = create_part_with_feature_evidence(sw, out_dir, part)
             part_paths[part.name] = part_path
             part_feature_evidence[part.name] = feature_evidence
@@ -2347,7 +2980,6 @@ def construct_live_fixture(spec: CompleteShaperSpec, out_dir: Path, reports_dir:
             for part in spec.parts:
                 stage = f"insert_component:{part.name}"
                 assert_solidworks_runtime_healthy(stage)
-                print(f"[complete-shaper] inserting {part.name}", flush=True)
                 if part.name in placements:
                     comp = add_component(sw, asm, part_paths[part.name], placements[part.name])
                     components.append(comp.Name2)

@@ -146,6 +146,37 @@ class MateIntentExecuteTests(unittest.TestCase):
         self.assertEqual([item["mate_type"] for item in manifest["macros"]], ["width", "limit_distance"])
         self.assertEqual(manifest["macros"][1]["distance_max_m"], 0.05)
 
+    def test_expanded_intent_preserves_explicit_engineering_mate_names(self):
+        spec = {
+            "mate_intents": [
+                {
+                    "id": "ram_ways",
+                    "kind": "prismatic",
+                    "components": ["ram-1", "left_way-1", "right_way-1"],
+                    "distance_m": 0.025,
+                    "expected_mate_names": {
+                        "width": "Ram_Centered_Between_Ways",
+                        "travel_limit": "Ram_Stroke_Limit",
+                    },
+                    "interfaces": {
+                        "guide_left_face": planar_selector("left_way-1", "left_way-1:face:y_max", [0, 1, 0], [0, -0.02, 0]),
+                        "guide_right_face": planar_selector("right_way-1", "right_way-1:face:y_min", [0, -1, 0], [0, 0.02, 0]),
+                        "slider_left_face": planar_selector("ram-1", "ram-1:face:y_min", [0, -1, 0], [0, -0.01, 0]),
+                        "slider_right_face": planar_selector("ram-1", "ram-1:face:y_max", [0, 1, 0], [0, 0.01, 0]),
+                        "travel_stop_face": planar_selector("ram-1", "ram-1:face:x_min", [-1, 0, 0], [-0.10, 0, 0]),
+                        "travel_reference_face": planar_selector("frame-1", "frame-1:face:x_max", [1, 0, 0], [-0.125, 0, 0]),
+                    },
+                }
+            ]
+        }
+
+        manifest = mod.expand_intent_spec(spec)
+
+        self.assertEqual(
+            ["Ram_Centered_Between_Ways", "Ram_Stroke_Limit"],
+            [item["expected_mate_name"] for item in manifest["macros"]],
+        )
+
     def test_cli_dry_run_reports_expanded_intent_without_solidworks(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)

@@ -33,8 +33,10 @@ def optional_selector(intent: dict[str, Any], name: str) -> dict[str, Any] | Non
 
 def base_macro(intent: dict[str, Any], suffix: str, mate_type: str, selectors: list[dict[str, Any]]) -> dict[str, Any]:
     joint_id = str(intent.get("id") or intent.get("joint_id") or "mate_intent")
-    name = str(intent.get("name") or intent.get("expected_mate_name") or f"MI_{joint_id}_{suffix}")
-    if not name.endswith(suffix):
+    named_mates = intent.get("expected_mate_names") if isinstance(intent.get("expected_mate_names"), dict) else {}
+    explicit_name = named_mates.get(suffix) or named_mates.get(mate_type) or intent.get("expected_mate_name")
+    name = str(explicit_name or intent.get("name") or f"MI_{joint_id}_{suffix}")
+    if explicit_name is None and not name.endswith(suffix):
         name = f"{name}_{suffix}"
     return {
         "group_id": joint_id,

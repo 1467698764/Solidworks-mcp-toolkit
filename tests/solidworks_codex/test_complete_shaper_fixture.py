@@ -22,20 +22,22 @@ def load_module():
 def sample_shaper_mates(module):
     mates = []
     for name, expected in module.expected_shaper_mate_contract().items():
+        selected_entities = 4 if expected["type"] == "width" else 2
+        components = [f"{part_name}-1" for part_name in expected["semantic_pair"]]
         mates.append({
             "name": name,
             "ok": True,
             "kind": expected["type"],
             "mate_error": 1,
             "semantic_pair": list(expected["semantic_pair"]),
-            "components": [f"{expected['semantic_pair'][0]}-1", f"{expected['semantic_pair'][1]}-1"],
-            "selected_entities": 2,
+            "components": components,
+            "selected_entities": selected_entities,
             "selection_guard": {
                 "cleared_selection_count": 0,
                 "left_selected": True,
                 "right_selected": True,
-                "selection_count_before_mate": 2,
-                "component_pair": [f"{expected['semantic_pair'][0]}-1", f"{expected['semantic_pair'][1]}-1"],
+                "selection_count_before_mate": selected_entities,
+                "component_pair": components,
             },
         })
     return mates
@@ -720,19 +722,32 @@ class CompleteShaperSpecTests(unittest.TestCase):
 
     def test_complete_shaper_uses_real_interface_mates_without_fixing_motion_parts(self):
         expected = self.module.expected_shaper_mate_contract()
-        real_mates = {name: mate for name, mate in expected.items() if mate.get("type") in {"coincident", "parallel", "distance", "concentric"}}
+        real_mates = {
+            name: mate
+            for name, mate in expected.items()
+            if mate.get("type") in {"coincident", "parallel", "perpendicular", "distance", "limit_distance", "angle", "limit_angle", "width", "concentric"}
+        }
         kinds = {mate["type"] for mate in expected.values()}
 
         self.assertGreaterEqual(len(real_mates), 30)
         self.assertIn("coincident", kinds)
-        self.assertIn("distance", kinds)
+        self.assertIn("perpendicular", kinds)
+        self.assertIn("limit_distance", kinds)
+        self.assertTrue({"angle", "limit_angle"} & kinds)
+        self.assertIn("limit_angle", kinds)
+        self.assertIn("width", kinds)
         self.assertIn("Ram_Left_Way_Parallel", real_mates)
         self.assertIn("Bull_Gear_Crank_Shaft_Concentric", real_mates)
         self.assertIn("Bed_Column_Contact", real_mates)
         self.assertIn("Crank_Shaft_Axial_Locator", real_mates)
         self.assertEqual("MateParallel", self.module.expected_inspect_mate_type("parallel"))
         self.assertEqual("MateCoincident", self.module.expected_inspect_mate_type("coincident"))
+        self.assertEqual("MatePerpendicular", self.module.expected_inspect_mate_type("perpendicular"))
         self.assertEqual("MateDistanceDim", self.module.expected_inspect_mate_type("distance"))
+        self.assertEqual("MateLimitDistanceDim", self.module.expected_inspect_mate_type("limit_distance"))
+        self.assertEqual("MateAngleDim", self.module.expected_inspect_mate_type("angle"))
+        self.assertEqual("MateLimitPlanarAngleDim", self.module.expected_inspect_mate_type("limit_angle"))
+        self.assertEqual("MateWidth", self.module.expected_inspect_mate_type("width"))
         self.assertEqual("MateConcentric", self.module.expected_inspect_mate_type("concentric"))
         source = SCRIPT.read_text(encoding="utf-8")
         self.assertIn("GetSelectedObjectCount2(-1)", source)
@@ -770,26 +785,37 @@ class CompleteShaperSpecTests(unittest.TestCase):
             groups.setdefault(mate["functional_group"], set()).add(mate["type"])
         self.assertIn("coincident", mate_types)
         self.assertIn("parallel", mate_types)
-        self.assertIn("distance", mate_types)
         self.assertIn("concentric", mate_types)
+        self.assertIn("perpendicular", mate_types)
+        self.assertIn("width", mate_types)
+        self.assertTrue({"angle", "limit_angle"} & mate_types)
+        self.assertIn("limit_angle", mate_types)
+        self.assertIn("limit_distance", mate_types)
+        self.assertLessEqual(sum(1 for mate in expected.values() if mate["type"] == "distance"), 8)
         self.assertFalse(all(mate["type"] == "lock" for mate in expected.values()))
         self.assertIn("coincident", groups["structure"])
-        self.assertIn("distance", groups["ram_guidance"])
-        self.assertIn("distance", groups["quick_return_drive"])
+        self.assertIn("perpendicular", groups["structure"])
+        self.assertIn("width", groups["ram_guidance"])
+        self.assertIn("limit_distance", groups["ram_guidance"])
+        self.assertTrue({"angle", "limit_angle"} & groups["quick_return_drive"])
         self.assertIn("coincident", groups["tool_head"])
         self.assertIn("coincident", groups["workholding"])
         for required_mate in (
             "Bed_Column_Parallel",
             "Bed_Column_Contact",
+            "Column_Bed_Perpendicular",
             "Left_Way_Column_Parallel",
             "Right_Way_Column_Parallel",
             "Ram_Left_Way_Parallel",
+            "Ram_Centered_Between_Ways",
+            "Ram_Stroke_Limit",
             "Tool_Head_Ram_Parallel",
             "Tool_Tool_Head_Parallel",
             "Table_Slide_Parallel",
             "Fixed_Jaw_Table_Parallel",
             "Bull_Gear_Crank_Shaft_Concentric",
             "Crank_Shaft_Axial_Locator",
+            "Crank_Reference_Angle",
             "Eccentric_Pin_Bull_Gear_Concentric",
             "Eccentric_Pin_Axial_Locator",
             "Rocker_Pivot_Shaft_Bracket_Concentric",
@@ -798,6 +824,67 @@ class CompleteShaperSpecTests(unittest.TestCase):
             "Ram_Link_Ram_Concentric",
         ):
             self.assertIn(required_mate, expected)
+
+    def test_shaper_builds_engineering_mate_intent_spec_for_mcp_execution(self):
+        spec = self.module.build_shaper_mate_intent_spec()
+        kinds = {intent["kind"] for intent in spec["mate_intents"]}
+        expanded_names = {
+            macro["expected_mate_name"]
+            for macro in self.module.load_sibling_module("sw_mate_intent_execute").expand_intent_spec(spec)["macros"]
+        }
+
+        self.assertEqual("engineering_mate_intent", spec["mode"])
+        self.assertIn("prismatic", kinds)
+        self.assertIn("revolute", kinds)
+        self.assertIn("rigid_mount", kinds)
+        self.assertIn("direct_mate", kinds)
+        self.assertLess(
+            sum(1 for intent in spec["mate_intents"] if intent["kind"] == "direct_mate"),
+            len(self.module.expected_shaper_mate_contract()),
+        )
+        self.assertEqual(set(self.module.expected_shaper_mate_contract()), expanded_names)
+        ram_guide = next(intent for intent in spec["mate_intents"] if intent["id"] == "ram_guided_between_dovetail_ways")
+        self.assertEqual("prismatic", ram_guide["kind"])
+        self.assertIn("guide_left_face", ram_guide["interfaces"])
+        self.assertIn("slider_right_face", ram_guide["interfaces"])
+        self.assertEqual("bbox_planar_face", ram_guide["interfaces"]["guide_left_face"]["fallback"]["type"])
+        self.assertEqual("Ram_Centered_Between_Ways", ram_guide["expected_mate_names"]["width"])
+        self.assertEqual("Ram_Stroke_Limit", ram_guide["expected_mate_names"]["travel_limit"])
+
+    def test_add_shaper_mate_network_routes_through_mcp_intent_executor(self):
+        calls = []
+        module = self.module
+
+        class IntentExecutor:
+            def execute_intent(self, spec, asm):
+                calls.append((spec, asm))
+                return {
+                    "ok": True,
+                    "executed_mates": [
+                        {
+                            "expected_mate_name": name,
+                            "name": name,
+                            "ok": True,
+                            "mate_type": expected["type"],
+                            "components": [f"{part_name}-1" for part_name in expected["semantic_pair"]],
+                            "selected_entities": 4 if expected["type"] == "width" else 2,
+                            "selection_guard": {"selection_count_before_mate": 4 if expected["type"] == "width" else 2},
+                        }
+                        for name, expected in module.expected_shaper_mate_contract().items()
+                    ],
+                }
+
+        original_loader = self.module.load_sibling_module
+        self.module.load_sibling_module = lambda name: IntentExecutor() if name == "sw_mate_intent_execute" else original_loader(name)
+        try:
+            mates = self.module.add_shaper_mate_network(object(), [])
+        finally:
+            self.module.load_sibling_module = original_loader
+
+        self.assertEqual(1, len(calls))
+        self.assertEqual("engineering_mate_intent", calls[0][0]["mode"])
+        self.assertEqual(set(self.module.expected_shaper_mate_contract()), {mate["name"] for mate in mates})
+        self.assertTrue(all(mate["ok"] for mate in mates))
 
         spatial = self.module.expected_shaper_spatial_contract()
         self.assertIn("structural_stack", spatial)
@@ -1298,8 +1385,203 @@ class CompleteShaperSpecTests(unittest.TestCase):
 
     def test_complete_shaper_declares_interface_axes_for_planar_mates(self):
         for mate_name, expected in self.module.expected_shaper_mate_contract().items():
-            if expected["type"] in {"coincident", "parallel", "distance"}:
+            if expected["type"] in {"coincident", "parallel", "perpendicular", "distance", "limit_distance", "angle", "limit_angle"}:
                 self.assertIsNotNone(self.module.planar_mate_normal_hint(mate_name), mate_name)
+
+    def test_complete_shaper_width_mate_uses_four_native_face_entities(self):
+        self.assertEqual("width", self.module.expected_shaper_mate_contract()["Ram_Centered_Between_Ways"]["type"])
+        source = SCRIPT.read_text(encoding="utf-8")
+        self.assertIn("CreateMateData", source)
+        self.assertIn("WidthSelection", source)
+        self.assertIn("TabSelection", source)
+        self.assertIn("CreateMate", source)
+
+    def test_ram_centered_between_ways_uses_lateral_z_interfaces(self):
+        selectors = self.module.shaper_width_interface_selector("Ram_Centered_Between_Ways")
+
+        self.assertEqual(("z", "max"), selectors["left_way"])
+        self.assertEqual(("z", "min"), selectors["right_way"])
+        self.assertEqual(("z", "min"), selectors["ram_left"])
+        self.assertEqual(("z", "max"), selectors["ram_right"])
+
+    def test_gib_and_crank_axial_mates_use_opposed_z_datums(self):
+        self.assertEqual(
+            (("z", "min"), ("z", "max")),
+            self.module.shaper_planar_interface_selector(
+                "Front_Gib_Ram_Parallel",
+                ["front_gib_plate", "ram_with_dovetail_and_tool_mount"],
+            ),
+        )
+        self.assertEqual(
+            (("z", "min"), ("z", "max")),
+            self.module.shaper_planar_interface_selector(
+                "Rear_Gib_Ram_Parallel",
+                ["rear_gib_plate", "ram_with_dovetail_and_tool_mount"],
+            ),
+        )
+        self.assertEqual(
+            (("z", "min"), ("z", "max")),
+            self.module.shaper_planar_interface_selector(
+                "Crank_Shaft_Axial_Locator",
+                ["bull_gear_crank_disk", "crank_center_shaft"],
+            ),
+        )
+
+    def test_limit_distance_mates_use_nominal_design_distance_not_measured_layout_gap(self):
+        class SelectionManager:
+            def GetSelectedObjectCount2(self, mark):
+                return 2
+
+        class MateData:
+            pass
+
+        class Feature:
+            Name = ""
+
+        class Asm:
+            def __init__(self):
+                self.SelectionManager = SelectionManager()
+                self.addmate_args = None
+
+            def ClearSelection2(self, value):
+                return True
+
+            def AddMate5(self, *args):
+                self.addmate_args = args
+                return Feature()
+
+            def CreateMateData(self, mate_type):
+                return MateData()
+
+            def CreateMate(self, data):
+                return None
+
+        class Face:
+            def Select4(self, *args):
+                return True
+
+        class VariantFactory:
+            def VARIANT(self, kind, value):
+                if isinstance(value, (list, tuple)):
+                    payload = tuple(value)
+                else:
+                    payload = value
+                return ("variant", kind, payload)
+
+        class PythonCom:
+            VT_ARRAY = 1
+            VT_DISPATCH = 2
+            VT_R8 = 4
+            VT_BYREF = 8
+            VT_I4 = 16
+
+        original_best = self.module.explicit_planar_face_pair
+        original_select = self.module.select_faces
+        original_clearance = self.module.shaper_distance_mate_clearance
+        original_require = self.module.require_pywin32
+        original_empty = self.module.empty_dispatch_variant
+        self.module.explicit_planar_face_pair = lambda *args, **kwargs: (Face(), Face(), 1.1975)
+        self.module.select_faces = lambda asm, left, right, component_pair=None: {
+            "cleared_selection_count": 0,
+            "left_selected": True,
+            "right_selected": True,
+            "selection_count_before_mate": 2,
+            "component_pair": component_pair or [],
+        }
+        self.module.shaper_distance_mate_clearance = lambda name: 0.01
+        self.module.require_pywin32 = lambda: (PythonCom(), VariantFactory())
+        self.module.empty_dispatch_variant = lambda: object()
+        try:
+            result = self.module.add_semantic_limit_distance_mate(
+                Asm(),
+                [type("Comp", (), {"Name2": "ram_with_dovetail_and_tool_mount-1"})(), type("Comp", (), {"Name2": "column_frame_with_window-1"})()],
+                "Ram_Stroke_Limit",
+                ["ram_with_dovetail_and_tool_mount", "column_frame_with_window"],
+            )
+        finally:
+            self.module.explicit_planar_face_pair = original_best
+            self.module.select_faces = original_select
+            self.module.shaper_distance_mate_clearance = original_clearance
+            self.module.require_pywin32 = original_require
+            self.module.empty_dispatch_variant = original_empty
+
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(0.01, result["requested_selector_distance_m"])
+        self.assertAlmostEqual(1.1975, result["face_pair_actual_distance_m"])
+
+    def test_width_mate_records_multiple_create_data_attempts(self):
+        class SelectionManager:
+            def GetSelectedObjectCount2(self, mark):
+                return 4
+
+        class MateData:
+            def __init__(self):
+                self.WidthSelection = None
+                self.TabSelection = None
+                self.ConstraintType = None
+
+        class Feature:
+            Name = ""
+
+        class Asm:
+            def __init__(self):
+                self.SelectionManager = SelectionManager()
+                self.data = []
+
+            def ClearSelection2(self, value):
+                return True
+
+            def AddMate5(self, *args):
+                return None
+
+            def CreateMateData(self, mate_type):
+                data = MateData()
+                self.data.append(data)
+                return data
+
+            def CreateMate(self, data):
+                return Feature() if len(self.data) == 2 else None
+
+        class Face:
+            def Select4(self, *args):
+                return True
+
+        class VariantFactory:
+            def VARIANT(self, kind, value):
+                if isinstance(value, (list, tuple)):
+                    payload = tuple(value)
+                else:
+                    payload = value
+                return ("variant", kind, payload)
+
+        class PythonCom:
+            VT_ARRAY = 1
+            VT_DISPATCH = 2
+            VT_VARIANT = 4
+            VT_BYREF = 8
+            VT_I4 = 16
+
+        original_require = self.module.require_pywin32
+        original_empty = self.module.empty_dispatch_variant
+        self.module.require_pywin32 = lambda: (PythonCom(), VariantFactory())
+        self.module.empty_dispatch_variant = lambda: object()
+        try:
+            result = self.module.create_width_mate(
+                Asm(),
+                "Ram_Centered_Between_Ways",
+                [Face(), Face()],
+                [Face(), Face()],
+                ["left-1", "right-1", "ram-1"],
+            )
+        finally:
+            self.module.require_pywin32 = original_require
+            self.module.empty_dispatch_variant = original_empty
+
+        self.assertTrue(result["ok"], result)
+        self.assertEqual("CreateMateData/CreateMate", result["api"])
+        self.assertGreaterEqual(len(result["create_mate_attempts"]), 2)
+        self.assertIn("plain_dispatch_list", {attempt["selection_variant"] for attempt in result["create_mate_attempts"]})
+        self.assertIn("variant_dispatch_array", {attempt["selection_variant"] for attempt in result["create_mate_attempts"]})
 
 
 
