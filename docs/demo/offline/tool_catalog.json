@@ -1,6 +1,6 @@
 {
-  "timestamp": "2026-06-05T13:41:20",
-  "count": 53,
+  "timestamp": "2026-06-06T09:41:40",
+  "count": 56,
   "tools": [
     {
       "name": "solidworks_assembly_diagnose",
@@ -174,13 +174,14 @@
     {
       "name": "solidworks_engineering_lite",
       "group": "analysis",
-      "description": "Generate a read-only engineering-lite BOM, material, DFM, and DFA review from inspect evidence.",
+      "description": "Generate a read-only engineering-lite BOM, drawing-BOM CSV, material, DFM, and DFA review from inspect evidence.",
       "required": [
         "report"
       ],
       "properties": [
         "json_out",
         "out",
+        "out_dir",
         "report"
       ]
     },
@@ -207,18 +208,21 @@
     {
       "name": "solidworks_feature_state",
       "group": "write_guarded",
-      "description": "Change part or assembly feature state by feature name: suppress/unsuppress/delete, set a feature-scoped dimension, or reorder a feature before/after a reviewed target, then rebuild and report before/after evidence.",
+      "description": "Change part or assembly feature state by feature name: suppress/unsuppress/delete, set a feature-scoped dimension, reorder a feature, or apply reviewed Feature Definition property edits, then rebuild and report before/after evidence.",
       "required": [
         "feature",
         "action"
       ],
       "properties": [
         "action",
+        "definition_spec",
         "dimension",
         "feature",
         "model",
         "out",
+        "reorder_position",
         "save",
+        "target_feature",
         "value_m"
       ]
     },
@@ -273,9 +277,10 @@
     {
       "name": "solidworks_interference_check",
       "group": "export_verify",
-      "description": "Run conservative SolidWorks assembly interference detection and emit JSON.",
+      "description": "Run conservative SolidWorks assembly interference detection against the active or specified assembly and emit handoff plus collision evidence.",
       "required": [],
       "properties": [
+        "model",
         "out"
       ]
     },
@@ -483,7 +488,7 @@
     {
       "name": "solidworks_part_feature_execute",
       "group": "other",
-      "description": "Execute a reviewed part feature spec in SolidWorks: extrude cuts, basic/countersink/counterbore holes, slot cuts, pocket cuts, fillet, chamfer, linear pattern, circular pattern, or mirror with named feature/entity selectors.",
+      "description": "Execute a reviewed part feature spec in SolidWorks: extrude bosses, extrude cuts, revolve bosses, revolved cuts, basic/countersink/counterbore holes, slot cuts, pocket cuts, fillet, chamfer, linear pattern, circular pattern, or mirror with named feature/entity selectors.",
       "required": [
         "spec"
       ],
@@ -651,6 +656,21 @@
       ]
     },
     {
+      "name": "solidworks_standard_part_resolve",
+      "group": "write_guarded",
+      "description": "Resolve a reviewed local standard-part catalog request into a component-insert spec with source policy, supplier/license evidence, host attachment intent, and selector handoff.",
+      "required": [
+        "catalog",
+        "request"
+      ],
+      "properties": [
+        "catalog",
+        "component_spec_out",
+        "out",
+        "request"
+      ]
+    },
+    {
       "name": "solidworks_start_inspect",
       "group": "read_only",
       "description": "Allow COM launch of SolidWorks, then run deep read-only inspect.",
@@ -707,6 +727,31 @@
       ]
     },
     {
+      "name": "solidworks_visual_capture",
+      "group": "export_verify",
+      "description": "Capture SolidWorks window visual evidence into a screenshot manifest; dry_run writes a deterministic placeholder PNG for CI/protocol checks.",
+      "required": [],
+      "properties": [
+        "dry_run",
+        "out",
+        "out_dir"
+      ]
+    },
+    {
+      "name": "solidworks_visual_validate",
+      "group": "export_verify",
+      "description": "Validate screenshot evidence and reviewed visual findings against an inspect report; missing screenshots or visual contradictions block acceptance.",
+      "required": [
+        "report"
+      ],
+      "properties": [
+        "out",
+        "report",
+        "screenshots",
+        "visual_review"
+      ]
+    },
+    {
       "name": "solidworks_worklog",
       "group": "handoff",
       "description": "Append a durable worklog event for multi-turn decisions, assumptions, verification, failures, and next steps.",
@@ -755,7 +800,9 @@
       "solidworks_finalize",
       "solidworks_interference_check",
       "solidworks_part_geometry_validate",
-      "solidworks_preflight"
+      "solidworks_preflight",
+      "solidworks_visual_capture",
+      "solidworks_visual_validate"
     ],
     "write_guarded": [
       "solidworks_backup",
@@ -769,7 +816,8 @@
       "solidworks_rebuild",
       "solidworks_restore_backup",
       "solidworks_safe_set_dimension",
-      "solidworks_set_dimension"
+      "solidworks_set_dimension",
+      "solidworks_standard_part_resolve"
     ],
     "external_reference": [
       "solidworks_existing_mcp_tools"

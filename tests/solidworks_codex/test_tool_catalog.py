@@ -56,6 +56,10 @@ class ToolCatalogTests(unittest.TestCase):
             self.assertIn("solidworks_engineering_lite", names)
             self.assertIn("solidworks_part_geometry_validate", names)
             self.assertIn("solidworks_standard_part_resolve", names)
+            part_feature_description = by_name["solidworks_part_feature_execute"]["description"]
+            self.assertIn("extrude bosses", part_feature_description)
+            self.assertIn("revolve bosses", part_feature_description)
+            self.assertIn("revolved cuts", part_feature_description)
             self.assertIn("mate", by_name["solidworks_mate_macro"]["properties"])
             schemas = {tool["name"]: tool for tool in sw_tool_catalog.list_tools_via_node()}
             mate_schema = schemas["solidworks_mate_macro"]["inputSchema"]["properties"]

@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-06-06T09:21:35",
+  "timestamp": "2026-06-06T09:41:40",
   "count": 74,
   "capabilities": [
     {
@@ -647,7 +647,7 @@
         "spec",
         "start"
       ],
-      "description": "Execute a reviewed part feature spec in SolidWorks: extrude cuts, basic/countersink/counterbore holes, slot cuts, pocket cuts, fillet, chamfer, linear pattern, circular pattern, or mirror with named feature/entity selectors."
+      "description": "Execute a reviewed part feature spec in SolidWorks: extrude bosses, extrude cuts, revolve bosses, revolved cuts, basic/countersink/counterbore holes, slot cuts, pocket cuts, fillet, chamfer, linear pattern, circular pattern, or mirror with named feature/entity selectors."
     },
     {
       "cli": "part-geometry-validate",

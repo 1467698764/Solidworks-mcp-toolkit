@@ -1,7 +1,7 @@
 # SolidWorks MCP Tool Catalog
 
-- Timestamp: `2026-06-05T13:41:20`
-- Tool count: `53`
+- Timestamp: `2026-06-06T09:41:40`
+- Tool count: `56`
 
 ## Operator notes
 - Do not blindly replay templates: inspect the current report, context, worklog, and handoff artifacts before choosing a tool.
@@ -10,14 +10,14 @@
 
 ## Groups
 - `analysis`: `solidworks_assembly_diagnose`, `solidworks_change_plan`, `solidworks_design_review`, `solidworks_engineering_lite`, `solidworks_issue_report`, `solidworks_model_understand`, `solidworks_report_context`, `solidworks_report_search`
-- `export_verify`: `solidworks_audit`, `solidworks_compare_reports`, `solidworks_export`, `solidworks_finalize`, `solidworks_interference_check`, `solidworks_part_geometry_validate`, `solidworks_preflight`
+- `export_verify`: `solidworks_audit`, `solidworks_compare_reports`, `solidworks_export`, `solidworks_finalize`, `solidworks_interference_check`, `solidworks_part_geometry_validate`, `solidworks_preflight`, `solidworks_visual_capture`, `solidworks_visual_validate`
 - `external_reference`: `solidworks_existing_mcp_tools`
 - `handoff`: `solidworks_handoff_bundle`, `solidworks_worklog`
 - `live_protocol`: `solidworks_mate_group_live_protocol`
 - `macro_generation`: `solidworks_mate_group_macro`, `solidworks_mate_macro`, `solidworks_template_macro`
 - `other`: `solidworks_assembly_repair_plan`, `solidworks_assembly_review_pipeline`, `solidworks_change_verify`, `solidworks_interface_index`, `solidworks_mate_group_execution_check`, `solidworks_mate_group_plan`, `solidworks_mate_group_validate`, `solidworks_offline_demo`, `solidworks_part_feature_execute`, `solidworks_session_snapshot`, `solidworks_tool_catalog`
 - `read_only`: `solidworks_inspect`, `solidworks_mass_properties`, `solidworks_mate_selection_check`, `solidworks_probe`, `solidworks_report_summary`, `solidworks_selection_report`, `solidworks_start_inspect`, `solidworks_start_probe`
-- `write_guarded`: `solidworks_backup`, `solidworks_backup_status`, `solidworks_component_insert`, `solidworks_component_state`, `solidworks_feature_state`, `solidworks_mate_group_execute`, `solidworks_metadata_execute`, `solidworks_motion_sweep_lite`, `solidworks_rebuild`, `solidworks_restore_backup`, `solidworks_safe_set_dimension`, `solidworks_set_dimension`
+- `write_guarded`: `solidworks_backup`, `solidworks_backup_status`, `solidworks_component_insert`, `solidworks_component_state`, `solidworks_feature_state`, `solidworks_mate_group_execute`, `solidworks_metadata_execute`, `solidworks_motion_sweep_lite`, `solidworks_rebuild`, `solidworks_restore_backup`, `solidworks_safe_set_dimension`, `solidworks_set_dimension`, `solidworks_standard_part_resolve`
 
 ## Tools
 ### `solidworks_assembly_diagnose`
@@ -107,9 +107,9 @@
 ### `solidworks_engineering_lite`
 
 - Group: `analysis`
-- Description: Generate a read-only engineering-lite BOM, material, DFM, and DFA review from inspect evidence.
+- Description: Generate a read-only engineering-lite BOM, drawing-BOM CSV, material, DFM, and DFA review from inspect evidence.
 - Required: `report`
-- Properties: `json_out, out, report`
+- Properties: `json_out, out, out_dir, report`
 
 ### `solidworks_existing_mcp_tools`
 
@@ -128,9 +128,9 @@
 ### `solidworks_feature_state`
 
 - Group: `write_guarded`
-- Description: Change part or assembly feature state by feature name: suppress/unsuppress/delete, set a feature-scoped dimension, or reorder a feature before/after a reviewed target, then rebuild and report before/after evidence.
+- Description: Change part or assembly feature state by feature name: suppress/unsuppress/delete, set a feature-scoped dimension, reorder a feature, or apply reviewed Feature Definition property edits, then rebuild and report before/after evidence.
 - Required: `feature, action`
-- Properties: `action, dimension, feature, model, out, save, value_m`
+- Properties: `action, definition_spec, dimension, feature, model, out, reorder_position, save, target_feature, value_m`
 
 ### `solidworks_finalize`
 
@@ -163,9 +163,9 @@
 ### `solidworks_interference_check`
 
 - Group: `export_verify`
-- Description: Run conservative SolidWorks assembly interference detection and emit JSON.
+- Description: Run conservative SolidWorks assembly interference detection against the active or specified assembly and emit handoff plus collision evidence.
 - Required: `<none>`
-- Properties: `out`
+- Properties: `model, out`
 
 ### `solidworks_issue_report`
 
@@ -268,7 +268,7 @@
 ### `solidworks_part_feature_execute`
 
 - Group: `other`
-- Description: Execute a reviewed part feature spec in SolidWorks: extrude cuts, basic/countersink/counterbore holes, slot cuts, pocket cuts, fillet, chamfer, linear pattern, circular pattern, or mirror with named feature/entity selectors.
+- Description: Execute a reviewed part feature spec in SolidWorks: extrude bosses, extrude cuts, revolve bosses, revolved cuts, basic/countersink/counterbore holes, slot cuts, pocket cuts, fillet, chamfer, linear pattern, circular pattern, or mirror with named feature/entity selectors.
 - Required: `spec`
 - Properties: `dry_run, model, out, save, spec, start`
 
@@ -356,6 +356,13 @@
 - Required: `dimension, value_m`
 - Properties: `dimension, model, out, save, value_m`
 
+### `solidworks_standard_part_resolve`
+
+- Group: `write_guarded`
+- Description: Resolve a reviewed local standard-part catalog request into a component-insert spec with source policy, supplier/license evidence, host attachment intent, and selector handoff.
+- Required: `catalog, request`
+- Properties: `catalog, component_spec_out, out, request`
+
 ### `solidworks_start_inspect`
 
 - Group: `read_only`
@@ -383,6 +390,20 @@
 - Description: Generate a grouped catalog of all SolidWorks Codex MCP tools and when to use them.
 - Required: `<none>`
 - Properties: `json_out, out`
+
+### `solidworks_visual_capture`
+
+- Group: `export_verify`
+- Description: Capture SolidWorks window visual evidence into a screenshot manifest; dry_run writes a deterministic placeholder PNG for CI/protocol checks.
+- Required: `<none>`
+- Properties: `dry_run, out, out_dir`
+
+### `solidworks_visual_validate`
+
+- Group: `export_verify`
+- Description: Validate screenshot evidence and reviewed visual findings against an inspect report; missing screenshots or visual contradictions block acceptance.
+- Required: `report`
+- Properties: `out, report, screenshots, visual_review`
 
 ### `solidworks_worklog`
 
