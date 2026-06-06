@@ -1077,9 +1077,11 @@ def add_component(sw: Any, asm: Any, path: Path, xyz: tuple[float, float, float]
     if com_created(comp):
         return comp
     opened = open_part_for_insert(sw, path)
-    activate_assembly(sw, asm)
-    comp = asm.AddComponent5(resolved, 0, "", False, "", xyz[0], xyz[1], xyz[2])
-    close_doc(sw, opened)
+    try:
+        activate_assembly(sw, asm)
+        comp = asm.AddComponent5(resolved, 0, "", False, "", xyz[0], xyz[1], xyz[2])
+    finally:
+        close_doc(sw, opened)
     require_com_created(comp, f"AddComponent5 for {path}")
     return comp
 
@@ -1506,8 +1508,11 @@ def restore_component_origin(sw: Any, component: Any, origin: tuple[float, float
                 except Exception as exc:
                     errors.append(f"Transform2.ArrayData:{repr(exc)}")
                 try:
-                    read_member(component, "SetTransformAndSolve2", transform)
-                    return {"component": name, "restored": True, "restored_origin_m": list(origin), "restore_api": "SetTransformAndSolve2(existing)"}
+                    solve_result = read_member(component, "SetTransformAndSolve2", transform)
+                    if com_created(solve_result):
+                        return {"component": name, "restored": True, "restored_origin_m": list(origin), "restore_api": "SetTransformAndSolve2(existing)", "api_result": solve_result}
+                    returned = "None" if solve_result is None else repr(solve_result)
+                    errors.append(f"SetTransformAndSolve2(existing) returned {returned}")
                 except Exception as exc:
                     errors.append(f"SetTransformAndSolve2(existing):{repr(exc)}")
         try:
@@ -1515,16 +1520,24 @@ def restore_component_origin(sw: Any, component: Any, origin: tuple[float, float
             new_transform = None
             for candidate in (variant_data, data):
                 try:
-                    new_transform = math_util.CreateTransform(candidate)
-                    break
+                    created = math_util.CreateTransform(candidate)
+                    if com_created(created):
+                        new_transform = created
+                        break
+                    returned = "None" if created is None else repr(created)
+                    errors.append(f"CreateTransform returned {returned}")
                 except Exception as exc:
                     errors.append(f"CreateTransform:{repr(exc)}")
                 try:
-                    new_transform = read_member(math_util, "CreateTransform", candidate)
-                    break
+                    created = read_member(math_util, "CreateTransform", candidate)
+                    if com_created(created):
+                        new_transform = created
+                        break
+                    returned = "None" if created is None else repr(created)
+                    errors.append(f"read_member(CreateTransform) returned {returned}")
                 except Exception as exc:
                     errors.append(f"read_member(CreateTransform):{repr(exc)}")
-            if new_transform is not None:
+            if com_created(new_transform):
                 setattr(component, "Transform2", new_transform)
                 return {"component": name, "restored": True, "restored_origin_m": list(origin), "restore_api": "CreateTransform"}
         except Exception as exc:

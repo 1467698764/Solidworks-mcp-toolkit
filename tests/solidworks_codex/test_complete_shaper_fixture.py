@@ -312,6 +312,90 @@ class CompleteShaperSpecTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "ForceRebuild3.*returned False"):
             self.module.require_rebuild_success(Model(), "part rebuild")
 
+    def test_restore_component_origin_rejects_false_transform_api_returns(self):
+        class VariantFactory:
+            def VARIANT(self, *args):
+                return args[-1]
+
+        class PythonCom:
+            VT_ARRAY = 0
+            VT_R8 = 0
+
+        class Transform:
+            def __init__(self):
+                self._array_data = [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]
+
+            @property
+            def ArrayData(self):
+                return self._array_data
+
+            @ArrayData.setter
+            def ArrayData(self, value):
+                raise RuntimeError("array assignment failed")
+
+        class MathUtility:
+            def CreateTransform(self, data):
+                return False
+
+        class Sw:
+            def GetMathUtility(self):
+                return MathUtility()
+
+        class Component:
+            Name2 = "cast_bed_with_t_slots-1"
+
+            def __init__(self):
+                self._transform = Transform()
+
+            @property
+            def Transform2(self):
+                return self._transform
+
+            @Transform2.setter
+            def Transform2(self, value):
+                raise RuntimeError("transform assignment failed")
+
+            def SetTransformAndSolve2(self, transform):
+                return False
+
+        original_require = self.module.require_pywin32
+        self.module.require_pywin32 = lambda: (PythonCom(), VariantFactory())
+        try:
+            result = self.module.restore_component_origin(Sw(), Component(), (0.1, 0.2, 0.3))
+        finally:
+            self.module.require_pywin32 = original_require
+
+        self.assertFalse(result["restored"])
+        self.assertIn("SetTransformAndSolve2(existing) returned False", result["error"])
+        self.assertIn("CreateTransform returned False", result["error"])
+
+    def test_add_component_closes_opened_part_when_retry_insert_fails(self):
+        events = []
+        opened_part = object()
+
+        class Asm:
+            def __init__(self):
+                self.calls = 0
+
+            def AddComponent5(self, *args):
+                self.calls += 1
+                if self.calls == 1:
+                    return False
+                raise RuntimeError("retry insert failed")
+
+        original_open = self.module.open_part_for_insert
+        original_close = self.module.close_doc
+        self.module.open_part_for_insert = lambda sw, path: opened_part
+        self.module.close_doc = lambda sw, model: events.append(("closed", model))
+        try:
+            with self.assertRaisesRegex(RuntimeError, "retry insert failed"):
+                self.module.add_component(object(), Asm(), Path("part.SLDPRT"), (0.0, 0.0, 0.0))
+        finally:
+            self.module.open_part_for_insert = original_open
+            self.module.close_doc = original_close
+
+        self.assertEqual([("closed", opened_part)], events)
+
     def test_live_builder_places_visible_attached_detail_instances(self):
         detail_placements = self.module.detail_instance_placements()
         self.assertGreaterEqual(len(detail_placements["fastener_set_m6"]), 18)
